@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- API Versioning - VERSÃO CORRETA -->
+		<PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
+
+		<!-- Health Checks -->
+		<PackageReference Include="AspNetCore.HealthChecks.MySql" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+		<PackageReference Include="AspNetCore.HealthChecks.Uris" Version="9.0.0" />
+
+		<!-- Rate Limiting -->
+		<PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
+
+		<!-- AutoMapper -->
+		<PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
+
+		<!-- Database -->
+		<PackageReference Include="Dapper" Version="2.1.66" />
+		<PackageReference Include="MySqlConnector" Version="2.4.0" />
+
+		<!-- HTTP Client com Polly -->
+		<PackageReference Include="Microsoft.Extensions.Http.Polly" Version="9.0.6" />
+		<PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
+
+		<!-- Swagger/OpenAPI -->
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.10" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.1" />
+
+		<!-- Caching -->
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.6" />
+
+		<!-- Logging -->
+		<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\HoopGameNight.Core\HoopGameNight.Core.csproj" />
+		<ProjectReference Include="..\HoopGameNight.Infrastructure\HoopGameNight.Infrastructure.csproj" />
+	</ItemGroup>
+
+	<!-- INCLUIR ARQUIVOS SQL NO BUILD -->
+	<ItemGroup>
+		<Content Include="..\HoopGameNight.Infrastructure\Sql\**\*.sql" Condition="Exists('..\HoopGameNight.Infrastructure\Sql')">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Sql\%(RecursiveDir)%(Filename)%(Extension)</Link>
+		</Content>
+	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="logs\" />
+	</ItemGroup>
+
+</Project>

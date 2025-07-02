@@ -1,0 +1,1 @@
+﻿SELECT COUNT(*) FROM players WHERE team_id = @TeamId;

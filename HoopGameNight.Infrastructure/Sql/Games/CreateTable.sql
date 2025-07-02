@@ -1,0 +1,27 @@
+﻿CREATE TABLE IF NOT EXISTS games (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    external_id INT NOT NULL UNIQUE,
+    date DATE NOT NULL,
+    datetime DATETIME NOT NULL,
+    home_team_id INT NOT NULL,
+    visitor_team_id INT NOT NULL,
+    home_team_score INT DEFAULT NULL,
+    visitor_team_score INT DEFAULT NULL,
+    status VARCHAR(20) DEFAULT 'Scheduled',
+    period INT DEFAULT NULL,
+    time_remaining VARCHAR(10) DEFAULT NULL,
+    postseason BOOLEAN DEFAULT FALSE,
+    season INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (home_team_id) REFERENCES teams(id),
+    FOREIGN KEY (visitor_team_id) REFERENCES teams(id),
+    INDEX idx_games_external_id (external_id),
+    INDEX idx_games_date (date),
+    INDEX idx_games_datetime (datetime),
+    INDEX idx_games_home_team (home_team_id),
+    INDEX idx_games_visitor_team (visitor_team_id),
+    INDEX idx_games_status (status),
+    INDEX idx_games_season (season)
+);

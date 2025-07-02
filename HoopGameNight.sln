@@ -1,0 +1,40 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HoopGameNight.Api", "HoopGameNight.Api\HoopGameNight.Api.csproj", "{3A495B05-3AAC-4D03-91AE-0677C06893DB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HoopGameNight.Core", "HoopGameNight.Core\HoopGameNight.Core.csproj", "{4B13775D-197D-4FEA-8C5B-CB60F8D73823}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HoopGameNight.Infrastructure", "HoopGameNight.Infrastructure\HoopGameNight.Infrastructure.csproj", "{20A39501-1968-4FF9-8655-2B873FA94613}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HoopGameNight.Tests", "HoopGameNight.Tests\HoopGameNight.Tests.csproj", "{CE15393C-AF79-4795-BABC-A2F4F05D7557}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3A495B05-3AAC-4D03-91AE-0677C06893DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A495B05-3AAC-4D03-91AE-0677C06893DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A495B05-3AAC-4D03-91AE-0677C06893DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A495B05-3AAC-4D03-91AE-0677C06893DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B13775D-197D-4FEA-8C5B-CB60F8D73823}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B13775D-197D-4FEA-8C5B-CB60F8D73823}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B13775D-197D-4FEA-8C5B-CB60F8D73823}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B13775D-197D-4FEA-8C5B-CB60F8D73823}.Release|Any CPU.Build.0 = Release|Any CPU
+		{20A39501-1968-4FF9-8655-2B873FA94613}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20A39501-1968-4FF9-8655-2B873FA94613}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20A39501-1968-4FF9-8655-2B873FA94613}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20A39501-1968-4FF9-8655-2B873FA94613}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE15393C-AF79-4795-BABC-A2F4F05D7557}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE15393C-AF79-4795-BABC-A2F4F05D7557}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE15393C-AF79-4795-BABC-A2F4F05D7557}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE15393C-AF79-4795-BABC-A2F4F05D7557}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

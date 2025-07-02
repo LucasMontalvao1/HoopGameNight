@@ -1,0 +1,9 @@
+﻿SET FOREIGN_KEY_CHECKS = 0;
+
+CREATE DATABASE IF NOT EXISTS hoop_game_night 
+CHARACTER SET utf8mb4 
+COLLATE utf8mb4_unicode_ci;
+
+USE hoop_game_night;
+
+SET FOREIGN_KEY_CHECKS = 1;

@@ -1,0 +1,1 @@
+﻿SELECT COUNT(*) FROM players WHERE external_id = @ExternalId;

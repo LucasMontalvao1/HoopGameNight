@@ -1,0 +1,1 @@
+﻿SELECT * FROM games WHERE external_id = @ExternalId;

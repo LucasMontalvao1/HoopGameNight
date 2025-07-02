@@ -1,0 +1,1 @@
+﻿SELECT COUNT(*) FROM teams WHERE external_id = @ExternalId;

@@ -1,0 +1,1 @@
+﻿DELETE FROM teams WHERE id = @Id;
