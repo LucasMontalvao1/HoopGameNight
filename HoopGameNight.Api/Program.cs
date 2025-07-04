@@ -19,15 +19,11 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // ============================================
     // CONFIGURAR SERILOG
-    // ============================================
     builder.Host.UseSerilog((context, configuration) =>
         configuration.ReadFrom.Configuration(context.Configuration));
 
-    // ============================================
     // CONFIGURAR SERVIÇOS BÁSICOS
-    // ============================================
     builder.Services.AddControllers(options =>
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
@@ -35,9 +31,7 @@ try
 
     builder.Services.AddEndpointsApiExplorer();
 
-    // ============================================
     // CONFIGURAR DATABASE
-    // ============================================
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
         ?? throw new InvalidOperationException("MySQL connection string not found");
 
@@ -46,23 +40,17 @@ try
     builder.Services.AddSingleton<ISqlLoader, SqlLoader>();
     builder.Services.AddScoped<DatabaseInitializer>();
 
-    // ============================================
     // CONFIGURAR REPOSITORIES
-    // ============================================
     builder.Services.AddScoped<IGameRepository, GameRepository>();
     builder.Services.AddScoped<ITeamRepository, TeamRepository>();
     builder.Services.AddScoped<IPlayerRepository, PlayerRepository>();
 
-    // ============================================
     // CONFIGURAR SERVICES
-    // ============================================
     builder.Services.AddScoped<IGameService, GameService>();
     builder.Services.AddScoped<ITeamService, TeamService>();
     builder.Services.AddScoped<IPlayerService, PlayerService>();
 
-    // ============================================
     // CONFIGURAR EXTERNAL SERVICES (BALL DON'T LIE)
-    // ============================================
     var ballDontLieConfig = builder.Configuration.GetSection("ExternalApis:BallDontLie");
     var baseUrl = ballDontLieConfig["BaseUrl"] ?? "https://api.balldontlie.io/v1";
     var apiKey = ballDontLieConfig["ApiKey"];
@@ -90,24 +78,15 @@ try
         // ✅ HEADERS PADRÃO (sem Authorization aqui)
         client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
         client.DefaultRequestHeaders.Add("Accept", "application/json");
-
-        // ❌ NÃO adicione Authorization aqui - vai no BallDontLieService por request
-        // client.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
     });
 
-    // ============================================
     // CONFIGURAR AUTOMAPPER
-    // ============================================
     builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
 
-    // ============================================
     // CONFIGURAR CACHE
-    // ============================================
     builder.Services.AddMemoryCache();
 
-    // ============================================
     // CONFIGURAR SWAGGER
-    // ============================================
     try
     {
         builder.Services.AddSwaggerGen(c =>
@@ -126,9 +105,7 @@ try
         Log.Warning(ex, "⚠️ Error configuring Swagger - continuing without it");
     }
 
-    // ============================================
     // CONFIGURAR CORS
-    // ============================================
     try
     {
         ConfigureCors(builder.Services, builder.Configuration);
@@ -144,9 +121,7 @@ try
         });
     }
 
-    // ============================================
     // CONFIGURAR BACKGROUND SERVICES (OPCIONAL)
-    // ============================================
     try
     {
         builder.Services.AddHostedService<DataSyncBackgroundService>();
@@ -157,17 +132,13 @@ try
         Log.Warning(ex, "⚠️ Error configuring background services");
     }
 
-    // ============================================
     // BUILD APPLICATION
-    // ============================================
     var app = builder.Build();
     Log.Information("✅ Application built successfully");
 
-    // ============================================
     // CONFIGURAR MIDDLEWARE PIPELINE
-    // ============================================
 
-    // Error Handling (sempre primeiro)
+    // Error Handling 
     app.UseMiddleware<HoopGameNight.Api.Middleware.ErrorHandlingMiddleware>();
 
     // Development middleware
@@ -181,7 +152,7 @@ try
             app.UseSwaggerUI(c =>
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hoop Game Night API V1");
-                c.RoutePrefix = string.Empty; // Swagger na raiz
+                c.RoutePrefix = string.Empty; 
                 c.DisplayRequestDuration();
                 c.EnableTryItOutByDefault();
             });
@@ -213,9 +184,7 @@ try
     // Map controllers
     app.MapControllers();
 
-    // ============================================
     // HEALTH CHECKS SIMPLES
-    // ============================================
     app.MapGet("/health", () => Results.Ok(new
     {
         status = "healthy",
@@ -231,9 +200,7 @@ try
         timestamp = DateTime.UtcNow
     }));
 
-    // ============================================
     // INICIALIZAR BANCO DE DADOS
-    // ============================================
     try
     {
         using var scope = app.Services.CreateScope();
@@ -244,12 +211,9 @@ try
     catch (Exception ex)
     {
         Log.Error(ex, "❌ Error initializing database - continuing without it");
-        // Não fazer throw para permitir que a API funcione mesmo sem DB inicializado
     }
 
-    // ============================================
     // INICIAR APLICAÇÃO
-    // ============================================
     Log.Information("🚀 Starting Hoop Game Night API");
     Log.Information("📊 Environment: {Environment}", app.Environment.EnvironmentName);
     Log.Information("🌐 Swagger available at: https://localhost:7000 (or configured port)");
@@ -267,10 +231,7 @@ finally
     await Log.CloseAndFlushAsync();
 }
 
-// ============================================
 // MÉTODOS DE CONFIGURAÇÃO
-// ============================================
-
 static void ConfigureCors(IServiceCollection services, IConfiguration configuration)
 {
     var corsConfig = configuration.GetSection("Cors");

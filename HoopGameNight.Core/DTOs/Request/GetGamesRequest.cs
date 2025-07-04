@@ -2,7 +2,7 @@
 
 namespace HoopGameNight.Core.DTOs.Request
 {
-    public class GetGamesRequest : PaginatedRequest  // PÚBLICO
+    public class GetGamesRequest : PaginatedRequest  
     {
         public DateTime? Date { get; set; }
         public DateTime? StartDate { get; set; }

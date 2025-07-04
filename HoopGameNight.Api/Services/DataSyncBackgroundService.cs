@@ -9,7 +9,7 @@ namespace HoopGameNight.Api.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DataSyncBackgroundService> _logger;
-        private readonly TimeSpan _syncInterval = TimeSpan.FromHours(1); // Sync every hour
+        private readonly TimeSpan _syncInterval = TimeSpan.FromHours(1); 
 
         public DataSyncBackgroundService(
             IServiceProvider serviceProvider,

@@ -141,7 +141,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// ✅ NOVO: Método para sincronizar jogos por data específica
+        /// Método para sincronizar jogos por data específica
         /// </summary>
         public async Task<int> SyncGamesByDateAsync(DateTime date)
         {
@@ -178,13 +178,13 @@ namespace HoopGameNight.Core.Services
                             var game = new Models.Entities.Game
                             {
                                 ExternalId = externalGame.Id,
-                                Date = DateTime.Parse(externalGame.Date), // ✅ Corrigido: Converter string para DateTime
-                                DateTime = DateTime.Parse(externalGame.Date), // ✅ Mesmo valor para DateTime
+                                Date = DateTime.Parse(externalGame.Date), 
+                                DateTime = DateTime.Parse(externalGame.Date), 
                                 HomeTeamId = homeTeam.Id,
                                 VisitorTeamId = visitorTeam.Id,
                                 HomeTeamScore = externalGame.HomeTeamScore,
                                 VisitorTeamScore = externalGame.VisitorTeamScore,
-                                Status = MapGameStatus(externalGame.Status), // ✅ Converter para enum
+                                Status = MapGameStatus(externalGame.Status), 
                                 Period = externalGame.Period,
                                 TimeRemaining = externalGame.Time,
                                 PostSeason = externalGame.Postseason,
@@ -193,7 +193,7 @@ namespace HoopGameNight.Core.Services
                                 UpdatedAt = DateTime.UtcNow
                             };
 
-                            await _gameRepository.InsertAsync(game); // ✅ InsertAsync é o método correto
+                            await _gameRepository.InsertAsync(game); 
                             syncCount++;
 
                             _logger.LogInformation("Synced game: {HomeTeam} vs {VisitorTeam} on {Date}",
@@ -204,7 +204,7 @@ namespace HoopGameNight.Core.Services
                             // Atualizar jogo existente
                             existingGame.HomeTeamScore = externalGame.HomeTeamScore;
                             existingGame.VisitorTeamScore = externalGame.VisitorTeamScore;
-                            existingGame.Status = MapGameStatus(externalGame.Status); // ✅ Converter para enum
+                            existingGame.Status = MapGameStatus(externalGame.Status); 
                             existingGame.Period = externalGame.Period;
                             existingGame.TimeRemaining = externalGame.Time;
                             existingGame.UpdatedAt = DateTime.UtcNow;
@@ -217,7 +217,6 @@ namespace HoopGameNight.Core.Services
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error syncing game {GameId}", externalGame.Id);
-                        // Continue com o próximo jogo
                     }
                 }
 
@@ -236,7 +235,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// ✅ NOVO: Sincronizar jogos de um período
+        /// Sincronizar jogos de um período
         /// </summary>
         public async Task<int> SyncGamesForPeriodAsync(DateTime startDate, DateTime endDate)
         {

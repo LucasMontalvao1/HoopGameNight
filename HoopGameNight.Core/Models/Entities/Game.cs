@@ -17,7 +17,7 @@ namespace HoopGameNight.Core.Models.Entities
         public bool PostSeason { get; set; }
         public int Season { get; set; }
 
-        // Navigation Properties (não persistidas no banco)
+        // Navigation Properties 
         public Team? HomeTeam { get; set; }
         public Team? VisitorTeam { get; set; }
 
@@ -48,7 +48,7 @@ namespace HoopGameNight.Core.Models.Entities
                 else if (VisitorTeamScore > HomeTeamScore)
                     return VisitorTeam;
 
-                return null; // Empate (improvável na NBA)
+                return null; 
             }
         }
 

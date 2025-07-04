@@ -8,7 +8,7 @@ namespace HoopGameNight.Api.Middleware
         private readonly RequestDelegate _next;
         private readonly ILogger<RateLimitingMiddleware> _logger;
         private readonly ConcurrentDictionary<string, List<DateTime>> _requests = new();
-        private readonly int _requestLimit = 100; // requests per minute
+        private readonly int _requestLimit = 100; 
         private readonly TimeSpan _timeWindow = TimeSpan.FromMinutes(1);
 
         public RateLimitingMiddleware(RequestDelegate next, ILogger<RateLimitingMiddleware> logger)

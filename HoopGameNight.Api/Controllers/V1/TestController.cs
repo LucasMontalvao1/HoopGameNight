@@ -40,32 +40,30 @@ namespace HoopGameNight.Api.Controllers.V1
                 var stopwatch = Stopwatch.StartNew();
                 var testResults = new List<object>();
 
-                // ✅ EXTRAIR DADOS DOS ActionResult ANTES DE ADICIONAR
 
                 // 1. Teste de configuração
                 var configTest = TestConfiguration();
-                var configData = configTest.Value?.Data; // ✅ Extrair dados aqui
+                var configData = configTest.Value?.Data; 
                 testResults.Add(configData);
 
                 // 2. Teste básico de conectividade
                 var connectivityResult = await TestConnectivityInternal();
-                testResults.Add(connectivityResult); // ✅ Já é objeto direto
+                testResults.Add(connectivityResult); 
 
                 // 3. Teste de teams
                 var teamsResult = await TestTeamsEndpointInternal();
-                testResults.Add(teamsResult); // ✅ Já é objeto direto
+                testResults.Add(teamsResult); 
 
                 // 4. Teste de games
                 var gamesResult = await TestGamesEndpointInternal();
-                testResults.Add(gamesResult); // ✅ Já é objeto direto
+                testResults.Add(gamesResult); 
 
                 // 5. Teste de players
                 var playersResult = await TestPlayersEndpointInternal();
-                testResults.Add(playersResult); // ✅ Já é objeto direto
+                testResults.Add(playersResult); 
 
                 stopwatch.Stop();
 
-                // ✅ AGORA FUNCIONA - todos são objetos diretos
                 var allTestsPassed = testResults.All(t =>
                 {
                     var testObj = t as dynamic;
@@ -83,7 +81,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     totalDuration = $"{stopwatch.ElapsedMilliseconds}ms",
                     allTestsPassed,
                     totalTests = testResults.Count,
-                    passedTests, // ✅ Usar a variável calculada corretamente
+                    passedTests, 
                     timestamp = DateTime.UtcNow,
                     tests = testResults
                 };
@@ -109,7 +107,7 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         /// <summary>
-        /// ✅ NOVO: Teste de diagnóstico do HttpClient
+        /// Teste de diagnóstico do HttpClient
         /// </summary>
         [HttpGet("external/httpclient-debug")]
         public async Task<ActionResult<ApiResponse<object>>> DebugHttpClient()
@@ -384,7 +382,7 @@ namespace HoopGameNight.Api.Controllers.V1
                 return new
                 {
                     test = "Games",
-                    success = true, // Mesmo sem jogos, endpoint funcionando é sucesso
+                    success = true, 
                     todayGames = games.Count(),
                     responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
                     timestamp = DateTime.UtcNow
@@ -418,7 +416,7 @@ namespace HoopGameNight.Api.Controllers.V1
                 return new
                 {
                     test = "Players",
-                    success = true, // Endpoint funcionando é sucesso
+                    success = true, 
                     playersFound = players.Count(),
                     searchTerm = "lebron",
                     responseTime = $"{stopwatch.ElapsedMilliseconds}ms",
@@ -653,10 +651,6 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
-
-        // ============================================
-        // HELPER METHODS
-        // ============================================
 
         private async Task<object> TestNetworkConnectivity()
         {

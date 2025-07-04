@@ -10,7 +10,6 @@ namespace HoopGameNight.Api.Extensions
     {
         public static IApplicationBuilder UseApplicationMiddleware(this IApplicationBuilder app, IWebHostEnvironment env)
         {
-            // Error Handling (deve ser o primeiro)
             app.UseMiddleware<ErrorHandlingMiddleware>();
 
             if (env.IsDevelopment())
@@ -22,7 +21,7 @@ namespace HoopGameNight.Api.Extensions
             app.UseMiddleware<RequestResponseLoggingMiddleware>();
 
             // Security Headers
-            app.UseCustomSecurityHeaders(); // ✅ MUDOU AQUI - para evitar conflito
+            app.UseCustomSecurityHeaders(); 
 
             // Rate Limiting
             app.UseIpRateLimiting();
@@ -30,7 +29,6 @@ namespace HoopGameNight.Api.Extensions
             return app;
         }
 
-        // ✅ RENOMEADO para UseCustomSecurityHeaders para evitar conflito
         public static IApplicationBuilder UseCustomSecurityHeaders(this IApplicationBuilder app)
         {
             app.Use(async (context, next) =>
@@ -78,8 +76,7 @@ namespace HoopGameNight.Api.Extensions
             catch (Exception ex)
             {
                 var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                logger.LogError(ex, "Failed to initialize database - continuing without it"); // ✅ MUDOU AQUI - não quebra a app
-                // ✅ REMOVIDO: throw; para não quebrar a aplicação se DB não estiver disponível
+                logger.LogError(ex, "Failed to initialize database - continuing without it");
             }
 
             return app;

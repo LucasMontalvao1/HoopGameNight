@@ -62,7 +62,6 @@ namespace HoopGameNight.Api.Extensions
         {
             try
             {
-                // Remover caracteres problemáticos e criar ID único
                 var name = type.Name;
 
                 if (type.IsGenericType)

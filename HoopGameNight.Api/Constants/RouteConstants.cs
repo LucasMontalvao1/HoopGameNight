@@ -9,7 +9,6 @@
             public const string GET_BY_TEAM = "team/{teamId:int}";
             public const string GET_BY_ID = "{id:int}";
 
-            // Novos endpoints de sync
             public const string SYNC_TODAY = "sync/today";
             public const string SYNC_BY_DATE = "sync/date/{date:datetime}";
             public const string EXTERNAL_TODAY = "external/today";
@@ -22,7 +21,6 @@
             public const string GET_BY_ID = "{id:int}";
             public const string GET_BY_ABBREVIATION = "abbreviation/{abbreviation}";
 
-            // Novos endpoints de sync
             public const string SYNC = "sync";
             public const string EXTERNAL = "external";
             public const string SYNC_STATUS = "sync/status";
@@ -34,7 +32,6 @@
             public const string GET_BY_ID = "{id:int}";
             public const string GET_BY_TEAM = "team/{teamId:int}";
 
-            // Novos endpoints de sync
             public const string SYNC = "sync";
             public const string EXTERNAL_SEARCH = "external/search";
             public const string SYNC_STATUS = "sync/status";

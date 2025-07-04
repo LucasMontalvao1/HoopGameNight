@@ -1,6 +1,6 @@
 ﻿namespace HoopGameNight.Core.DTOs.Request
 {
-    public class SearchPlayerRequest : PaginatedRequest  // PÚBLICO
+    public class SearchPlayerRequest : PaginatedRequest  
     {
         public string? Search { get; set; }
         public int? TeamId { get; set; }

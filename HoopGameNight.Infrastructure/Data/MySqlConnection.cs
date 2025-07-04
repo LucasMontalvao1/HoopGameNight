@@ -23,7 +23,7 @@ namespace HoopGameNight.Infrastructure.Data
             try
             {
                 using var connection = CreateConnection();
-                connection.Open(); // Usar Open() síncrono
+                connection.Open(); 
                 return true;
             }
             catch

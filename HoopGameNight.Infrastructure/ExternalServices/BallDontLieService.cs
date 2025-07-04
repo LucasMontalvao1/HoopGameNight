@@ -14,10 +14,10 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly string _apiKey;
 
-        // ✅ RATE LIMITING - 60 requests per minute
+        // RATE LIMITING - 60 requests per minute
         private static readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
         private static DateTime _lastRequestTime = DateTime.MinValue;
-        private const int MinDelayBetweenRequestsMs = 2000; // ✅ 2 segundos entre requests
+        private const int MinDelayBetweenRequestsMs = 2000; 
         private static DateTime _rateLimitResetTime = DateTime.MinValue;
 
         public BallDontLieService(
@@ -28,20 +28,20 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             _httpClient = httpClient;
             _logger = logger;
 
-            // ✅ CONFIGURAÇÃO DA API KEY
+            // CONFIGURAÇÃO DA API KEY
             var ballDontLieConfig = configuration.GetSection("ExternalApis:BallDontLie");
             _apiKey = ballDontLieConfig["ApiKey"] ?? throw new InvalidOperationException("BallDontLie ApiKey not configured");
 
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-                PropertyNameCaseInsensitive = true // ✅ Adicionar para ser mais tolerante
+                PropertyNameCaseInsensitive = true 
             };
 
             _logger.LogInformation("BallDontLieService initialized with API key configured: {HasApiKey}", !string.IsNullOrEmpty(_apiKey));
         }
 
-        // ✅ PROPRIEDADES PÚBLICAS PARA CIRCUIT BREAKER
+        // PROPRIEDADES PÚBLICAS PARA CIRCUIT BREAKER
         public bool IsRateLimited => DateTime.UtcNow < _rateLimitResetTime;
         public TimeSpan TimeUntilReset => _rateLimitResetTime > DateTime.UtcNow
             ? _rateLimitResetTime - DateTime.UtcNow
@@ -58,9 +58,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
                     var response = await ExecuteWithRateLimit(async () =>
                     {
-                        // ✅ CORRIGIDO: Adicionar /v1 no path
                         var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/games?dates[]={today}");
-                        // ✅ CORRIGIDO: Usar Bearer token
                         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
                         return await _httpClient.SendAsync(request);
                     });
@@ -79,7 +77,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                 }
                 catch (HttpRequestException ex) when (ex.Message.Contains("429"))
                 {
-                    throw; // Re-throw para o retry handler
+                    throw; 
                 }
                 catch (Exception ex)
                 {
@@ -100,9 +98,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
                     var response = await ExecuteWithRateLimit(async () =>
                     {
-                        // ✅ CORRIGIDO: Adicionar /v1 no path
                         var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/games?dates[]={dateString}");
-                        // ✅ CORRIGIDO: Usar Bearer token
                         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
                         return await _httpClient.SendAsync(request);
                     });
@@ -140,9 +136,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
                     var response = await ExecuteWithRateLimit(async () =>
                     {
-                        // ✅ CORRIGIDO: Adicionar /v1 no path
                         var request = new HttpRequestMessage(HttpMethod.Get, "/v1/teams");
-                        // ✅ CORRIGIDO: Usar Bearer token
                         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
                         return await _httpClient.SendAsync(request);
                     });
@@ -180,9 +174,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
                     var response = await ExecuteWithRateLimit(async () =>
                     {
-                        // ✅ CORRIGIDO: Adicionar /v1 no path
                         var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/players?search={Uri.EscapeDataString(search)}&page={page}");
-                        // ✅ CORRIGIDO: Usar Bearer token
                         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
                         return await _httpClient.SendAsync(request);
                     });
@@ -220,9 +212,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
                     var response = await ExecuteWithRateLimit(async () =>
                     {
-                        // ✅ CORRIGIDO: Adicionar /v1 no path
                         var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/players/{playerId}");
-                        // ✅ CORRIGIDO: Usar Bearer token
                         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
                         return await _httpClient.SendAsync(request);
                     });
@@ -257,10 +247,8 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             });
         }
 
-        // ✅ PRIVATE METHODS - RATE LIMITING E RETRY
-
         /// <summary>
-        /// ✅ NOVO: Método centralizado para handling de erros
+        /// Método centralizado para handling de erros
         /// </summary>
         private async Task<IEnumerable<T>> HandleErrorResponse<T>(HttpResponseMessage response, string operation)
         {
@@ -268,10 +256,8 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             _logger.LogWarning("Failed to {Operation}. Status: {StatusCode}, Content: {Content}",
                 operation, response.StatusCode, errorContent);
 
-            // ✅ DETECTAR E TRATAR RATE LIMIT
             if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
             {
-                // Rate limit por 1 minuto + margem de segurança
                 _rateLimitResetTime = DateTime.UtcNow.AddMinutes(1).AddSeconds(10);
                 _logger.LogWarning("Rate limit detected. Reset time set to: {ResetTime}", _rateLimitResetTime);
                 throw new HttpRequestException("429 - Too Many Requests");
@@ -288,7 +274,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             await _rateLimitSemaphore.WaitAsync();
             try
             {
-                // ✅ VERIFICAR SE ESTAMOS EM RATE LIMIT
                 if (DateTime.UtcNow < _rateLimitResetTime)
                 {
                     var waitTime = _rateLimitResetTime - DateTime.UtcNow;
@@ -296,7 +281,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                     await Task.Delay(waitTime);
                 }
 
-                // Garantir delay mínimo entre requests
                 var timeSinceLastRequest = DateTime.UtcNow - _lastRequestTime;
                 if (timeSinceLastRequest.TotalMilliseconds < MinDelayBetweenRequestsMs)
                 {
@@ -308,7 +292,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                 _lastRequestTime = DateTime.UtcNow;
                 var response = await operation();
 
-                // ✅ LOG DA REQUEST PARA DEBUG
                 _logger.LogDebug("API Request completed. Status: {StatusCode}, URL: {Url}",
                     response.StatusCode, response.RequestMessage?.RequestUri);
 
@@ -323,7 +306,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         /// <summary>
         /// Executa operação com retry em caso de rate limit (429)
         /// </summary>
-        private async Task<T> ExecuteWithRetry<T>(Func<Task<T>> operation, int maxRetries = 2) // ✅ Reduzido para 2 retries
+        private async Task<T> ExecuteWithRetry<T>(Func<Task<T>> operation, int maxRetries = 2) 
         {
             for (int attempt = 0; attempt < maxRetries; attempt++)
             {
@@ -339,13 +322,11 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                     {
                         _logger.LogError("Rate limit exceeded after {MaxRetries} retries. Service temporarily unavailable", maxRetries);
 
-                        // ✅ DEFINIR RESET TIME MAIS LONGO
                         _rateLimitResetTime = DateTime.UtcNow.AddMinutes(2);
 
                         throw new InvalidOperationException("Rate limit exceeded - service temporarily unavailable", ex);
                     }
 
-                    // ✅ Backoff mais longo: 30s, 60s
                     var delay = TimeSpan.FromSeconds(30 * (attempt + 1));
                     _logger.LogWarning("Rate limit hit, waiting {Delay}s before retry {Attempt}/{MaxRetries}",
                         delay.TotalSeconds, attempt + 1, maxRetries);

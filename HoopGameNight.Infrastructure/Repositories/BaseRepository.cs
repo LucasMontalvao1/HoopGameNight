@@ -130,7 +130,7 @@ namespace HoopGameNight.Infrastructure.Repositories
         protected async Task<TResult> ExecuteInTransactionAsync<TResult>(Func<IDbConnection, IDbTransaction, Task<TResult>> operation)
         {
             using var connection = _connection.CreateConnection();
-            connection.Open(); // Usar Open() síncrono em vez de OpenAsync()
+            connection.Open(); 
 
             using var transaction = connection.BeginTransaction();
             try

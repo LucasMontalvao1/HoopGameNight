@@ -47,7 +47,7 @@ namespace HoopGameNight.Api.Controllers.V1
                 var startTime = DateTime.UtcNow;
                 var syncResults = new List<string>();
 
-                // 1. Sync teams first (dependency for games and players)
+                // sincroniza os times
                 try
                 {
                     await _teamService.SyncAllTeamsAsync();
@@ -61,7 +61,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     Logger.LogError(ex, "❌ Teams sync failed");
                 }
 
-                // 2. Sync today's games
+                // sincroniza os jogos de hoje
                 try
                 {
                     await _gameService.SyncTodayGamesAsync();
@@ -75,7 +75,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     Logger.LogError(ex, "❌ Games sync failed");
                 }
 
-                // 3. Sync popular players (sample)
+                // 3. sincroniza alguns jogadores
                 try
                 {
                     var popularNames = new[] { "lebron", "curry", "durant", "giannis", "luka" };
@@ -322,11 +322,6 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
-
-        // ============================================
-        // HELPER METHODS
-        // ============================================
-
         private static int CalculateHealthScore(int teamsCount, int gamesCount)
         {
             var score = 0;

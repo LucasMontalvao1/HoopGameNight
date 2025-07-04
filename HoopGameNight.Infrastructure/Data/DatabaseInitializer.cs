@@ -28,7 +28,7 @@ namespace HoopGameNight.Infrastructure.Data
                 _logger.LogInformation("Starting database initialization...");
 
                 using var connection = _connection.CreateConnection();
-                connection.Open(); // Usar Open() síncrono em vez de OpenAsync()
+                connection.Open(); 
 
                 // Criar tabelas
                 await CreateTablesAsync(connection);
@@ -64,7 +64,7 @@ namespace HoopGameNight.Infrastructure.Data
                 _logger.LogWarning(ex, "Database initialization script failed, but continuing...");
             }
 
-            // Criar tabelas na ordem correta (respeitando foreign keys)
+            // Criar tabelas na ordem correta
             var tableOrder = new[] { "Teams", "Players", "Games" };
 
             foreach (var table in tableOrder)
@@ -110,7 +110,6 @@ namespace HoopGameNight.Infrastructure.Data
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to seed initial data, but continuing...");
-                // Não fazer throw aqui, seed é opcional
             }
         }
 

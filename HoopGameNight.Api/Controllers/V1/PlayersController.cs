@@ -138,10 +138,6 @@ namespace HoopGameNight.Api.Controllers.V1
             }
         }
 
-        // ============================================
-        // NOVOS ENDPOINTS DE SYNC
-        // ============================================
-
         /// <summary>
         /// Sincronizar jogadores por termo de busca
         /// </summary>

@@ -40,7 +40,7 @@ namespace HoopGameNight.Api.Extensions
             // Caching
             services.AddMemoryCache();
 
-            // AutoMapper - CORRIGIDO
+            // AutoMapper 
             services.AddAutoMapper(typeof(AutoMapperProfile));
 
             return services;
@@ -48,7 +48,6 @@ namespace HoopGameNight.Api.Extensions
 
         private static IServiceCollection AddConfigurations(this IServiceCollection services, IConfiguration configuration)
         {
-            // Registrar apenas as configurações que existem
             services.Configure<ApiConfiguration>(configuration.GetSection("ApiSettings"));
             services.Configure<ExternalApiConfiguration>(configuration.GetSection("ExternalApis"));
             services.Configure<CorsConfiguration>(configuration.GetSection("Cors"));
@@ -97,9 +96,6 @@ namespace HoopGameNight.Api.Extensions
             var ballDontLieConfig = configuration.GetSection("ExternalApis:BallDontLie");
             var baseUrl = ballDontLieConfig["BaseUrl"] ?? "https://api.balldontlie.io/v1";
             var apiKey = ballDontLieConfig["ApiKey"];
-
-            // ✅ REMOVIDO: Validação que quebrava quando API Key estava no appsettings
-            // Agora funciona com API Key tanto no appsettings quanto em User Secrets
 
             // Configurar HttpClient com Polly (resilience)
             services.AddHttpClient<IBallDontLieService, BallDontLieService>(client =>

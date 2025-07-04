@@ -13,7 +13,7 @@ namespace HoopGameNight.Core.Models.Entities
         public int? WeightPounds { get; set; }
         public int? TeamId { get; set; }
 
-        // Navigation Properties (não persistidas no banco)
+        // Navigation Properties 
         public Team? Team { get; set; }
 
         // Computed Properties

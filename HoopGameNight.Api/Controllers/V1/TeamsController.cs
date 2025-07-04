@@ -139,10 +139,6 @@ namespace HoopGameNight.Api.Controllers.V1
             }
         }
 
-        // ============================================
-        // NOVOS ENDPOINTS DE SYNC
-        // ============================================
-
         /// <summary>
         /// Sincronizar todos os times da API externa
         /// </summary>

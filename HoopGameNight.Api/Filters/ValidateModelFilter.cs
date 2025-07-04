@@ -30,7 +30,6 @@ namespace HoopGameNight.Api.Filters
 
         public void OnActionExecuted(ActionExecutedContext context)
         {
-            // Nothing to do here
         }
     }
 }
