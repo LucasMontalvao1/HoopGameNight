@@ -2,9 +2,18 @@
 {
     public abstract class BaseEntity
     {
+        private static DateTime GetCurrentTimestamp() => DateTime.UtcNow;
+
         public int Id { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+
+        protected BaseEntity()
+        {
+            var timestamp = GetCurrentTimestamp();
+            CreatedAt = timestamp;
+            UpdatedAt = timestamp;
+        }
 
         public virtual void UpdateTimestamp()
         {

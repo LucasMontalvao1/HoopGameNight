@@ -1,22 +1,20 @@
 ﻿using HoopGameNight.Core.Interfaces.Infrastructure;
-using Dapper;
-using System.Data;
 using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Infrastructure.Data
 {
     public class DatabaseInitializer
     {
-        private readonly IDatabaseConnection _connection;
+        private readonly IDatabaseQueryExecutor _queryExecutor;
         private readonly ISqlLoader _sqlLoader;
         private readonly ILogger<DatabaseInitializer> _logger;
 
         public DatabaseInitializer(
-            IDatabaseConnection connection,
+            IDatabaseQueryExecutor queryExecutor,
             ISqlLoader sqlLoader,
             ILogger<DatabaseInitializer> logger)
         {
-            _connection = connection;
+            _queryExecutor = queryExecutor;
             _sqlLoader = sqlLoader;
             _logger = logger;
         }
@@ -27,14 +25,11 @@ namespace HoopGameNight.Infrastructure.Data
             {
                 _logger.LogInformation("Starting database initialization...");
 
-                using var connection = _connection.CreateConnection();
-                connection.Open(); 
-
                 // Criar tabelas
-                await CreateTablesAsync(connection);
+                await CreateTablesAsync();
 
                 // Verificar se precisa de seed data
-                await SeedInitialDataAsync(connection);
+                await SeedInitialDataAsync();
 
                 _logger.LogInformation("Database initialization completed successfully!");
             }
@@ -45,7 +40,7 @@ namespace HoopGameNight.Infrastructure.Data
             }
         }
 
-        private async Task CreateTablesAsync(IDbConnection connection)
+        private async Task CreateTablesAsync()
         {
             _logger.LogInformation("Creating database tables...");
 
@@ -55,7 +50,7 @@ namespace HoopGameNight.Infrastructure.Data
                 var initScript = await _sqlLoader.LoadSqlAsync("Database", "InitDatabase");
                 if (!string.IsNullOrEmpty(initScript))
                 {
-                    await connection.ExecuteAsync(initScript);
+                    await _queryExecutor.ExecuteAsync(initScript);
                     _logger.LogDebug("Database initialization script executed successfully");
                 }
             }
@@ -72,7 +67,7 @@ namespace HoopGameNight.Infrastructure.Data
                 try
                 {
                     var createTableSql = await _sqlLoader.LoadSqlAsync(table, "CreateTable");
-                    await connection.ExecuteAsync(createTableSql);
+                    await _queryExecutor.ExecuteAsync(createTableSql);
                     _logger.LogDebug("Table {Table} created/verified successfully", table);
                 }
                 catch (Exception ex)
@@ -83,13 +78,12 @@ namespace HoopGameNight.Infrastructure.Data
             }
         }
 
-        private async Task SeedInitialDataAsync(IDbConnection connection)
+        private async Task SeedInitialDataAsync()
         {
             try
             {
                 // Verificar se já existem times
-                var teamCount = await connection.QuerySingleAsync<int>(
-                    "SELECT COUNT(*) FROM teams");
+                var teamCount = await _queryExecutor.QuerySingleAsync<int>("SELECT COUNT(*) FROM teams");
 
                 if (teamCount == 0)
                 {
@@ -98,7 +92,7 @@ namespace HoopGameNight.Infrastructure.Data
                     var seedSql = await _sqlLoader.LoadSqlAsync("Database", "SeedData");
                     if (!string.IsNullOrEmpty(seedSql))
                     {
-                        await connection.ExecuteAsync(seedSql);
+                        await _queryExecutor.ExecuteAsync(seedSql);
                         _logger.LogInformation("Initial data seeded successfully");
                     }
                 }
@@ -117,8 +111,7 @@ namespace HoopGameNight.Infrastructure.Data
         {
             try
             {
-                using var connection = _connection.CreateConnection();
-                var result = await connection.QuerySingleAsync<int>("SELECT 1");
+                var result = await _queryExecutor.QuerySingleAsync<int>("SELECT 1");
                 return result == 1;
             }
             catch (Exception ex)

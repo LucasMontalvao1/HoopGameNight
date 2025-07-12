@@ -12,6 +12,13 @@ using MySqlConnector;
 using System.Data;
 using Serilog;
 using MySqlConnection = MySqlConnector.MySqlConnection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
+using System.Reflection;
+using Polly;
+using Polly.Extensions.Http;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 try
 {
@@ -31,12 +38,17 @@ try
 
     builder.Services.AddEndpointsApiExplorer();
 
-    // CONFIGURAR DATABASE
+    // CONFIGURAR DATABASE - 
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
         ?? throw new InvalidOperationException("MySQL connection string not found");
 
+    // Database abstrações na ordem correta
     builder.Services.AddScoped<IDbConnection>(sp => new MySqlConnection(connectionString));
     builder.Services.AddSingleton<IDatabaseConnection>(sp => new HoopGameNight.Infrastructure.Data.MySqlConnection(connectionString));
+
+    //  Query Executor abstração
+    builder.Services.AddScoped<IDatabaseQueryExecutor, DapperQueryExecutor>();
+
     builder.Services.AddSingleton<ISqlLoader, SqlLoader>();
     builder.Services.AddScoped<DatabaseInitializer>();
 
@@ -50,35 +62,8 @@ try
     builder.Services.AddScoped<ITeamService, TeamService>();
     builder.Services.AddScoped<IPlayerService, PlayerService>();
 
-    // CONFIGURAR EXTERNAL SERVICES (BALL DON'T LIE)
-    var ballDontLieConfig = builder.Configuration.GetSection("ExternalApis:BallDontLie");
-    var baseUrl = ballDontLieConfig["BaseUrl"] ?? "https://api.balldontlie.io/v1";
-    var apiKey = ballDontLieConfig["ApiKey"];
-
-    builder.Services.AddHttpClient<IBallDontLieService, BallDontLieService>((serviceProvider, client) =>
-    {
-        // ✅ OBTER CONFIGURAÇÃO DO SERVICE PROVIDER
-        var configuration = serviceProvider.GetRequiredService<IConfiguration>();
-        var ballDontLieConfig = configuration.GetSection("ExternalApis:BallDontLie");
-
-        var baseUrl = ballDontLieConfig["BaseUrl"];
-        var apiKey = ballDontLieConfig["ApiKey"];
-
-        // ✅ VALIDAÇÕES
-        if (string.IsNullOrEmpty(baseUrl))
-            throw new InvalidOperationException("BallDontLie BaseUrl not configured in appsettings");
-
-        if (string.IsNullOrEmpty(apiKey))
-            throw new InvalidOperationException("BallDontLie ApiKey not configured");
-
-        // ✅ CONFIGURAÇÃO DO CLIENT
-        client.BaseAddress = new Uri(baseUrl!);
-        client.Timeout = TimeSpan.FromSeconds(30);
-
-        // ✅ HEADERS PADRÃO (sem Authorization aqui)
-        client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
-    });
+    // CONFIGURAR EXTERNAL SERVICES (BALL DON'T LIE) - ✅ CORRIGIDO
+    ConfigureBallDontLieHttpClient(builder.Services, builder.Configuration);
 
     // CONFIGURAR AUTOMAPPER
     builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
@@ -86,40 +71,17 @@ try
     // CONFIGURAR CACHE
     builder.Services.AddMemoryCache();
 
-    // CONFIGURAR SWAGGER
-    try
-    {
-        builder.Services.AddSwaggerGen(c =>
-        {
-            c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-            {
-                Title = "Hoop Game Night API",
-                Version = "v1",
-                Description = "API completa para acompanhamento de jogos da NBA"
-            });
-        });
-        Log.Information("✅ Swagger documentation configured");
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "⚠️ Error configuring Swagger - continuing without it");
-    }
+    // ✅ HEALTH CHECKS BÁSICOS (sem custom health check por enquanto)
+    ConfigureBasicHealthChecks(builder.Services, connectionString);
+
+    // ✅ RATE LIMITING CORRIGIDO
+    ConfigureRateLimiting(builder.Services, builder.Configuration);
+
+    // CONFIGURAR SWAGGER - 
+    ConfigureSwagger(builder.Services);
 
     // CONFIGURAR CORS
-    try
-    {
-        ConfigureCors(builder.Services, builder.Configuration);
-        Log.Information("✅ CORS configured");
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "⚠️ Error configuring CORS - using default policy");
-        builder.Services.AddCors(options =>
-        {
-            options.AddDefaultPolicy(policy =>
-                policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
-        });
-    }
+    ConfigureCors(builder.Services, builder.Configuration);
 
     // CONFIGURAR BACKGROUND SERVICES (OPCIONAL)
     try
@@ -136,62 +98,49 @@ try
     var app = builder.Build();
     Log.Information("✅ Application built successfully");
 
-    // CONFIGURAR MIDDLEWARE PIPELINE
+    // CONFIGURAR MIDDLEWARE PIPELINE - 
 
-    // Error Handling 
+    // 1. Error Handling (sempre primeiro)
     app.UseMiddleware<HoopGameNight.Api.Middleware.ErrorHandlingMiddleware>();
 
-    // Development middleware
+    // 2. Security Headers (cedo no pipeline)
+    app.UseSecurityHeaders();
+
+    // 3. Development middleware
     if (app.Environment.IsDevelopment())
     {
         app.UseDeveloperExceptionPage();
-
-        try
+        app.UseSwagger();
+        app.UseSwaggerUI(c =>
         {
-            app.UseSwagger();
-            app.UseSwaggerUI(c =>
-            {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hoop Game Night API V1");
-                c.RoutePrefix = string.Empty; 
-                c.DisplayRequestDuration();
-                c.EnableTryItOutByDefault();
-            });
-            Log.Information("✅ Swagger UI available at root path");
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "⚠️ Swagger UI not available");
-        }
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hoop Game Night API V1");
+            c.RoutePrefix = string.Empty;
+            c.DisplayRequestDuration();
+            c.EnableTryItOutByDefault();
+        });
+        Log.Information("✅ Swagger UI available at root path");
     }
 
-    // Security Headers
-    app.Use(async (context, next) =>
-    {
-        context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
-        context.Response.Headers.Add("X-Frame-Options", "DENY");
-        context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
-        await next();
-    });
+    // 4. HTTPS Redirection
+    app.UseHttpsRedirection();
 
-    // CORS
+    // 5. Rate Limiting (antes de routing)
+    app.UseRateLimiter();
+
+    // 6. CORS
     var corsPolicy = app.Configuration.GetSection("Cors")["PolicyName"] ?? "HoopGameNightPolicy";
     app.UseCors(corsPolicy);
 
-    // Standard pipeline
-    app.UseHttpsRedirection();
+    // 7. Routing
     app.UseRouting();
 
-    // Map controllers
+    // 8. Health Checks BÁSICOS
+    app.MapHealthChecks("/health");
+
+    // 9. Controllers
     app.MapControllers();
 
-    // HEALTH CHECKS SIMPLES
-    app.MapGet("/health", () => Results.Ok(new
-    {
-        status = "healthy",
-        timestamp = DateTime.UtcNow,
-        environment = app.Environment.EnvironmentName
-    }));
-
+    // 10. Info endpoints
     app.MapGet("/info", () => Results.Ok(new
     {
         name = "Hoop Game Night API",
@@ -200,23 +149,14 @@ try
         timestamp = DateTime.UtcNow
     }));
 
-    // INICIALIZAR BANCO DE DADOS
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var dbInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-        await dbInitializer.InitializeAsync();
-        Log.Information("✅ Database initialized successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "❌ Error initializing database - continuing without it");
-    }
+    // INICIALIZAR BANCO DE DADOS -
+    await InitializeDatabase(app);
 
     // INICIAR APLICAÇÃO
     Log.Information("🚀 Starting Hoop Game Night API");
     Log.Information("📊 Environment: {Environment}", app.Environment.EnvironmentName);
     Log.Information("🌐 Swagger available at: https://localhost:7000 (or configured port)");
+    Log.Information("🏥 Health checks available at: /health");
 
     app.Run();
 }
@@ -231,7 +171,118 @@ finally
     await Log.CloseAndFlushAsync();
 }
 
-// MÉTODOS DE CONFIGURAÇÃO
+// ✅ MÉTODOS DE CONFIGURAÇÃO
+
+static void ConfigureBallDontLieHttpClient(IServiceCollection services, IConfiguration configuration)
+{
+    services.AddHttpClient<IBallDontLieService, BallDontLieService>((serviceProvider, client) =>
+    {
+        var config = serviceProvider.GetRequiredService<IConfiguration>();
+        var section = config.GetSection("ExternalApis:BallDontLie");
+
+        var baseUrl = section["BaseUrl"];
+        var apiKey = section["ApiKey"];
+
+        if (string.IsNullOrEmpty(baseUrl))
+            throw new InvalidOperationException("BallDontLie BaseUrl not configured");
+
+        if (string.IsNullOrEmpty(apiKey))
+            throw new InvalidOperationException("BallDontLie ApiKey not configured");
+
+        client.BaseAddress = new Uri(baseUrl!);
+        client.Timeout = TimeSpan.FromSeconds(30);
+        client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+    })
+    .AddPolicyHandler(GetRetryPolicy())
+    .AddPolicyHandler(GetCircuitBreakerPolicy());
+}
+
+// ✅ POLLY POLICIES 
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+{
+    return HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .WaitAndRetryAsync(
+            retryCount: 3,
+            sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+            onRetry: (outcome, timespan, retryCount, context) => 
+            {
+                Log.Warning("Retry {RetryCount} after {Delay}ms. Reason: {Reason}",
+                    retryCount, timespan.TotalMilliseconds, outcome.Exception?.Message ?? "Unknown");
+            });
+}
+
+static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+{
+    return HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .CircuitBreakerAsync(
+            handledEventsAllowedBeforeBreaking: 3,
+            durationOfBreak: TimeSpan.FromSeconds(30),
+            onBreak: (exception, duration) => 
+            {
+                Log.Warning("Circuit breaker opened for {Duration}. Reason: {Reason}",
+                    duration, exception.Exception?.Message ?? "Unknown");
+            },
+            onReset: () => Log.Information("Circuit breaker closed"));
+}
+
+// ✅ HEALTH CHECKS BÁSICOS (sem custom health check)
+static void ConfigureBasicHealthChecks(IServiceCollection services, string connectionString)
+{
+    services.AddHealthChecks()
+        .AddMySql(connectionString, name: "mysql", tags: new[] { "database", "mysql" });
+    
+}
+
+// ✅ RATE LIMITING 
+static void ConfigureRateLimiting(IServiceCollection services, IConfiguration configuration)
+{
+    services.AddRateLimiter(options =>
+    {
+        options.AddFixedWindowLimiter("ApiPolicy", limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 100;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            // ✅ REMOVIDO QueueProcessingOrder - não existe no .NET 8
+            limiterOptions.QueueLimit = 10;
+        });
+
+        options.OnRejected = async (context, token) =>
+        {
+            context.HttpContext.Response.StatusCode = 429;
+            await context.HttpContext.Response.WriteAsync("Rate limit exceeded", token);
+        };
+    });
+}
+
+static void ConfigureSwagger(IServiceCollection services)
+{
+    services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new OpenApiInfo
+        {
+            Title = "Hoop Game Night API",
+            Version = "v1",
+            Description = "API completa para acompanhamento de jogos da NBA",
+            Contact = new OpenApiContact
+            {
+                Name = "Support Team",
+                Email = "support@hoopgamenight.com"
+            }
+        });
+
+        // Include XML comments if available
+        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            c.IncludeXmlComments(xmlPath);
+        }
+    });
+}
+
 static void ConfigureCors(IServiceCollection services, IConfiguration configuration)
 {
     var corsConfig = configuration.GetSection("Cors");
@@ -241,7 +292,7 @@ static void ConfigureCors(IServiceCollection services, IConfiguration configurat
         options.AddPolicy(corsConfig["PolicyName"] ?? "HoopGameNightPolicy", policy =>
         {
             var allowedOrigins = corsConfig.GetSection("AllowedOrigins").Get<string[]>()
-                ?? new[] { "http://localhost:3000", "https://localhost:3000", "http://localhost:4200", "https://localhost:4200" };
+                ?? new[] { "http://localhost:3000", "https://localhost:3000" };
 
             var allowedMethods = corsConfig.GetSection("AllowedMethods").Get<string[]>()
                 ?? new[] { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
@@ -269,4 +320,37 @@ static void ConfigureCors(IServiceCollection services, IConfiguration configurat
             }
         });
     });
+}
+
+// ✅ DATABASE INITIALIZATION SIMPLES
+static async Task InitializeDatabase(WebApplication app)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var dbInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+        await dbInitializer.InitializeAsync();
+        Log.Information("✅ Database initialized successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "❌ Error initializing database - continuing without it");
+    }
+}
+
+// EXTENSION METHOD PARA SECURITY HEADERS
+public static class SecurityHeadersExtensions
+{
+    public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app)
+    {
+        return app.Use(async (context, next) =>
+        {
+            context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+            context.Response.Headers.Add("X-Frame-Options", "DENY");
+            context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+            context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+            context.Response.Headers.Add("Content-Security-Policy", "default-src 'self'");
+            await next();
+        });
+    }
 }

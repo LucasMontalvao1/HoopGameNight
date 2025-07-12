@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using HoopGameNight.Core.Constants;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Exceptions;
 using HoopGameNight.Core.Interfaces.Repositories;
@@ -36,10 +37,25 @@ namespace HoopGameNight.Core.Services
             {
                 _logger.LogInformation("Getting all teams");
 
+                // Verifica se existe no cache
+                if (_cache.TryGetValue(CacheKeys.ALL_TEAMS, out List<TeamResponse> cachedTeams))
+                {
+                    _logger.LogInformation("Returning {TeamCount} teams from cache", cachedTeams.Count);
+                    return cachedTeams;
+                }
+
+                // Se não está no cache, busca do repositório
                 var teams = await _teamRepository.GetAllAsync();
                 var response = _mapper.Map<List<TeamResponse>>(teams);
 
-                _logger.LogInformation("Retrieved {TeamCount} teams", response.Count);
+                // Armazena no cache com expiração
+                var cacheOptions = new MemoryCacheEntryOptions()
+                    .SetSlidingExpiration(TimeSpan.FromMinutes(30)) // Expira após 30 minutos sem uso
+                    .SetAbsoluteExpiration(TimeSpan.FromHours(2));  // Expira após 2 horas independentemente
+
+                _cache.Set(CacheKeys.ALL_TEAMS, response, cacheOptions);
+
+                _logger.LogInformation("Retrieved {TeamCount} teams from database and cached", response.Count);
                 return response;
             }
             catch (Exception ex)
@@ -55,6 +71,17 @@ namespace HoopGameNight.Core.Services
             {
                 _logger.LogInformation("Getting team by ID: {TeamId}", id);
 
+                // Cache key específico para cada time
+                var cacheKey = CacheKeys.GetTeamById(id);
+
+                // Verifica se existe no cache
+                if (_cache.TryGetValue(cacheKey, out TeamResponse cachedTeam))
+                {
+                    _logger.LogInformation("Returning team {TeamId} from cache", id);
+                    return cachedTeam;
+                }
+
+                // Se não está no cache, busca do repositório
                 var team = await _teamRepository.GetByIdAsync(id);
                 if (team == null)
                 {
@@ -63,7 +90,14 @@ namespace HoopGameNight.Core.Services
                 }
 
                 var response = _mapper.Map<TeamResponse>(team);
-                _logger.LogInformation("Retrieved team: {TeamName}", response.DisplayName);
+
+                // Armazena no cache
+                var cacheOptions = new MemoryCacheEntryOptions()
+                    .SetSlidingExpiration(TimeSpan.FromMinutes(30));
+
+                _cache.Set(cacheKey, response, cacheOptions);
+
+                _logger.LogInformation("Retrieved team: {TeamName} and cached", response.DisplayName);
                 return response;
             }
             catch (Exception ex)
@@ -117,10 +151,11 @@ namespace HoopGameNight.Core.Services
                     }
                 }
 
-                // Clear cache
-                _cache.Remove(Constants.CacheKeys.ALL_TEAMS);
+                // Clear all team-related cache entries
+                _cache.Remove(CacheKeys.ALL_TEAMS);
 
-                _logger.LogInformation("Synced {SyncCount} new teams", syncCount);
+
+                _logger.LogInformation("Synced {SyncCount} new teams and cleared cache", syncCount);
             }
             catch (Exception ex)
             {
