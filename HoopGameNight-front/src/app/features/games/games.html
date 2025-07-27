@@ -1,0 +1,308 @@
+<div class="games-page">
+  <div class="games-page__container">
+    <!-- Header -->
+    <div class="games-page__header">
+      <h1 class="games-page__title">NBA Games</h1>
+      <p class="games-page__subtitle">
+        @if (gamesService.isToday()) {
+          Jogos de hoje
+        } @else {
+          Jogos de {{ getCurrentDate() }}
+        }
+      </p>
+    </div>
+    
+    <!-- Date Navigation -->
+    <div class="date-navigation">
+      <button 
+        class="date-nav-btn"
+        (click)="goToPreviousDay()"
+        [disabled]="gamesService.isLoading()">
+        <span class="material-icons">chevron_left</span>
+        Anterior
+      </button>
+      
+      <div class="current-date">
+        <span class="current-date__text">
+          @if (gamesService.isToday()) {
+            Hoje
+          } @else {
+            {{ getShortDate() }}
+          }
+        </span>
+        <span class="current-date__full">{{ getCurrentDate() }}</span>
+        
+        @if (!gamesService.isToday()) {
+          <button class="btn btn--ghost btn--sm" (click)="goToToday()">
+            Voltar para Hoje
+          </button>
+        }
+
+        <!-- Date Picker Integration -->
+        <app-date-picker 
+          [selectedDate]="gamesService.selectedDate()"
+          (dateChange)="onDateChange($event)">
+        </app-date-picker>
+      </div>
+      
+      <button 
+        class="date-nav-btn"
+        (click)="goToNextDay()"
+        [disabled]="gamesService.isLoading()">
+        Próximo
+        <span class="material-icons">chevron_right</span>
+      </button>
+    </div>
+
+    <!-- Actions Bar -->
+    <div class="actions-bar">
+      <div class="actions-bar__info">
+        @if (gamesService.syncStatus(); as status) {
+          <div class="sync-info" [class.sync-info--needs-sync]="status.needsSync">
+            <span class="material-icons">
+              {{ status.needsSync ? 'sync_problem' : 'sync' }}
+            </span>
+            <span>{{ status.recommendation }}</span>
+          </div>
+        }
+        
+        @if (gamesService.lastUpdate(); as lastUpdate) {
+          <span class="last-update">
+            Atualizado: {{ lastUpdate.toLocaleTimeString('pt-BR') }}
+          </span>
+        }
+      </div>
+      
+      <div class="actions-bar__buttons">
+        <button 
+          class="btn btn--secondary"
+          (click)="refreshGames()"
+          [disabled]="gamesService.isLoading()">
+          <span class="material-icons">refresh</span>
+          Atualizar
+        </button>
+        
+        <button 
+          class="btn btn--primary"
+          (click)="syncCurrentDate()"
+          [disabled]="gamesService.isLoading()">
+          <span class="material-icons">sync</span>
+          Sincronizar
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    @if (gamesService.isLoading()) {
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Carregando jogos...</p>
+      </div>
+    }
+
+    <!-- Error State -->
+    @if (gamesService.error(); as error) {
+      <div class="error-state">
+        <span class="material-icons">error</span>
+        <h3>Erro ao carregar jogos</h3>
+        <p>{{ error }}</p>
+        <button class="btn btn--primary" (click)="refreshGames()">
+          Tentar Novamente
+        </button>
+      </div>
+    }
+
+    <!-- Games Grid -->
+    @if (!gamesService.isLoading() && !gamesService.error()) {
+      <div class="games-grid">
+        <!-- Live Games Section -->
+        @if (gamesService.liveGames().length > 0) {
+          <div class="games-section">
+            <h2 class="games-section__title">
+              <span class="live-indicator"></span>
+              Jogos Ao Vivo ({{ gamesService.liveGames().length }})
+            </h2>
+            <div class="games-list">
+              @for (game of gamesService.liveGames(); track trackByGameId($index, game)) {
+                <div class="game-card game-card--live">
+                  
+                  <!-- Card Header com Status e Horário -->
+                  <div class="game-card__header">
+                    <div class="game-header__left">
+                      <span class="game-time">{{ formatGameTime(game.dateTime) }}</span>
+                      @if (game.postSeason) {
+                        <span class="playoff-badge">PLAYOFFS</span>
+                      }
+                    </div>
+                    <div class="game-status game-status--live">
+                      <span class="status-dot"></span>
+                      {{ game.statusDisplay }}
+                    </div>
+                  </div>
+                  
+                  <!-- Teams Section -->
+                  <div class="game-card__teams">
+                    <!-- Visitor Team -->
+                    <div class="team">
+                      <div class="team__logo">
+                        <img 
+                          [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
+                          [alt]="game.visitorTeam.name + ' logo'"
+                          (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
+                          class="team-logo"
+                          loading="lazy">
+                      </div>
+                      <div class="team__info">
+                        <span class="team__abbreviation">{{ game.visitorTeam.abbreviation }}</span>
+                        <span class="team__name">{{ game.visitorTeam.city }}</span>
+                      </div>
+                      <div class="team__score">{{ game.visitorTeamScore || 0 }}</div>
+                    </div>
+                    
+                    <!-- VS Separator -->
+                    <div class="game-separator">
+                      <span class="separator-text">@</span>
+                    </div>
+                    
+                    <!-- Home Team -->
+                    <div class="team">
+                      <div class="team__logo">
+                        <img 
+                          [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
+                          [alt]="game.homeTeam.name + ' logo'"
+                          (error)="handleLogoError($event, game.homeTeam.abbreviation)"
+                          class="team-logo"
+                          loading="lazy">
+                      </div>
+                      <div class="team__info">
+                        <span class="team__abbreviation">{{ game.homeTeam.abbreviation }}</span>
+                        <span class="team__name">{{ game.homeTeam.city }}</span>
+                      </div>
+                      <div class="team__score">{{ game.homeTeamScore || 0 }}</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Game Details -->
+                  @if (game.period || game.timeRemaining) {
+                    <div class="game-card__details">
+                      @if (game.period) {
+                        <span class="detail-item">{{ game.period }}º período</span>
+                      }
+                      @if (game.timeRemaining) {
+                        <span class="detail-item">{{ game.timeRemaining }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- All Games Section -->
+        <div class="games-section">
+          <h2 class="games-section__title">
+            Todos os Jogos ({{ gamesService.getCurrentGames().length }})
+          </h2>
+          
+          @if (gamesService.getCurrentGames().length === 0) {
+            <div class="empty-state">
+              <span class="material-icons">event_busy</span>
+              <h3>Nenhum jogo encontrado</h3>
+              <p>Não há jogos agendados para esta data.</p>
+              <button class="btn btn--primary" (click)="syncCurrentDate()">
+                <span class="material-icons">sync</span>
+                Sincronizar Dados
+              </button>
+            </div>
+          } @else {
+            <div class="games-list">
+              @for (game of gamesService.getCurrentGames(); track trackByGameId($index, game)) {
+                <div class="game-card" 
+                     [class.game-card--live]="game.isLive"
+                     [class.game-card--completed]="game.isCompleted"
+                     [class.game-card--scheduled]="!game.isLive && !game.isCompleted">
+                  
+                  <!-- Card Header com Status e Horário -->
+                  <div class="game-card__header">
+                    <div class="game-header__left">
+                      <span class="game-time">{{ formatGameTime(game.dateTime) }}</span>
+                      @if (game.postSeason) {
+                        <span class="playoff-badge">PLAYOFFS</span>
+                      }
+                    </div>
+                    <div class="game-status" 
+                         [class.game-status--live]="game.isLive"
+                         [class.game-status--completed]="game.isCompleted"
+                         [class.game-status--scheduled]="!game.isLive && !game.isCompleted">
+                      @if (game.isLive) {
+                        <span class="status-dot"></span>
+                        {{ game.statusDisplay }}
+                      } @else {
+                        {{ game.statusDisplay }}
+                      }
+                    </div>
+                  </div>
+                  
+                  <!-- Teams Section -->
+                  <div class="game-card__teams">
+                    <!-- Visitor Team -->
+                    <div class="team" [class.team--winner]="game.isCompleted && game.winningTeam?.id === game.visitorTeam.id">
+                      <div class="team__logo">
+                        <img 
+                          [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
+                          [alt]="game.visitorTeam.name + ' logo'"
+                          (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
+                          class="team-logo"
+                          loading="lazy">
+                      </div>
+                      <div class="team__info">
+                        <span class="team__abbreviation">{{ game.visitorTeam.abbreviation }}</span>
+                        <span class="team__name">{{ game.visitorTeam.city }}</span>
+                      </div>
+                      <div class="team__score">{{ game.visitorTeamScore || 0 }}</div>
+                    </div>
+                    
+                    <!-- VS Separator -->
+                    <div class="game-separator">
+                      <span class="separator-text">@</span>
+                    </div>
+                    
+                    <!-- Home Team -->
+                    <div class="team" [class.team--winner]="game.isCompleted && game.winningTeam?.id === game.homeTeam.id">
+                      <div class="team__logo">
+                        <img 
+                          [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
+                          [alt]="game.homeTeam.name + ' logo'"
+                          (error)="handleLogoError($event, game.homeTeam.abbreviation)"
+                          class="team-logo"
+                          loading="lazy">
+                      </div>
+                      <div class="team__info">
+                        <span class="team__abbreviation">{{ game.homeTeam.abbreviation }}</span>
+                        <span class="team__name">{{ game.homeTeam.city }}</span>
+                      </div>
+                      <div class="team__score">{{ game.homeTeamScore || 0 }}</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Game Details -->
+                  @if (game.period || game.timeRemaining) {
+                    <div class="game-card__details">
+                      @if (game.period) {
+                        <span class="detail-item">{{ game.period }}º período</span>
+                      }
+                      @if (game.timeRemaining) {
+                        <span class="detail-item">{{ game.timeRemaining }}</span>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

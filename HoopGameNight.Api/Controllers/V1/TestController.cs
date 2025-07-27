@@ -35,7 +35,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🧪 Starting complete external API test");
+                Logger.LogInformation("Starting complete external API test");
 
                 var stopwatch = Stopwatch.StartNew();
                 var testResults = new List<object>();
@@ -86,14 +86,14 @@ namespace HoopGameNight.Api.Controllers.V1
                     tests = testResults
                 };
 
-                Logger.LogInformation("🧪 External API test completed in {Duration}ms - {Passed}/{Total} tests passed",
+                Logger.LogInformation("External API test completed in {Duration}ms - {Passed}/{Total} tests passed",
                     stopwatch.ElapsedMilliseconds, passedTests, testResults.Count);
 
                 return Ok(summary, "External API test completed");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ Error during external API test");
+                Logger.LogError(ex, "Error during external API test");
 
                 var errorResult = (object)new
                 {
@@ -114,7 +114,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🔧 Debugging HttpClient configuration");
+                Logger.LogInformation("Debugging HttpClient configuration");
 
                 // Obter HttpClient diretamente do DI
                 using var scope = HttpContext.RequestServices.CreateScope();
@@ -136,8 +136,8 @@ namespace HoopGameNight.Api.Controllers.V1
                     configuredBaseUrl = _configuration["ExternalApis:BallDontLie:BaseUrl"],
                     hasApiKey = !string.IsNullOrEmpty(_configuration["ExternalApis:BallDontLie:ApiKey"]),
                     recommendation = httpClient?.BaseAddress == null ?
-                        "❌ HttpClient BaseAddress is NULL - check Program.cs configuration" :
-                        "✅ HttpClient appears to be configured correctly",
+                        "HttpClient BaseAddress is NULL - check Program.cs configuration" :
+                        "HttpClient appears to be configured correctly",
                     timestamp = DateTime.UtcNow
                 };
 
@@ -145,7 +145,7 @@ namespace HoopGameNight.Api.Controllers.V1
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ HttpClient debug failed");
+                Logger.LogError(ex, "HttpClient debug failed");
 
                 var errorResult = new
                 {
@@ -167,7 +167,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("⚙️ Testing API configuration");
+                Logger.LogInformation("⚙Testing API configuration");
 
                 var ballDontLieConfig = _configuration.GetSection("ExternalApis:BallDontLie");
                 var baseUrl = ballDontLieConfig["BaseUrl"];
@@ -183,14 +183,14 @@ namespace HoopGameNight.Api.Controllers.V1
                     recommendations = GetConfigRecommendations(baseUrl, apiKey)
                 };
 
-                Logger.LogInformation("⚙️ Config test: BaseUrl={BaseUrl}, HasApiKey={HasApiKey}",
+                Logger.LogInformation("⚙Config test: BaseUrl={BaseUrl}, HasApiKey={HasApiKey}",
                     !string.IsNullOrEmpty(baseUrl), !string.IsNullOrEmpty(apiKey));
 
                 return Ok(result, "Configuration checked");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ Configuration test failed");
+                Logger.LogError(ex, "Configuration test failed");
 
                 var result = (object)new
                 {
@@ -211,7 +211,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🔧 Testing raw API without authentication");
+                Logger.LogInformation("Testing raw API without authentication");
 
                 var tests = new List<object>();
 
@@ -285,7 +285,7 @@ namespace HoopGameNight.Api.Controllers.V1
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ Raw API test failed");
+                Logger.LogError(ex, "Raw API test failed");
 
                 var result = (object)new
                 {
@@ -304,7 +304,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🔌 Testing connectivity to Ball Don't Lie API");
+                Logger.LogInformation("Testing connectivity to Ball Don't Lie API");
 
                 var stopwatch = Stopwatch.StartNew();
                 var response = await _httpClient.GetAsync("https://api.balldontlie.io/v1/teams?per_page=1");
@@ -339,7 +339,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🏀 Testing teams endpoint");
+                Logger.LogInformation("Testing teams endpoint");
 
                 var stopwatch = Stopwatch.StartNew();
                 var teams = await _ballDontLieService.GetAllTeamsAsync();
@@ -373,7 +373,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🎮 Testing games endpoint");
+                Logger.LogInformation("Testing games endpoint");
 
                 var stopwatch = Stopwatch.StartNew();
                 var games = await _ballDontLieService.GetTodaysGamesAsync();
@@ -407,7 +407,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("👤 Testing players endpoint");
+                Logger.LogInformation("Testing players endpoint");
 
                 var stopwatch = Stopwatch.StartNew();
                 var players = await _ballDontLieService.SearchPlayersAsync("lebron", 1);
@@ -443,7 +443,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🔍 Checking API version and endpoint changes");
+                Logger.LogInformation("Checking API version and endpoint changes");
 
                 var tests = new List<object>();
 
@@ -477,7 +477,7 @@ namespace HoopGameNight.Api.Controllers.V1
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ API version check failed");
+                Logger.LogError(ex, "API version check failed");
                 throw;
             }
         }
@@ -596,7 +596,7 @@ namespace HoopGameNight.Api.Controllers.V1
 
             if (!hasSuccessfulTest)
             {
-                return "🚨 AÇÃO NECESSÁRIA: Nenhum teste passou. Verifique se você tem uma API key válida em balldontlie.io e se está usando o endpoint correto.";
+                return "AÇÃO NECESSÁRIA: Nenhum teste passou. Verifique se você tem uma API key válida em balldontlie.io e se está usando o endpoint correto.";
             }
 
             var bearerAuthWorked = tests.Any(t =>
@@ -607,7 +607,7 @@ namespace HoopGameNight.Api.Controllers.V1
 
             if (bearerAuthWorked)
             {
-                return "✅ RECOMENDAÇÃO: Use Bearer Authentication com https://api.balldontlie.io/v1/";
+                return "RECOMENDAÇÃO: Use Bearer Authentication com https://api.balldontlie.io/v1/";
             }
 
             var newApiWorked = tests.Any(t =>
@@ -618,10 +618,10 @@ namespace HoopGameNight.Api.Controllers.V1
 
             if (newApiWorked)
             {
-                return "✅ RECOMENDAÇÃO: Use https://api.balldontlie.io/v1/ como base URL";
+                return "RECOMENDAÇÃO: Use https://api.balldontlie.io/v1/ como base URL";
             }
 
-            return "⚠️ INVESTIGAÇÃO NECESSÁRIA: Resultados mistos. Verifique logs detalhados.";
+            return "INVESTIGAÇÃO NECESSÁRIA: Resultados mistos. Verifique logs detalhados.";
         }
 
         /// <summary>
@@ -633,7 +633,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🔬 Running complete API diagnosis");
+                Logger.LogInformation("Running complete API diagnosis");
 
                 var diagnosis = new
                 {
@@ -647,7 +647,7 @@ namespace HoopGameNight.Api.Controllers.V1
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ Diagnosis failed");
+                Logger.LogError(ex, "Diagnosis failed");
                 throw;
             }
         }
@@ -682,16 +682,16 @@ namespace HoopGameNight.Api.Controllers.V1
             var recommendations = new List<string>();
 
             if (string.IsNullOrEmpty(baseUrl))
-                recommendations.Add("❌ Configure BaseUrl in appsettings.json");
+                recommendations.Add("Configure BaseUrl in appsettings.json");
 
             if (string.IsNullOrEmpty(apiKey))
-                recommendations.Add("❌ Configure ApiKey in appsettings.json or User Secrets");
+                recommendations.Add("Configure ApiKey in appsettings.json or User Secrets");
 
             if (!string.IsNullOrEmpty(apiKey) && apiKey.Length < 20)
-                recommendations.Add("⚠️ API Key seems too short - verify it's correct");
+                recommendations.Add("API Key seems too short - verify it's correct");
 
             if (recommendations.Count == 0)
-                recommendations.Add("✅ Configuration looks good");
+                recommendations.Add("Configuration looks good");
 
             return recommendations;
         }

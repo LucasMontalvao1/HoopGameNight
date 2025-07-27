@@ -37,26 +37,26 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching today's games");
+                Logger.LogInformation("Buscando jogos de hoje");
 
                 var cacheKey = ApiConstants.CacheKeys.TODAY_GAMES;
 
                 if (_cache.TryGetValue(cacheKey, out List<GameResponse>? cachedGames))
                 {
-                    Logger.LogDebug("Returning cached today's games");
-                    return Ok(cachedGames!, "Today's games (cached)");
+                    Logger.LogDebug("Retornando jogos do cache");
+                    return Ok(cachedGames!, "Jogos de hoje (cache)");
                 }
 
                 var games = await _gameService.GetTodayGamesAsync();
 
                 _cache.Set(cacheKey, games, TimeSpan.FromMinutes(5));
 
-                Logger.LogInformation("Found {GameCount} games for today", games.Count);
-                return Ok(games, "Today's games retrieved successfully");
+                Logger.LogInformation("Encontrados {GameCount} jogos para hoje", games.Count);
+                return Ok(games, "Jogos de hoje recuperados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching today's games");
+                Logger.LogError(ex, "Erro ao buscar jogos de hoje");
                 throw;
             }
         }
@@ -73,16 +73,16 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching games for date: {Date}", date.ToShortDateString());
+                Logger.LogInformation("Buscando jogos para a data: {Date}", date.ToShortDateString());
 
                 var games = await _gameService.GetGamesByDateAsync(date);
 
-                Logger.LogInformation("Found {GameCount} games for {Date}", games.Count, date.ToShortDateString());
-                return Ok(games, $"Games for {date:yyyy-MM-dd} retrieved successfully");
+                Logger.LogInformation("Encontrados {GameCount} jogos para a data {Date}", games.Count, date.ToShortDateString());
+                return Ok(games, $"Jogos do dia {date:yyyy-MM-dd} recuperados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching games for date: {Date}", date);
+                Logger.LogError(ex, "Erro ao buscar jogos por data: {Date}", date);
                 throw;
             }
         }
@@ -101,20 +101,20 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (!request.IsValid())
                 {
-                    var errorResponse = ApiResponse<object>.ErrorResult("Invalid request parameters");
+                    var errorResponse = ApiResponse<object>.ErrorResult("Request incorreto");
                     return BadRequest(errorResponse);
                 }
 
-                Logger.LogInformation("Fetching games with filters: {@Request}", request);
+                Logger.LogInformation("Buscando jogos com filtros: {@Request}", request);
 
                 var (games, totalCount) = await _gameService.GetGamesAsync(request);
 
-                Logger.LogInformation("Found {GameCount} games (total: {TotalCount})", games.Count, totalCount);
-                return OkPaginated(games, request.Page, request.PageSize, totalCount, "Games retrieved successfully");
+                Logger.LogInformation("Encontrados {GameCount} jogos (total: {TotalCount})", games.Count, totalCount);
+                return OkPaginated(games, request.Page, request.PageSize, totalCount, "Jogos recuperados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching games with filters: {@Request}", request);
+                Logger.LogError(ex, "Erro ao buscar jogos com filtros: {@Request}", request);
                 throw;
             }
         }
@@ -131,23 +131,23 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching game with ID: {GameId}", id);
+                Logger.LogInformation("Buscando jogo com ID: {GameId}", id);
 
                 var game = await _gameService.GetGameByIdAsync(id);
 
                 if (game == null)
                 {
-                    Logger.LogWarning("Game not found with ID: {GameId}", id);
-                    var errorResponse = ApiResponse<GameResponse>.ErrorResult($"Game with ID {id} not found");
+                    Logger.LogWarning("Jogo não encontrado com ID: {GameId}", id);
+                    var errorResponse = ApiResponse<GameResponse>.ErrorResult($"Jogo com ID {id} não encontrado");
                     return NotFound(errorResponse);
                 }
 
-                Logger.LogInformation("Game found: {GameTitle}", game.GameTitle);
-                return Ok(game, "Game retrieved successfully");
+                Logger.LogInformation("Jogo encontrado: {GameTitle}", game.GameTitle);
+                return Ok(game, "Jogo recuperado com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching game with ID: {GameId}", id);
+                Logger.LogError(ex, "Erro ao buscar jogo com ID: {GameId}", id);
                 throw;
             }
         }
@@ -171,20 +171,20 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (page < 1 || pageSize < 1 || pageSize > 100)
                 {
-                    var errorResponse = ApiResponse<object>.ErrorResult("Invalid pagination parameters");
+                    var errorResponse = ApiResponse<object>.ErrorResult("Parâmetros de paginação inválidos");
                     return BadRequest(errorResponse);
                 }
 
-                Logger.LogInformation("Fetching games for team: {TeamId}", teamId);
+                Logger.LogInformation("Buscando jogos para o time: {TeamId}", teamId);
 
                 var (games, totalCount) = await _gameService.GetGamesByTeamAsync(teamId, page, pageSize);
 
-                Logger.LogInformation("Found {GameCount} games for team {TeamId}", games.Count, teamId);
-                return OkPaginated(games, page, pageSize, totalCount, $"Games for team {teamId} retrieved successfully");
+                Logger.LogInformation("Encontrados {GameCount} jogos para o time {TeamId}", games.Count, teamId);
+                return OkPaginated(games, page, pageSize, totalCount, $"Jogos do time {teamId} recuperados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching games for team: {TeamId}", teamId);
+                Logger.LogError(ex, "Erro ao buscar jogos por time: {TeamId}", teamId);
                 throw;
             }
         }
@@ -199,7 +199,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Starting manual sync of today's games");
+                Logger.LogInformation("Iniciando sincronização manual dos jogos de hoje");
 
                 await _gameService.SyncTodayGamesAsync();
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
@@ -207,17 +207,17 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var result = (object)new
                 {
-                    message = "Today's games synced successfully",
+                    message = "Jogos de hoje sincronizados com sucesso",
                     gameCount = games.Count,
                     timestamp = DateTime.UtcNow
                 };
 
-                Logger.LogInformation("Manual sync completed - {GameCount} games synced", games.Count);
-                return Ok(result, "Today's games synced and retrieved successfully");
+                Logger.LogInformation("Sincronização manual concluída - {GameCount} jogos", games.Count);
+                return Ok(result, "Jogos de hoje sincronizados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error during manual sync of today's games");
+                Logger.LogError(ex, "Erro na sincronização manual dos jogos de hoje");
                 throw;
             }
         }
@@ -235,36 +235,33 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (date > DateTime.Today.AddDays(30))
                 {
-                    return BadRequest<object>("Cannot sync games more than 30 days in the future");
+                    return BadRequest<object>("Não é possível sincronizar jogos com mais de 30 dias no futuro");
                 }
 
-                Logger.LogInformation("Starting sync of games for date: {Date}", date.ToShortDateString());
+                Logger.LogInformation("Sincronizando jogos para a data: {Date}", date.ToShortDateString());
 
-                // ✅ CORRIGIDO: Usar o método de sincronização do GameService
                 var syncCount = await _gameService.SyncGamesByDateAsync(date);
 
-                // Limpar cache após sincronização
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
                 _cache.Remove(string.Format(ApiConstants.CacheKeys.GAMES_BY_DATE, date.ToString("yyyy-MM-dd")));
 
-                // Buscar jogos salvos para confirmar
                 var savedGames = await _gameService.GetGamesByDateAsync(date);
 
                 var result = (object)new
                 {
-                    message = $"Games synced successfully for {date:yyyy-MM-dd}",
+                    message = $"Jogos sincronizados com sucesso para {date:yyyy-MM-dd}",
                     syncedCount = syncCount,
                     totalGamesInDb = savedGames.Count,
                     date = date.ToString("yyyy-MM-dd"),
                     timestamp = DateTime.UtcNow
                 };
 
-                Logger.LogInformation("Sync completed for {Date} - {GameCount} games synced", date.ToShortDateString(), syncCount);
-                return Ok(result, "Games synced successfully");
+                Logger.LogInformation("Sincronização concluída para {Date} - {GameCount} jogos", date.ToShortDateString(), syncCount);
+                return Ok(result, "Jogos sincronizados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error syncing games for date: {Date}", date);
+                Logger.LogError(ex, "Erro ao sincronizar jogos para a data: {Date}", date);
                 throw;
             }
         }
@@ -280,7 +277,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching today's games directly from external API");
+                Logger.LogInformation("Buscando jogos de hoje diretamente da API externa");
 
                 var externalGames = await _ballDontLieService.GetTodaysGamesAsync();
                 var gamesList = externalGames.Select(g => new
@@ -294,12 +291,12 @@ namespace HoopGameNight.Api.Controllers.V1
                     visitorScore = g.VisitorTeamScore
                 }).ToList<object>();
 
-                Logger.LogInformation("Retrieved {GameCount} games from external API", gamesList.Count);
-                return Ok(gamesList, "Today's games from external API");
+                Logger.LogInformation("Recuperados {GameCount} jogos da API externa", gamesList.Count);
+                return Ok(gamesList, "Jogos de hoje da API externa");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching games from external API");
+                Logger.LogError(ex, "Erro ao buscar jogos da API externa");
                 throw;
             }
         }
@@ -324,15 +321,15 @@ namespace HoopGameNight.Api.Controllers.V1
                     needsSync = localGamesCount != externalGamesCount,
                     lastCheck = DateTime.UtcNow,
                     recommendation = localGamesCount != externalGamesCount ?
-                        "Sync recommended - data mismatch detected" :
-                        "Data is synchronized"
+                       "Sincronização recomendada - divergência detectada" :
+                        "Dados sincronizado"
                 };
 
-                return Ok(status, "Sync status retrieved");
+                return Ok(status, "Status da sincronização recuperado");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error checking sync status");
+                Logger.LogError(ex, "Erro ao verificar status de sincronização");
                 throw;
             }
         }

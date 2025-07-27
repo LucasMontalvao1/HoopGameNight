@@ -35,18 +35,18 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Searching players with criteria: {@Request}", request);
+                _logger.LogInformation("Buscando jogadores com critérios: {@Request}", request);
 
                 var (players, totalCount) = await _playerRepository.SearchPlayersAsync(request);
                 var response = _mapper.Map<List<PlayerResponse>>(players);
 
-                _logger.LogInformation("Found {PlayerCount} players (total: {TotalCount})", response.Count, totalCount);
+                _logger.LogInformation("Encontrados {PlayerCount} jogadores (total: {TotalCount})", response.Count, totalCount);
                 return (response, totalCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error searching players: {@Request}", request);
-                throw new BusinessException("Failed to search players", ex);
+                _logger.LogError(ex, "Erro ao buscar jogadores: {@Request}", request);
+                throw new BusinessException("Falha ao buscar jogadores", ex);
             }
         }
 
@@ -54,18 +54,18 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting players for team: {TeamId}", teamId);
+                _logger.LogInformation("Buscando jogadores do time: {TeamId}", teamId);
 
                 var (players, totalCount) = await _playerRepository.GetPlayersByTeamAsync(teamId, page, pageSize);
                 var response = _mapper.Map<List<PlayerResponse>>(players);
 
-                _logger.LogInformation("Found {PlayerCount} players for team {TeamId}", response.Count, teamId);
+                _logger.LogInformation("Encontrados {PlayerCount} jogadores para o time {TeamId}", response.Count, teamId);
                 return (response, totalCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting players for team: {TeamId}", teamId);
-                throw new BusinessException($"Failed to retrieve players for team {teamId}", ex);
+                _logger.LogError(ex, "Erro ao buscar jogadores do time: {TeamId}", teamId);
+                throw new BusinessException($"Falha ao recuperar jogadores do time {teamId}", ex);
             }
         }
 
@@ -73,23 +73,23 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting player by ID: {PlayerId}", id);
+                _logger.LogInformation("Buscando jogador por ID: {PlayerId}", id);
 
                 var player = await _playerRepository.GetByIdAsync(id);
                 if (player == null)
                 {
-                    _logger.LogWarning("Player not found: {PlayerId}", id);
+                    _logger.LogWarning("Jogador não encontrado: {PlayerId}", id);
                     return null;
                 }
 
                 var response = _mapper.Map<PlayerResponse>(player);
-                _logger.LogInformation("Retrieved player: {PlayerName}", response.FullName);
+                _logger.LogInformation("Jogador recuperado: {PlayerName}", response.FullName);
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting player by ID: {PlayerId}", id);
-                throw new BusinessException($"Failed to retrieve player {id}", ex);
+                _logger.LogError(ex, "Erro ao buscar jogador por ID: {PlayerId}", id);
+                throw new BusinessException($"Falha ao recuperar o jogador {id}", ex);
             }
         }
 
@@ -97,7 +97,7 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Starting sync of players with search: {SearchTerm}", searchTerm ?? "All");
+                _logger.LogInformation("Iniciando sincronização de jogadores com busca: {SearchTerm}", searchTerm ?? "Todos");
 
                 var externalPlayers = await _ballDontLieService.SearchPlayersAsync(searchTerm ?? "");
                 var entities = _mapper.Map<List<Models.Entities.Player>>(externalPlayers);
@@ -113,12 +113,12 @@ namespace HoopGameNight.Core.Services
                     }
                 }
 
-                _logger.LogInformation("Synced {SyncCount} new players", syncCount);
+                _logger.LogInformation("Sincronizados {SyncCount} novos jogadores", syncCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error syncing players");
-                throw new ExternalApiException("Ball Don't Lie", "Failed to sync players from external API", null);
+                _logger.LogError(ex, "Erro ao sincronizar jogadores");
+                throw new ExternalApiException("Ball Don't Lie", "Falha ao sincronizar jogadores da API externa", null);
             }
         }
     }

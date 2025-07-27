@@ -1,0 +1,235 @@
+<div class="nba-dashboard">
+  <div class="nba-dashboard__container">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero__content">
+        <h1 class="hero__title">
+          <span class="hero__title-main">Hoop</span>
+          <span class="hero__title-accent">Game Night</span>
+        </h1>
+        <p class="hero__subtitle">
+          Acompanhe jogos, estatísticas e predições da NBA em tempo real
+        </p>
+      </div>
+      
+      <!-- API Status Integration -->
+      <div class="hero__status">
+        <div class="api-status-mini">
+          <span class="api-status-mini__label">API Status</span>
+          <app-status-indicator 
+            [status]="healthCheck.status()"
+            [showText]="true"
+            size="small">
+          </app-status-indicator>
+        </div>
+      </div>
+    </section>
+
+    <!-- Today's Games Section -->
+    <section class="games-section">
+      <div class="section-header">
+        <h2 class="section-title">Jogos de Hoje</h2>
+        <div class="section-actions">
+          @if (hasLiveGames()) {
+            <span class="live-games-badge">
+              <span class="live-indicator"></span>
+              {{ getLiveGamesCount() }} ao vivo
+            </span>
+          }
+          <select class="date-selector">
+            <option>Hoje</option>
+            <option>Ontem</option>
+            <option>Amanhã</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="games-preview">
+        @if (gamesService.isLoading()) {
+          <div class="games-loading">
+            <div class="loading-spinner"></div>
+            <p>Carregando jogos de hoje...</p>
+          </div>
+        } @else if (gamesService.error()) {
+          <div class="games-error">
+            <span class="material-icons">error</span>
+            <h3>Erro ao carregar jogos</h3>
+            <p>{{ gamesService.error() }}</p>
+            <button class="btn btn--primary" routerLink="/games">
+              <span class="material-icons">refresh</span>
+              Tentar Novamente
+            </button>
+          </div>
+        } @else if (getTodayGamesCount() === 0) {
+          <div class="games-placeholder">
+            <div class="games-placeholder__icon">🏀</div>
+            <h3>Nenhum jogo hoje</h3>
+            <p>Não há jogos da NBA agendados para hoje</p>
+            <button class="btn btn--primary" routerLink="/games">
+              <span class="material-icons">calendar_today</span>
+              Ver Outros Dias
+            </button>
+          </div>
+        } @else {
+          <!-- ✅ MINI PREVIEW DOS JOGOS (CORRIGIDO) -->
+          <div class="games-mini-list">
+            @for (game of gamesService.todayGames().slice(0, 3); track trackByGameId($index, game)) {
+              <div class="game-mini-card" [class.game-mini-card--live]="game.isLive">
+                <div class="game-mini-card__teams">
+                  <span class="team-abbr">{{ game.visitorTeam.abbreviation }}</span>
+                  <span class="vs">@</span>
+                  <span class="team-abbr">{{ game.homeTeam.abbreviation }}</span>
+                </div>
+                <div class="game-mini-card__info">
+                  @if (game.isLive) {
+                    <span class="score">{{ game.score }}</span>
+                    <span class="status live">AO VIVO</span>
+                  } @else if (game.isCompleted) {
+                    <span class="score">{{ game.score }}</span>
+                    <span class="status completed">Final</span>
+                  } @else {
+                    <span class="time">{{ formatGameTime(game.dateTime) }}</span>
+                    <span class="status scheduled">Agendado</span>
+                  }
+                </div>
+              </div>
+            }
+            
+            @if (getTodayGamesCount() > 3) {
+              <div class="games-more">
+                <button class="btn btn--ghost" routerLink="/games">
+                  +{{ getTodayGamesCount() - 3 }} jogos
+                </button>
+              </div>
+            }
+          </div>
+          
+          <div class="games-summary">
+            <div class="summary-stats">
+              <div class="stat">
+                <span class="stat__value">{{ getTodayGamesCount() }}</span>
+                <span class="stat__label">Total</span>
+              </div>
+              @if (hasLiveGames()) {
+                <div class="stat stat--live">
+                  <span class="stat__value">{{ getLiveGamesCount() }}</span>
+                  <span class="stat__label">Ao Vivo</span>
+                </div>
+              }
+              <div class="stat">
+                <span class="stat__value">{{ gamesService.completedGames().length }}</span>
+                <span class="stat__label">Finalizados</span>
+              </div>
+            </div>
+            
+            <button class="btn btn--primary" routerLink="/games">
+              <span class="material-icons">sports_basketball</span>
+              Ver Todos os Jogos
+            </button>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Bottom Grid -->
+    <div class="dashboard-grid">
+      <!-- My Teams -->
+      <section class="my-teams">
+        <h3 class="section-title-small">Meus Times</h3>
+        
+        <div class="teams-list">
+          @for (team of myTeams; track team.code) {
+            <div class="team-card" [style.border-left-color]="team.color">
+              <div class="team-card__info">
+                <span class="team-card__code">{{ team.code }}</span>
+                <div class="team-card__details">
+                  <span class="team-card__name">{{ team.name }}</span>
+                  <span class="team-card__city">{{ team.city }}</span>
+                </div>
+              </div>
+              <div class="team-card__next">
+                <span class="team-card__next-label">Próximo:</span>
+                <span class="team-card__next-game">{{ team.nextGame }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Search Player -->
+      <section class="player-search">
+        <h3 class="section-title-small">Buscar Jogador</h3>
+        
+        <div class="search-box">
+          <input 
+            type="text" 
+            class="search-input" 
+            placeholder="LeBron James, Stephen Curry..."
+            disabled>
+          <button class="search-btn" disabled>
+            <span class="material-icons">search</span>
+          </button>
+        </div>
+        
+        <p class="search-placeholder">
+          Busca de jogadores será implementada com a NBA API
+        </p>
+      </section>
+
+      <!-- AI Insights -->
+      <section class="ai-insights">
+        <h3 class="section-title-small">IA Insights</h3>
+        
+        <div class="insights-list">
+          @for (insight of aiInsights; track insight.title) {
+            <div class="insight-card" [class]="'insight-card--' + insight.type">
+              <div class="insight-card__header">
+                <span class="insight-card__title">{{ insight.title }}</span>
+              </div>
+              <p class="insight-card__description">{{ insight.description }}</p>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- System Status -->
+      <section class="system-status">
+        <h3 class="section-title-small">Status do Sistema</h3>
+        
+        <div class="status-list">
+          <div class="status-item">
+            <span class="status-item__label">NBA API</span>
+            <app-status-indicator 
+              [status]="healthCheck.status()"
+              [showText]="true"
+              size="small">
+            </app-status-indicator>
+          </div>
+          
+          <div class="status-item">
+            <span class="status-item__label">Base de Dados</span>
+            <app-status-indicator 
+              [status]="ApiStatusEnum.ONLINE"
+              [showText]="true"
+              size="small">
+            </app-status-indicator>
+          </div>
+          
+          <div class="status-item">
+            <span class="status-item__label">Cache</span>
+            <app-status-indicator 
+              [status]="ApiStatusEnum.ONLINE"
+              [showText]="true"
+              size="small">
+            </app-status-indicator>
+          </div>
+
+          <button class="btn btn--ghost btn--sm" routerLink="/api-status">
+            <span class="material-icons">monitor_heart</span>
+            Detalhes
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

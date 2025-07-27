@@ -35,26 +35,26 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching all teams");
+                Logger.LogInformation("Buscando todas as equipes");
 
                 var cacheKey = ApiConstants.CacheKeys.ALL_TEAMS;
 
                 if (_cache.TryGetValue(cacheKey, out List<TeamResponse>? cachedTeams))
                 {
-                    Logger.LogDebug("Returning cached teams");
-                    return Ok(cachedTeams!, "Teams retrieved successfully (cached)");
+                    Logger.LogDebug("Retornando equipes em cache");
+                    return Ok(cachedTeams!, "Equipes recuperadas com sucesso (armazenadas em cache)");
                 }
 
                 var teams = await _teamService.GetAllTeamsAsync();
 
                 _cache.Set(cacheKey, teams, TimeSpan.FromHours(24));
 
-                Logger.LogInformation("Found {TeamCount} teams", teams.Count);
-                return Ok(teams, "Teams retrieved successfully");
+                Logger.LogInformation("Foram encontrados {TeamCount} times", teams.Count);
+                return Ok(teams, "Equipes recuperadas com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching all teams");
+                Logger.LogError(ex, "Erro ao buscar todas as equipes");
                 throw;
             }
         }
@@ -71,32 +71,32 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching team with ID: {TeamId}", id);
+                Logger.LogInformation("Buscando equipe com ID: {TeamId}", id);
 
                 var cacheKey = string.Format(ApiConstants.CacheKeys.TEAM_BY_ID, id);
 
                 if (_cache.TryGetValue(cacheKey, out TeamResponse? cachedTeam))
                 {
-                    Logger.LogDebug("Returning cached team: {TeamId}", id);
-                    return Ok(cachedTeam!, "Team retrieved successfully (cached)");
+                    Logger.LogDebug("Retornando equipe em cache: {TeamId}", id);
+                    return Ok(cachedTeam!, "Equipe recuperada com sucesso (armazenada em cache)");
                 }
 
                 var team = await _teamService.GetTeamByIdAsync(id);
 
                 if (team == null)
                 {
-                    Logger.LogWarning("Team not found with ID: {TeamId}", id);
-                    return NotFound<TeamResponse>($"Team with ID {id} not found");
+                    Logger.LogWarning("Equipe não encontrada com ID: {TeamId}", id);
+                    return NotFound<TeamResponse>($"Equipe com ID {id} não encontrada");
                 }
 
                 _cache.Set(cacheKey, team, TimeSpan.FromHours(24));
 
-                Logger.LogInformation("Team found: {TeamName}", team.DisplayName);
-                return Ok(team, "Team retrieved successfully");
+                Logger.LogInformation("Equipe encontrada: {TeamName}", team.DisplayName);
+                return Ok(team, "Equipe recuperada com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching team with ID: {TeamId}", id);
+                Logger.LogError(ex, "Erro ao buscar equipe com ID: {TeamId}", id);
                 throw;
             }
         }
@@ -116,25 +116,25 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (string.IsNullOrWhiteSpace(abbreviation) || abbreviation.Length > 5)
                 {
-                    return BadRequest<TeamResponse>("Invalid team abbreviation");
+                    return BadRequest<TeamResponse>("Abreviação de equipe inválida");
                 }
 
-                Logger.LogInformation("Fetching team with abbreviation: {Abbreviation}", abbreviation);
+                Logger.LogInformation("Buscando equipe com abreviação: {Abreviação}", abbreviation);
 
                 var team = await _teamService.GetTeamByAbbreviationAsync(abbreviation.ToUpper());
 
                 if (team == null)
                 {
-                    Logger.LogWarning("Team not found with abbreviation: {Abbreviation}", abbreviation);
-                    return NotFound<TeamResponse>($"Team with abbreviation '{abbreviation}' not found");
+                    Logger.LogWarning("Equipe não encontrada com abreviação: {Abreviação}", abbreviation);
+                    return NotFound<TeamResponse>($"Equipe com abreviação '{abbreviation}' não encontrada");
                 }
 
-                Logger.LogInformation("Team found: {TeamName}", team.DisplayName);
-                return Ok(team, "Team retrieved successfully");
+                Logger.LogInformation("Equipe encontrada: {TeamName}", team.DisplayName);
+                return Ok(team, "Equipe recuperada com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching team with abbreviation: {Abbreviation}", abbreviation);
+                Logger.LogError(ex, "Erro ao buscar equipe com abreviação: {Abbreviation}", abbreviation);
                 throw;
             }
         }
@@ -149,7 +149,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Starting manual sync of teams");
+                Logger.LogInformation("Iniciando a sincronização manual das equipes");
 
                 await _teamService.SyncAllTeamsAsync();
                 _cache.Remove(ApiConstants.CacheKeys.ALL_TEAMS);
@@ -157,17 +157,17 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var result = (object)new
                 {
-                    message = "Teams synced successfully",
+                    message = "Equipes sincronizadas com sucesso",
                     teamCount = teams.Count,
                     timestamp = DateTime.UtcNow
                 };
 
-                Logger.LogInformation("Manual sync completed - {TeamCount} teams", teams.Count);
-                return Ok(result, "Teams synced successfully");
+                Logger.LogInformation("Sincronização manual concluída - {TeamCount} equipes", teams.Count);
+                return Ok(result, "Equipes sincronizadas com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error during manual sync of teams");
+                Logger.LogError(ex, "Erro durante sincronização manual de equipes");
                 throw;
             }
         }
@@ -184,7 +184,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching teams directly from external API");
+                Logger.LogInformation("Buscando equipes diretamente da API externa");
 
                 var externalTeams = await _ballDontLieService.GetAllTeamsAsync();
                 var teamsList = externalTeams.Select(t => new
@@ -198,12 +198,12 @@ namespace HoopGameNight.Api.Controllers.V1
                     division = t.Division
                 }).ToList<object>();
 
-                Logger.LogInformation("Retrieved {TeamCount} teams from external API", teamsList.Count);
-                return Ok(teamsList, "Teams from external API");
+                Logger.LogInformation("{TeamCount} equipes recuperadas da API externa", teamsList.Count);
+                return Ok(teamsList, "Equipes de API externa");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching teams from external API");
+                Logger.LogError(ex, "Erro ao buscar equipes da API externa");
                 throw;
             }
         }
@@ -228,15 +228,15 @@ namespace HoopGameNight.Api.Controllers.V1
                     needsSync = localTeamsCount != externalTeamsCount,
                     lastCheck = DateTime.UtcNow,
                     recommendation = localTeamsCount < 30 ?
-                        "Initial sync required - less than 30 teams found" :
-                        "Teams data looks complete"
+                        "Sincronização inicial necessária - menos de 30 equipes encontradas" :
+                        "Os dados das equipes parecem completos"
                 };
 
-                return Ok(status, "Sync status retrieved");
+                return Ok(status, "Status de sincronização recuperado");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error checking sync status");
+                Logger.LogError(ex, "Erro ao verificar o status de sincronização");
                 throw;
             }
         }

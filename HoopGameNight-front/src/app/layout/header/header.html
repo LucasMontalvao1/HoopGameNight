@@ -1,0 +1,96 @@
+<header class="header">
+  <div class="header__container">
+    <!-- Logo -->
+    <div class="header__logo">
+      <a routerLink="/dashboard" class="header__logo-link">
+        <span class="header__logo-icon">🏀</span>
+        <span class="header__logo-text">HoopGameNight</span>
+      </a>
+    </div>
+
+    <!-- Desktop Navigation -->
+    <nav class="header__nav header__nav--desktop">
+      @for (item of navigationService.navigationItems(); track item.id) {
+        <a 
+          [routerLink]="item.route"
+          routerLinkActive="header__nav-link--active"
+          class="header__nav-link"
+          [class.header__nav-link--disabled]="item.disabled">
+          <span class="material-icons">{{ item.icon }}</span>
+          <span class="header__nav-text">{{ item.label }}</span>
+          @if (item.badge) {
+            <span class="header__nav-badge">{{ item.badge }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <!-- Actions -->
+    <div class="header__actions">
+      <!-- API Status -->
+      <div class="header__status">
+        <app-status-indicator 
+          [status]="healthCheck.status()"
+          [showText]="false"
+          size="small">
+        </app-status-indicator>
+        <button 
+          type="button"
+          class="header__action-btn"
+          (click)="onRefreshStatus()"
+          [disabled]="healthCheck.status() === 'loading'"
+          title="Refresh API Status">
+          <span class="material-icons">refresh</span>
+        </button>
+      </div>
+
+      <!-- Theme Toggle -->
+      <button 
+        type="button"
+        class="header__action-btn"
+        (click)="onThemeToggle()"
+        title="Toggle Theme">
+        <span class="material-icons">{{ getThemeIcon() }}</span>
+      </button>
+
+      <!-- Mobile Menu Toggle -->
+      <button 
+        type="button"
+        class="header__mobile-toggle"
+        (click)="onMobileMenuToggle()"
+        [class.header__mobile-toggle--active]="navigationService.isMobileMenuOpen()">
+        <span class="header__hamburger"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile Navigation -->
+  <nav 
+    class="header__nav header__nav--mobile"
+    [class.header__nav--mobile-open]="navigationService.isMobileMenuOpen()">
+    <div class="header__nav-mobile-content">
+      @for (item of navigationService.navigationItems(); track item.id) {
+        <a 
+          [routerLink]="item.route"
+          routerLinkActive="header__nav-link--active"
+          class="header__nav-link header__nav-link--mobile"
+          [class.header__nav-link--disabled]="item.disabled"
+          (click)="navigationService.closeMobileMenu()">
+          <span class="material-icons">{{ item.icon }}</span>
+          <span class="header__nav-text">{{ item.label }}</span>
+          @if (item.badge) {
+            <span class="header__nav-badge">{{ item.badge }}</span>
+          }
+        </a>
+      }
+    </div>
+  </nav>
+
+  <!-- Mobile Overlay -->
+  @if (navigationService.isMobileMenuOpen()) {
+    <div 
+      class="header__overlay"
+      (click)="navigationService.closeMobileMenu()">
+    </div>
+  }
+</header>

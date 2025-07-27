@@ -1,0 +1,6 @@
+<div class="status-indicator status-indicator--{{status}}">
+  <div class="status-dot"></div>
+  @if (showText) {
+    <span class="status-text">{{ getStatusText() }}</span>
+  }
+</div>

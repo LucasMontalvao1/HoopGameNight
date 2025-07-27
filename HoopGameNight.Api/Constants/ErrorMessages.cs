@@ -2,29 +2,29 @@
 {
     public static class ErrorMessages
     {
-        // Generic
-        public const string INTERNAL_SERVER_ERROR = "An internal server error occurred";
-        public const string INVALID_REQUEST = "Invalid request parameters";
-        public const string RESOURCE_NOT_FOUND = "Resource not found";
+        // Genérico
+        public const string INTERNAL_SERVER_ERROR = "Ocorreu um erro interno no servidor";
+        public const string INVALID_REQUEST = "Parâmetros da requisição inválidos";
+        public const string RESOURCE_NOT_FOUND = "Recurso não encontrado";
 
-        // Games
-        public const string GAME_NOT_FOUND = "Game not found";
-        public const string INVALID_GAME_DATE = "Invalid game date";
+        // Jogos
+        public const string GAME_NOT_FOUND = "Jogo não encontrado";
+        public const string INVALID_GAME_DATE = "Data do jogo inválida";
 
-        // Teams
-        public const string TEAM_NOT_FOUND = "Team not found";
-        public const string INVALID_TEAM_ABBREVIATION = "Invalid team abbreviation";
+        // Times
+        public const string TEAM_NOT_FOUND = "Time não encontrado";
+        public const string INVALID_TEAM_ABBREVIATION = "Abreviação do time inválida";
 
-        // Players
-        public const string PLAYER_NOT_FOUND = "Player not found";
-        public const string INVALID_SEARCH_CRITERIA = "Invalid search criteria";
+        // Jogadores
+        public const string PLAYER_NOT_FOUND = "Jogador não encontrado";
+        public const string INVALID_SEARCH_CRITERIA = "Critério de busca inválido";
 
-        // External API
-        public const string EXTERNAL_API_ERROR = "External service temporarily unavailable";
-        public const string API_KEY_MISSING = "API key is missing or invalid";
+        // API Externa
+        public const string EXTERNAL_API_ERROR = "Serviço externo temporariamente indisponível";
+        public const string API_KEY_MISSING = "Chave da API ausente ou inválida";
 
-        // Validation
-        public const string INVALID_PAGINATION = "Invalid pagination parameters";
-        public const string SEARCH_TOO_SHORT = "Search term must be at least 2 characters";
+        // Validação
+        public const string INVALID_PAGINATION = "Parâmetros de paginação inválidos";
+        public const string SEARCH_TOO_SHORT = "O termo de busca deve ter pelo menos 2 caracteres";
     }
 }

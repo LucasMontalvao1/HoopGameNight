@@ -76,7 +76,7 @@ namespace HoopGameNight.Api.Extensions
             catch (Exception ex)
             {
                 var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-                logger.LogError(ex, "Failed to initialize database - continuing without it");
+                logger.LogError(ex, "Falha ao inicializar o banco de dados - continuando sem ele");
             }
 
             return app;

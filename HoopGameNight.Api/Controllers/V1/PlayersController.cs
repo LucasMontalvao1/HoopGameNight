@@ -40,20 +40,20 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (!request.IsValid())
                 {
-                    var errorResponse = ApiResponse<object>.ErrorResult("Invalid search parameters. Provide search term, team ID, or position.");
+                    var errorResponse = ApiResponse<object>.ErrorResult("Parâmetros de pesquisa inválidos. Informe o termo de pesquisa, ID da equipe ou posição.");
                     return BadRequest(errorResponse);
                 }
 
-                Logger.LogInformation("Searching players with criteria: {@Request}", request);
+                Logger.LogInformation("Procurando jogadores com critérios: {@Request}", request);
 
                 var (players, totalCount) = await _playerService.SearchPlayersAsync(request);
 
-                Logger.LogInformation("Found {PlayerCount} players (total: {TotalCount})", players.Count, totalCount);
-                return OkPaginated(players, request.Page, request.PageSize, totalCount, "Players retrieved successfully");
+                Logger.LogInformation("Foram encontrados {PlayerCount} jogadores (total: {TotalCount})", players.Count, totalCount);
+                return OkPaginated(players, request.Page, request.PageSize, totalCount, "Jogadores recuperados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error searching players with criteria: {@Request}", request);
+                Logger.LogError(ex, "Erro ao pesquisar jogadores com o critério: {@Request}", request);
                 throw;
             }
         }
@@ -70,33 +70,33 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Fetching player with ID: {PlayerId}", id);
+                Logger.LogInformation("Buscando jogador com ID: {PlayerId}", id);
 
                 var cacheKey = string.Format(ApiConstants.CacheKeys.PLAYER_BY_ID, id);
 
                 if (_cache.TryGetValue(cacheKey, out PlayerResponse? cachedPlayer))
                 {
-                    Logger.LogDebug("Returning cached player: {PlayerId}", id);
-                    return Ok(cachedPlayer!, "Player retrieved successfully (cached)");
+                    Logger.LogDebug("Retornando jogador em cache: {PlayerId}", id);
+                    return Ok(cachedPlayer!, "Jogador recuperado com sucesso (armazenado em cache)");
                 }
 
                 var player = await _playerService.GetPlayerByIdAsync(id);
 
                 if (player == null)
                 {
-                    Logger.LogWarning("Player not found with ID: {PlayerId}", id);
-                    var errorResponse = ApiResponse<PlayerResponse>.ErrorResult($"Player with ID {id} not found");
+                    Logger.LogWarning("Jogador não encontrado com ID: {PlayerId}", id);
+                    var errorResponse = ApiResponse<PlayerResponse>.ErrorResult($"Jogador com ID {id} não encontrado");
                     return NotFound(errorResponse);
                 }
 
                 _cache.Set(cacheKey, player, TimeSpan.FromHours(1));
 
-                Logger.LogInformation("Player found: {PlayerName}", player.FullName);
-                return Ok(player, "Player retrieved successfully");
+                Logger.LogInformation("Jogador encontrado: {PlayerName}", player.FullName);
+                return Ok(player, "Jogador recuperado com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching player with ID: {PlayerId}", id);
+                Logger.LogError(ex, "Erro ao buscar jogador com ID: {PlayerId}", id);
                 throw;
             }
         }
@@ -120,20 +120,20 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (page < 1 || pageSize < 1 || pageSize > 100)
                 {
-                    var errorResponse = ApiResponse<object>.ErrorResult("Invalid pagination parameters");
+                    var errorResponse = ApiResponse<object>.ErrorResult("Parâmetros de paginação inválidos");
                     return BadRequest(errorResponse);
                 }
 
-                Logger.LogInformation("Fetching players for team: {TeamId}", teamId);
+                Logger.LogInformation("Buscando jogadores para o time: {TeamId}", teamId);
 
                 var (players, totalCount) = await _playerService.GetPlayersByTeamAsync(teamId, page, pageSize);
 
-                Logger.LogInformation("Found {PlayerCount} players for team {TeamId}", players.Count, teamId);
-                return OkPaginated(players, page, pageSize, totalCount, $"Players for team {teamId} retrieved successfully");
+                Logger.LogInformation("Foram encontrados {PlayerCount} jogadores para a equipe {TeamId}", players.Count, teamId);
+                return OkPaginated(players, page, pageSize, totalCount, $"Jogadores da equipe {teamId} recuperados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error fetching players for team: {TeamId}", teamId);
+                Logger.LogError(ex, "Erro ao buscar jogadores para o time: {TeamId}", teamId);
                 throw;
             }
         }
@@ -150,23 +150,23 @@ namespace HoopGameNight.Api.Controllers.V1
             try
             {
                 var searchTerm = search ?? "a";
-                Logger.LogInformation("Starting manual sync of players with search: {Search}", searchTerm);
+                Logger.LogInformation("Iniciando a sincronização manual de jogadores com a pesquisa: {Search}", searchTerm);
 
                 await _playerService.SyncPlayersAsync(searchTerm);
 
                 var result = (object)new
                 {
-                    message = "Players synced successfully",
+                    message = "Jogadores sincronizados com sucesso",
                     searchTerm = searchTerm,
                     timestamp = DateTime.UtcNow
                 };
 
-                Logger.LogInformation("Manual sync of players completed");
-                return Ok(result, "Players synced successfully");
+                Logger.LogInformation("Sincronização manual de jogadores concluída");
+                return Ok(result, "Jogadores sincronizados com sucesso");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error during manual sync of players");
+                Logger.LogError(ex, "Erro durante a sincronização manual dos jogadores");
                 throw;
             }
         }
@@ -185,10 +185,10 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
                 {
-                    return BadRequest<List<object>>("Search term must be at least 2 characters");
+                    return BadRequest<List<object>>("O termo de pesquisa deve ter pelo menos 2 caracteres");
                 }
 
-                Logger.LogInformation("Searching players directly from external API: {Search}", search);
+                Logger.LogInformation("Pesquisando jogadores diretamente da API externa: {Pesquisar}", search);
 
                 var externalPlayers = await _ballDontLieService.SearchPlayersAsync(search);
                 var playersList = externalPlayers.Select(p => new
@@ -203,12 +203,12 @@ namespace HoopGameNight.Api.Controllers.V1
                     team = p.Team?.FullName ?? "Free Agent"
                 }).ToList<object>();
 
-                Logger.LogInformation("Found {PlayerCount} players from external API", playersList.Count);
-                return Ok(playersList, $"Players matching '{search}' from external API");
+                Logger.LogInformation("Foram encontrados {PlayerCount} jogadores na API externa", playersList.Count);
+                return Ok(playersList, $"Jogadores que correspondem a '{search}' da API externa");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error searching players from external API");
+                Logger.LogError(ex, "Erro ao pesquisar jogadores na API externa");
                 throw;
             }
         }
@@ -242,15 +242,15 @@ namespace HoopGameNight.Api.Controllers.V1
                     sampleLocalPlayers = localPlayers.Take(3).Select(p => p.FullName),
                     lastCheck = DateTime.UtcNow,
                     recommendation = localTotal == 0 ?
-                        "Initial player sync recommended" :
-                        "Some players data available"
+                        "Sincronização inicial de jogadores recomendada" :
+                        "Dados de alguns jogadores disponíveis"
                 };
 
-                return Ok(status, "Player sync status retrieved");
+                return Ok(status, "Status de sincronização do jogador recuperado");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error checking player sync status");
+                Logger.LogError(ex, "Erro ao verificar o status de sincronização do player");
                 throw;
             }
         }

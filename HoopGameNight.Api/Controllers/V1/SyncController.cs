@@ -42,7 +42,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🚀 Starting COMPLETE data synchronization");
+                Logger.LogInformation("Starting COMPLETE data synchronization");
 
                 var startTime = DateTime.UtcNow;
                 var syncResults = new List<string>();
@@ -52,13 +52,13 @@ namespace HoopGameNight.Api.Controllers.V1
                 {
                     await _teamService.SyncAllTeamsAsync();
                     _cache.Remove(ApiConstants.CacheKeys.ALL_TEAMS);
-                    syncResults.Add("✅ Teams synced successfully");
-                    Logger.LogInformation("✅ Teams sync completed");
+                    syncResults.Add("Teams synced successfully");
+                    Logger.LogInformation("Teams sync completed");
                 }
                 catch (Exception ex)
                 {
-                    syncResults.Add($"❌ Teams sync failed: {ex.Message}");
-                    Logger.LogError(ex, "❌ Teams sync failed");
+                    syncResults.Add($"Teams sync failed: {ex.Message}");
+                    Logger.LogError(ex, "Teams sync failed");
                 }
 
                 // sincroniza os jogos de hoje
@@ -66,13 +66,13 @@ namespace HoopGameNight.Api.Controllers.V1
                 {
                     await _gameService.SyncTodayGamesAsync();
                     _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
-                    syncResults.Add("✅ Today's games synced successfully");
-                    Logger.LogInformation("✅ Games sync completed");
+                    syncResults.Add("Today's games synced successfully");
+                    Logger.LogInformation("Games sync completed");
                 }
                 catch (Exception ex)
                 {
-                    syncResults.Add($"❌ Games sync failed: {ex.Message}");
-                    Logger.LogError(ex, "❌ Games sync failed");
+                    syncResults.Add($"Games sync failed: {ex.Message}");
+                    Logger.LogError(ex, "Games sync failed");
                 }
 
                 // 3. sincroniza alguns jogadores
@@ -83,13 +83,13 @@ namespace HoopGameNight.Api.Controllers.V1
                     {
                         await _playerService.SyncPlayersAsync(name);
                     }
-                    syncResults.Add("✅ Popular players synced successfully");
-                    Logger.LogInformation("✅ Players sync completed");
+                    syncResults.Add("Popular players synced successfully");
+                    Logger.LogInformation("Players sync completed");
                 }
                 catch (Exception ex)
                 {
-                    syncResults.Add($"❌ Players sync failed: {ex.Message}");
-                    Logger.LogError(ex, "❌ Players sync failed");
+                    syncResults.Add($"Players sync failed: {ex.Message}");
+                    Logger.LogError(ex, "Players sync failed");
                 }
 
                 var duration = DateTime.UtcNow - startTime;
@@ -108,12 +108,12 @@ namespace HoopGameNight.Api.Controllers.V1
                     }
                 };
 
-                Logger.LogInformation("🎉 Complete sync finished in {Duration} seconds", duration.TotalSeconds);
+                Logger.LogInformation("Complete sync finished in {Duration} seconds", duration.TotalSeconds);
                 return Ok(result, "All data synchronized successfully");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "❌ Error during complete synchronization");
+                Logger.LogError(ex, "Error during complete synchronization");
                 throw;
             }
         }
@@ -127,7 +127,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("⚡ Starting essential data sync");
+                Logger.LogInformation("Starting essential data sync");
 
                 var startTime = DateTime.UtcNow;
 
@@ -147,7 +147,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     synced = new[] { "Teams", "Today's Games" }
                 };
 
-                Logger.LogInformation("⚡ Essential sync completed in {Duration} seconds", duration.TotalSeconds);
+                Logger.LogInformation("Essential sync completed in {Duration} seconds", duration.TotalSeconds);
                 return Ok(result, "Essential data synchronized successfully");
             }
             catch (Exception ex)
@@ -167,7 +167,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("📊 Checking overall sync status");
+                Logger.LogInformation("Checking overall sync status");
 
                 var localTeams = await _teamService.GetAllTeamsAsync();
                 var localGames = await _gameService.GetTodayGamesAsync();
@@ -182,14 +182,14 @@ namespace HoopGameNight.Api.Controllers.V1
                         local = localTeams.Count,
                         external = externalTeams.Count(),
                         needsSync = localTeams.Count != externalTeams.Count(),
-                        status = localTeams.Count >= 30 ? "✅ Complete" : "⚠️ Incomplete"
+                        status = localTeams.Count >= 30 ? "Complete" : "Incomplete"
                     },
                     games = new
                     {
                         local = localGames.Count,
                         external = externalGames.Count(),
                         needsSync = localGames.Count != externalGames.Count(),
-                        status = localGames.Count > 0 ? "✅ Available" : "⚠️ No games"
+                        status = localGames.Count > 0 ? "Available" : "No games"
                     },
                     overallHealth = new
                     {
@@ -221,7 +221,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🔍 Checking external API health");
+                Logger.LogInformation("Checking external API health");
 
                 var startTime = DateTime.UtcNow;
                 var isHealthy = false;
@@ -245,12 +245,12 @@ namespace HoopGameNight.Api.Controllers.V1
                     isHealthy,
                     responseTime = $"{responseTime.TotalMilliseconds:F0}ms",
                     lastChecked = DateTime.UtcNow,
-                    status = isHealthy ? "✅ Healthy" : "❌ Unhealthy",
+                    status = isHealthy ? "Healthy" : "Unhealthy",
                     error = string.IsNullOrEmpty(errorMessage) ? null : errorMessage,
                     recommendations = GetApiHealthRecommendations(isHealthy, responseTime)
                 };
 
-                Logger.LogInformation("🔍 External API health: {Status}", isHealthy ? "Healthy" : "Unhealthy");
+                Logger.LogInformation("External API health: {Status}", isHealthy ? "Healthy" : "Unhealthy");
                 return Ok(health, "External API health checked");
             }
             catch (Exception ex)
@@ -263,7 +263,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     isHealthy = false,
                     error = ex.Message,
                     lastChecked = DateTime.UtcNow,
-                    status = "❌ Connection Failed"
+                    status = "Connection Failed"
                 };
 
                 return Ok(health, "External API health check failed");
@@ -279,7 +279,7 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("🧹 Clearing all system caches");
+                Logger.LogInformation("Clearing all system caches");
 
                 var clearedCaches = new List<string>();
 
@@ -313,7 +313,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     timestamp = DateTime.UtcNow
                 };
 
-                Logger.LogInformation("🧹 Cleared {Count} caches", clearedCaches.Count);
+                Logger.LogInformation("Cleared {Count} caches", clearedCaches.Count);
                 return Ok(result, "All caches cleared successfully");
             }
             catch (Exception ex)
@@ -342,10 +342,10 @@ namespace HoopGameNight.Api.Controllers.V1
 
         private static string GetSyncRecommendation(int teamsCount, int gamesCount)
         {
-            if (teamsCount == 0) return "🚨 URGENT: Run initial teams sync";
-            if (teamsCount < 30) return "⚠️ Teams data incomplete - sync recommended";
-            if (gamesCount == 0) return "📅 No games data - sync today's games";
-            return "✅ Data looks healthy";
+            if (teamsCount == 0) return "URGENT: Run initial teams sync";
+            if (teamsCount < 30) return "Teams data incomplete - sync recommended";
+            if (gamesCount == 0) return "No games data - sync today's games";
+            return "Data looks healthy";
         }
 
         private static List<string> GetApiHealthRecommendations(bool isHealthy, TimeSpan responseTime)

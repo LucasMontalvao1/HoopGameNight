@@ -39,18 +39,18 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting today's games");
+                _logger.LogInformation("Buscando jogos de hoje");
 
                 var games = await _gameRepository.GetTodayGamesAsync();
                 var response = _mapper.Map<List<GameResponse>>(games);
 
-                _logger.LogInformation("Retrieved {GameCount} games for today", response.Count);
+                _logger.LogInformation("Recuperados {GameCount} jogos para hoje", response.Count);
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting today's games");
-                throw new BusinessException("Failed to retrieve today's games", ex);
+                _logger.LogError(ex, "Erro ao buscar jogos de hoje");
+                throw new BusinessException("Falha ao recuperar os jogos de hoje", ex);
             }
         }
 
@@ -58,18 +58,18 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting games for date: {Date}", date.ToShortDateString());
+                _logger.LogInformation("Buscando jogos para a data: {Date}", date.ToShortDateString());
 
                 var games = await _gameRepository.GetGamesByDateAsync(date);
                 var response = _mapper.Map<List<GameResponse>>(games);
 
-                _logger.LogInformation("Retrieved {GameCount} games for {Date}", response.Count, date.ToShortDateString());
+                _logger.LogInformation("Recuperados {GameCount} jogos para {Date}", response.Count, date.ToShortDateString());
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting games for date: {Date}", date);
-                throw new BusinessException($"Failed to retrieve games for {date:yyyy-MM-dd}", ex);
+                _logger.LogError(ex, "Erro ao buscar jogos para a data: {Date}", date);
+                throw new BusinessException($"Falha ao recuperar jogos para {date:yyyy-MM-dd}", ex);
             }
         }
 
@@ -77,18 +77,18 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting games with filters: {@Request}", request);
+                _logger.LogInformation("Buscando jogos com filtros: {@Request}", request);
 
                 var (games, totalCount) = await _gameRepository.GetGamesAsync(request);
                 var response = _mapper.Map<List<GameResponse>>(games);
 
-                _logger.LogInformation("Retrieved {GameCount} games (total: {TotalCount})", response.Count, totalCount);
+                _logger.LogInformation("Recuperados {GameCount} jogos (total: {TotalCount})", response.Count, totalCount);
                 return (response, totalCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting games with filters: {@Request}", request);
-                throw new BusinessException("Failed to retrieve games", ex);
+                _logger.LogError(ex, "Erro ao buscar jogos com filtros: {@Request}", request);
+                throw new BusinessException("Falha ao recuperar jogos", ex);
             }
         }
 
@@ -96,18 +96,18 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting games for team: {TeamId}", teamId);
+                _logger.LogInformation("Buscando jogos do time: {TeamId}", teamId);
 
                 var (games, totalCount) = await _gameRepository.GetGamesByTeamAsync(teamId, page, pageSize);
                 var response = _mapper.Map<List<GameResponse>>(games);
 
-                _logger.LogInformation("Retrieved {GameCount} games for team {TeamId}", response.Count, teamId);
+                _logger.LogInformation("Recuperados {GameCount} jogos para o time {TeamId}", response.Count, teamId);
                 return (response, totalCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting games for team: {TeamId}", teamId);
-                throw new BusinessException($"Failed to retrieve games for team {teamId}", ex);
+                _logger.LogError(ex, "Erro ao buscar jogos do time: {TeamId}", teamId);
+                throw new BusinessException($"Falha ao recuperar jogos do time {teamId}", ex);
             }
         }
 
@@ -115,23 +115,23 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting game by ID: {GameId}", id);
+                _logger.LogInformation("Buscando jogo por ID: {GameId}", id);
 
                 var game = await _gameRepository.GetByIdAsync(id);
                 if (game == null)
                 {
-                    _logger.LogWarning("Game not found: {GameId}", id);
+                    _logger.LogWarning("Jogo não encontrado: {GameId}", id);
                     return null;
                 }
 
                 var response = _mapper.Map<GameResponse>(game);
-                _logger.LogInformation("Retrieved game: {GameTitle}", response.GameTitle);
+                _logger.LogInformation("Jogo recuperado: {GameTitle}", response.GameTitle);
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting game by ID: {GameId}", id);
-                throw new BusinessException($"Failed to retrieve game {id}", ex);
+                _logger.LogError(ex, "Erro ao buscar jogo por ID: {GameId}", id);
+                throw new BusinessException($"Falha ao recuperar o jogo {id}", ex);
             }
         }
 
@@ -147,10 +147,10 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Starting sync of games for date: {Date}", date.ToShortDateString());
+                _logger.LogInformation("Iniciando sincronização de jogos para a data: {Date}", date.ToShortDateString());
 
                 var externalGames = await _ballDontLieService.GetGamesByDateAsync(date);
-                _logger.LogInformation("Found {Count} games from external API for {Date}", externalGames.Count(), date.ToShortDateString());
+                _logger.LogInformation("Encontrados {Count} jogos da API externa para {Date}", externalGames.Count(), date.ToShortDateString());
 
                 var syncCount = 0;
 
@@ -169,7 +169,7 @@ namespace HoopGameNight.Core.Services
 
                             if (homeTeam == null || visitorTeam == null)
                             {
-                                _logger.LogWarning("Skipping game {GameId} - Teams not found. Home: {HomeId}, Visitor: {VisitorId}",
+                                _logger.LogWarning("Pulando jogo {GameId} - Times não encontrados. Casa: {HomeId}, Visitante: {VisitorId}",
                                     externalGame.Id, externalGame.HomeTeam.Id, externalGame.VisitorTeam.Id);
                                 continue;
                             }
@@ -178,13 +178,13 @@ namespace HoopGameNight.Core.Services
                             var game = new Models.Entities.Game
                             {
                                 ExternalId = externalGame.Id,
-                                Date = DateTime.Parse(externalGame.Date), 
-                                DateTime = DateTime.Parse(externalGame.Date), 
+                                Date = DateTime.Parse(externalGame.Date),
+                                DateTime = DateTime.Parse(externalGame.Date),
                                 HomeTeamId = homeTeam.Id,
                                 VisitorTeamId = visitorTeam.Id,
                                 HomeTeamScore = externalGame.HomeTeamScore,
                                 VisitorTeamScore = externalGame.VisitorTeamScore,
-                                Status = MapGameStatus(externalGame.Status), 
+                                Status = MapGameStatus(externalGame.Status),
                                 Period = externalGame.Period,
                                 TimeRemaining = externalGame.Time,
                                 PostSeason = externalGame.Postseason,
@@ -193,10 +193,10 @@ namespace HoopGameNight.Core.Services
                                 UpdatedAt = DateTime.UtcNow
                             };
 
-                            await _gameRepository.InsertAsync(game); 
+                            await _gameRepository.InsertAsync(game);
                             syncCount++;
 
-                            _logger.LogInformation("Synced game: {HomeTeam} vs {VisitorTeam} on {Date}",
+                            _logger.LogInformation("Jogo sincronizado: {HomeTeam} vs {VisitorTeam} em {Date}",
                                 homeTeam.Name, visitorTeam.Name, game.Date);
                         }
                         else
@@ -204,19 +204,19 @@ namespace HoopGameNight.Core.Services
                             // Atualizar jogo existente
                             existingGame.HomeTeamScore = externalGame.HomeTeamScore;
                             existingGame.VisitorTeamScore = externalGame.VisitorTeamScore;
-                            existingGame.Status = MapGameStatus(externalGame.Status); 
+                            existingGame.Status = MapGameStatus(externalGame.Status);
                             existingGame.Period = externalGame.Period;
                             existingGame.TimeRemaining = externalGame.Time;
                             existingGame.UpdatedAt = DateTime.UtcNow;
 
                             await _gameRepository.UpdateAsync(existingGame);
 
-                            _logger.LogDebug("Updated existing game: {GameId}", existingGame.Id);
+                            _logger.LogDebug("Jogo existente atualizado: {GameId}", existingGame.Id);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error syncing game {GameId}", externalGame.Id);
+                        _logger.LogError(ex, "Erro ao sincronizar jogo {GameId}", externalGame.Id);
                     }
                 }
 
@@ -224,13 +224,13 @@ namespace HoopGameNight.Core.Services
                 _cache.Remove(Constants.CacheKeys.TODAY_GAMES);
                 _cache.Remove(string.Format(Constants.CacheKeys.GAMES_BY_DATE, date.ToString("yyyy-MM-dd")));
 
-                _logger.LogInformation("Synced {SyncCount} new games for {Date}", syncCount, date.ToShortDateString());
+                _logger.LogInformation("Sincronizados {SyncCount} novos jogos para {Date}", syncCount, date.ToShortDateString());
                 return syncCount;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error syncing games for date: {Date}", date);
-                throw new ExternalApiException("Ball Don't Lie", $"Failed to sync games for {date:yyyy-MM-dd}", null);
+                _logger.LogError(ex, "Erro ao sincronizar jogos para a data: {Date}", date);
+                throw new ExternalApiException("Ball Don't Lie", $"Falha ao sincronizar jogos para {date:yyyy-MM-dd}", null);
             }
         }
 
@@ -241,7 +241,7 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Starting sync of games from {StartDate} to {EndDate}",
+                _logger.LogInformation("Iniciando sincronização de jogos de {StartDate} até {EndDate}",
                     startDate.ToShortDateString(), endDate.ToShortDateString());
 
                 var totalSynced = 0;
@@ -252,20 +252,20 @@ namespace HoopGameNight.Core.Services
                     var synced = await SyncGamesByDateAsync(currentDate);
                     totalSynced += synced;
 
-                    // Aguardar um pouco entre as requisições para evitar rate limit
+                    // Aguarda um pouco entre as requisições para evitar rate limit
                     await Task.Delay(2000);
 
                     currentDate = currentDate.AddDays(1);
                 }
 
-                _logger.LogInformation("Synced {TotalCount} games for period {StartDate} to {EndDate}",
+                _logger.LogInformation("Sincronizados {TotalCount} jogos para o período de {StartDate} até {EndDate}",
                     totalSynced, startDate.ToShortDateString(), endDate.ToShortDateString());
 
                 return totalSynced;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error syncing games for period");
+                _logger.LogError(ex, "Erro ao sincronizar jogos para o período");
                 throw;
             }
         }

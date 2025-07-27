@@ -35,12 +35,12 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting all teams");
+                _logger.LogInformation("Buscando todos os times");
 
                 // Verifica se existe no cache
                 if (_cache.TryGetValue(CacheKeys.ALL_TEAMS, out List<TeamResponse> cachedTeams))
                 {
-                    _logger.LogInformation("Returning {TeamCount} teams from cache", cachedTeams.Count);
+                    _logger.LogInformation("Retornando {TeamCount} times do cache", cachedTeams.Count);
                     return cachedTeams;
                 }
 
@@ -55,13 +55,13 @@ namespace HoopGameNight.Core.Services
 
                 _cache.Set(CacheKeys.ALL_TEAMS, response, cacheOptions);
 
-                _logger.LogInformation("Retrieved {TeamCount} teams from database and cached", response.Count);
+                _logger.LogInformation("Recuperados {TeamCount} times do banco de dados e armazenados em cache", response.Count);
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting all teams");
-                throw new BusinessException("Failed to retrieve teams", ex);
+                _logger.LogError(ex, "Erro ao buscar todos os times");
+                throw new BusinessException("Falha ao recuperar os times", ex);
             }
         }
 
@@ -69,7 +69,7 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting team by ID: {TeamId}", id);
+                _logger.LogInformation("Buscando time por ID: {TeamId}", id);
 
                 // Cache key específico para cada time
                 var cacheKey = CacheKeys.GetTeamById(id);
@@ -77,7 +77,7 @@ namespace HoopGameNight.Core.Services
                 // Verifica se existe no cache
                 if (_cache.TryGetValue(cacheKey, out TeamResponse cachedTeam))
                 {
-                    _logger.LogInformation("Returning team {TeamId} from cache", id);
+                    _logger.LogInformation("Retornando time {TeamId} do cache", id);
                     return cachedTeam;
                 }
 
@@ -85,7 +85,7 @@ namespace HoopGameNight.Core.Services
                 var team = await _teamRepository.GetByIdAsync(id);
                 if (team == null)
                 {
-                    _logger.LogWarning("Team not found: {TeamId}", id);
+                    _logger.LogWarning("Time não encontrado: {TeamId}", id);
                     return null;
                 }
 
@@ -97,13 +97,13 @@ namespace HoopGameNight.Core.Services
 
                 _cache.Set(cacheKey, response, cacheOptions);
 
-                _logger.LogInformation("Retrieved team: {TeamName} and cached", response.DisplayName);
+                _logger.LogInformation("Time recuperado: {TeamName} e armazenado em cache", response.DisplayName);
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting team by ID: {TeamId}", id);
-                throw new BusinessException($"Failed to retrieve team {id}", ex);
+                _logger.LogError(ex, "Erro ao buscar time por ID: {TeamId}", id);
+                throw new BusinessException($"Falha ao recuperar o time {id}", ex);
             }
         }
 
@@ -111,23 +111,23 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Getting team by abbreviation: {Abbreviation}", abbreviation);
+                _logger.LogInformation("Buscando time por abreviação: {Abbreviation}", abbreviation);
 
                 var team = await _teamRepository.GetByAbbreviationAsync(abbreviation);
                 if (team == null)
                 {
-                    _logger.LogWarning("Team not found with abbreviation: {Abbreviation}", abbreviation);
+                    _logger.LogWarning("Time não encontrado com a abreviação: {Abbreviation}", abbreviation);
                     return null;
                 }
 
                 var response = _mapper.Map<TeamResponse>(team);
-                _logger.LogInformation("Retrieved team: {TeamName}", response.DisplayName);
+                _logger.LogInformation("Time recuperado: {TeamName}", response.DisplayName);
                 return response;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting team by abbreviation: {Abbreviation}", abbreviation);
-                throw new BusinessException($"Failed to retrieve team with abbreviation {abbreviation}", ex);
+                _logger.LogError(ex, "Erro ao buscar time por abreviação: {Abbreviation}", abbreviation);
+                throw new BusinessException($"Falha ao recuperar o time com a abreviação {abbreviation}", ex);
             }
         }
 
@@ -135,7 +135,7 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Starting sync of all teams");
+                _logger.LogInformation("Iniciando sincronização de todos os times");
 
                 var externalTeams = await _ballDontLieService.GetAllTeamsAsync();
                 var entities = _mapper.Map<List<Models.Entities.Team>>(externalTeams);
@@ -154,13 +154,12 @@ namespace HoopGameNight.Core.Services
                 // Clear all team-related cache entries
                 _cache.Remove(CacheKeys.ALL_TEAMS);
 
-
-                _logger.LogInformation("Synced {SyncCount} new teams and cleared cache", syncCount);
+                _logger.LogInformation("Sincronizados {SyncCount} novos times e cache limpo", syncCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error syncing teams");
-                throw new ExternalApiException("Ball Don't Lie", "Failed to sync teams from external API", null);
+                _logger.LogError(ex, "Erro ao sincronizar times");
+                throw new ExternalApiException("Ball Don't Lie", "Falha ao sincronizar times da API externa", null);
             }
         }
     }

@@ -1,0 +1,6 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <rect width="100" height="100" rx="10" fill="#f3f4f6"/>
+  <text x="50" y="50" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" fill="#9ca3af">NBA</text>
+  <path d="M35 30 L35 70 M40 25 L40 75 M45 20 L45 80 M50 15 L50 85 M55 20 L55 80 M60 25 L60 75 M65 30 L65 70" stroke="#d1d5db" stroke-width="2" opacity="0.5"/>
+</svg>

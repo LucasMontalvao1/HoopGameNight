@@ -4,29 +4,26 @@
     {
         public static class Games
         {
-            public const string INVALID_DATE_RANGE = "Start date cannot be greater than end date";
-            public const string INVALID_SEASON = "Season must be greater than 2000";
-            public const string TEAMS_CANNOT_BE_SAME = "Home team and visitor team cannot be the same";
+            public const string INVALID_DATE_RANGE = "A data de início não pode ser maior que a data de fim";
+            public const string INVALID_SEASON = "A temporada deve ser maior que 2000";
+            public const string TEAMS_CANNOT_BE_SAME = "O time da casa e o time visitante não podem ser iguais";
         }
-
         public static class Players
         {
-            public const string SEARCH_TOO_SHORT = "Search term must be at least 2 characters";
-            public const string SEARCH_CRITERIA_REQUIRED = "At least one search criteria is required";
-            public const string INVALID_POSITION = "Invalid player position";
+            public const string SEARCH_TOO_SHORT = "O termo de busca deve ter pelo menos 2 caracteres";
+            public const string SEARCH_CRITERIA_REQUIRED = "Pelo menos um critério de busca é obrigatório";
+            public const string INVALID_POSITION = "Posição do jogador inválida";
         }
-
         public static class Pagination
         {
-            public const string INVALID_PAGE = "Page must be greater than 0";
-            public const string INVALID_PAGE_SIZE = "Page size must be between 1 and 100";
+            public const string INVALID_PAGE = "A página deve ser maior que 0";
+            public const string INVALID_PAGE_SIZE = "O tamanho da página deve estar entre 1 e 100";
         }
-
         public static class Teams
         {
-            public const string NAME_REQUIRED = "Team name is required";
-            public const string CITY_REQUIRED = "Team city is required";
-            public const string ABBREVIATION_REQUIRED = "Team abbreviation is required";
+            public const string NAME_REQUIRED = "O nome do time é obrigatório";
+            public const string CITY_REQUIRED = "A cidade do time é obrigatória";
+            public const string ABBREVIATION_REQUIRED = "A abreviação do time é obrigatória";
         }
     }
 }

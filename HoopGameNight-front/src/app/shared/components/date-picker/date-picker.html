@@ -1,0 +1,71 @@
+<div class="date-picker">
+  <button 
+    class="date-picker__trigger"
+    (click)="toggleCalendar()"
+    type="button">
+    <span class="material-icons">calendar_today</span>
+    <span class="date-picker__text">{{ getFormattedDate() }}</span>
+    <span class="material-icons">{{ isOpen() ? 'expand_less' : 'expand_more' }}</span>
+  </button>
+
+  @if (isOpen()) {
+    <div class="date-picker__dropdown">
+      <!-- Calendar Header -->
+      <div class="calendar-header">
+        <button 
+          class="calendar-nav-btn"
+          (click)="navigateMonth('prev')"
+          type="button">
+          <span class="material-icons">chevron_left</span>
+        </button>
+        
+        <span class="calendar-month">{{ getMonthYear() }}</span>
+        
+        <button 
+          class="calendar-nav-btn"
+          (click)="navigateMonth('next')"
+          type="button">
+          <span class="material-icons">chevron_right</span>
+        </button>
+      </div>
+
+      <!-- Weekdays -->
+      <div class="calendar-weekdays">
+        <span>Seg</span>
+        <span>Ter</span>
+        <span>Qua</span>
+        <span>Qui</span>
+        <span>Sex</span>
+        <span>Sáb</span>
+        <span>Dom</span>
+      </div>
+
+      <!-- Calendar Days -->
+      <div class="calendar-days">
+        @for (day of getMonthDays(); track day.getTime()) {
+          <button
+            class="calendar-day"
+            [class.calendar-day--today]="isToday(day)"
+            [class.calendar-day--selected]="isSelected(day)"
+            [class.calendar-day--other-month]="!isCurrentMonth(day)"
+            [class.calendar-day--disabled]="isDisabled(day)"
+            [disabled]="isDisabled(day)"
+            (click)="selectDate(day)"
+            type="button">
+            {{ day.getDate() }}
+          </button>
+        }
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="calendar-footer">
+        <button 
+          class="btn btn--sm btn--ghost"
+          (click)="goToToday()"
+          type="button">
+          Hoje
+        </button>
+      </div>
+    </div>
+  }
+</div>

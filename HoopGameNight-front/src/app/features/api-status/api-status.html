@@ -1,0 +1,138 @@
+<div class="api-status">
+  <div class="api-status__container">
+    <!-- Header -->
+    <div class="api-status__header">
+      <div>
+        <h1 class="api-status__title">API Status Monitor</h1>
+        <p class="api-status__subtitle">Real-time monitoring of all system endpoints</p>
+      </div>
+      
+      <button 
+        class="btn btn--primary"
+        (click)="onManualCheck()"
+        [disabled]="healthCheck.status() === 'loading'">
+        <span class="material-icons">refresh</span>
+        Refresh Status
+      </button>
+    </div>
+
+    <!-- Main Status Card -->
+    <div class="api-status__main-card">
+      <div class="status-overview">
+        <div class="status-overview__icon">
+          <app-status-indicator 
+            [status]="healthCheck.status()"
+            [showText]="false"
+            size="large">
+          </app-status-indicator>
+        </div>
+        
+        <div class="status-overview__content">
+          <h2 class="status-overview__title">{{ healthCheck.getStatusText() }}</h2>
+          <p class="status-overview__description">
+            @if (healthCheck.isOnline()) {
+              All systems operational
+            } @else if (healthCheck.isOffline()) {
+              Service temporarily unavailable
+            } @else {
+              Checking system status...
+            }
+          </p>
+        </div>
+
+        <div class="status-overview__timestamp">
+          <span class="timestamp-label">Last checked</span>
+          <span class="timestamp-value">{{ healthCheck.getTimeSinceLastCheck() }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Information -->
+    @if (healthCheck.healthData(); as data) {
+      <div class="api-status__details">
+        <div class="detail-card">
+          <h3 class="detail-card__title">System Information</h3>
+          
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-item__label">Status</span>
+              <span class="detail-item__value detail-item__value--success">{{ data.status }}</span>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-item__label">Uptime</span>
+              <span class="detail-item__value">{{ getUptimeFormatted() }}</span>
+            </div>
+            
+            @if (data.version) {
+              <div class="detail-item">
+                <span class="detail-item__label">Version</span>
+                <span class="detail-item__value">{{ data.version }}</span>
+              </div>
+            }
+            
+            @if (data.environment) {
+              <div class="detail-item">
+                <span class="detail-item__label">Environment</span>
+                <span class="detail-item__value">{{ data.environment }}</span>
+              </div>
+            }
+            
+            <div class="detail-item">
+              <span class="detail-item__label">Last Response</span>
+              <span class="detail-item__value">{{ data.timestamp | date:'dd/MM/yyyy HH:mm:ss' }}</span>
+            </div>
+            
+            @if (data.server) {
+              <div class="detail-item">
+                <span class="detail-item__label">Server</span>
+                <span class="detail-item__value">{{ data.server }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Error Information -->
+    @if (healthCheck.errorMessage(); as error) {
+      <div class="api-status__error">
+        <div class="error-card">
+          <div class="error-card__header">
+            <span class="material-icons">error</span>
+            <h3>Connection Error</h3>
+          </div>
+          <p class="error-card__message">{{ error }}</p>
+          <div class="error-card__details">
+            <span>Last attempt: {{ healthCheck.getTimeSinceLastCheck() }}</span>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Monitoring Information -->
+    <div class="api-status__info">
+      <div class="info-card">
+        <h3 class="info-card__title">Monitoring Details</h3>
+        <div class="info-list">
+          <div class="info-item">
+            <span class="material-icons">schedule</span>
+            <span>Automatic check every 30 seconds</span>
+          </div>
+          <div class="info-item">
+            <span class="material-icons">timer</span>
+            <span>60-second timeout per request</span>
+          </div>
+          <div class="info-item">
+            <span class="material-icons">sync</span>
+            <span>Real-time status updates</span>
+          </div>
+          <div class="info-item">
+            <span class="material-icons">security</span>
+            <span>HTTPS encrypted connection</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

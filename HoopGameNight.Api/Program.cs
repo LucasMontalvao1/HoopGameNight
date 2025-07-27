@@ -22,7 +22,7 @@ using Microsoft.AspNetCore.RateLimiting;
 
 try
 {
-    Log.Information("🚀 Starting Hoop Game Night API Configuration");
+    Log.Information("Starting Hoop Game Night API Configuration");
 
     var builder = WebApplication.CreateBuilder(args);
 
@@ -38,7 +38,7 @@ try
 
     builder.Services.AddEndpointsApiExplorer();
 
-    // CONFIGURAR DATABASE - 
+    // CONFIGURAR DATABASE 
     var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
         ?? throw new InvalidOperationException("MySQL connection string not found");
 
@@ -62,7 +62,7 @@ try
     builder.Services.AddScoped<ITeamService, TeamService>();
     builder.Services.AddScoped<IPlayerService, PlayerService>();
 
-    // CONFIGURAR EXTERNAL SERVICES (BALL DON'T LIE) - ✅ CORRIGIDO
+    // CONFIGURAR EXTERNAL SERVICES (BALL DON'T LIE)
     ConfigureBallDontLieHttpClient(builder.Services, builder.Configuration);
 
     // CONFIGURAR AUTOMAPPER
@@ -71,32 +71,32 @@ try
     // CONFIGURAR CACHE
     builder.Services.AddMemoryCache();
 
-    // ✅ HEALTH CHECKS BÁSICOS (sem custom health check por enquanto)
+    // HEALTH CHECKS BÁSICOS 
     ConfigureBasicHealthChecks(builder.Services, connectionString);
 
-    // ✅ RATE LIMITING CORRIGIDO
+    // RATE LIMITING 
     ConfigureRateLimiting(builder.Services, builder.Configuration);
 
-    // CONFIGURAR SWAGGER - 
+    // CONFIGURAR SWAGGER 
     ConfigureSwagger(builder.Services);
 
     // CONFIGURAR CORS
     ConfigureCors(builder.Services, builder.Configuration);
 
-    // CONFIGURAR BACKGROUND SERVICES (OPCIONAL)
+    // CONFIGURAR BACKGROUND SERVICES 
     try
     {
         builder.Services.AddHostedService<DataSyncBackgroundService>();
-        Log.Information("✅ Background services configured");
+        Log.Information("Background services configured");
     }
     catch (Exception ex)
     {
-        Log.Warning(ex, "⚠️ Error configuring background services");
+        Log.Warning(ex, "⚠Error configuring background services");
     }
 
     // BUILD APPLICATION
     var app = builder.Build();
-    Log.Information("✅ Application built successfully");
+    Log.Information("Application built successfully");
 
     // CONFIGURAR MIDDLEWARE PIPELINE - 
 
@@ -118,7 +118,7 @@ try
             c.DisplayRequestDuration();
             c.EnableTryItOutByDefault();
         });
-        Log.Information("✅ Swagger UI available at root path");
+        Log.Information("Swagger UI available at root path");
     }
 
     // 4. HTTPS Redirection
@@ -153,25 +153,25 @@ try
     await InitializeDatabase(app);
 
     // INICIAR APLICAÇÃO
-    Log.Information("🚀 Starting Hoop Game Night API");
-    Log.Information("📊 Environment: {Environment}", app.Environment.EnvironmentName);
-    Log.Information("🌐 Swagger available at: https://localhost:7000 (or configured port)");
-    Log.Information("🏥 Health checks available at: /health");
+    Log.Information("Starting Hoop Game Night API");
+    Log.Information("Environment: {Environment}", app.Environment.EnvironmentName);
+    Log.Information("Swagger available at: https://localhost:7000 (or configured port)");
+    Log.Information("Health checks available at: /health");
 
     app.Run();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "❌ Application terminated unexpectedly");
+    Log.Fatal(ex, "Application terminated unexpectedly");
     throw;
 }
 finally
 {
-    Log.Information("🏁 Shutting down Hoop Game Night API");
+    Log.Information("Shutting down Hoop Game Night API");
     await Log.CloseAndFlushAsync();
 }
 
-// ✅ MÉTODOS DE CONFIGURAÇÃO
+// MÉTODOS DE CONFIGURAÇÃO
 
 static void ConfigureBallDontLieHttpClient(IServiceCollection services, IConfiguration configuration)
 {
@@ -198,7 +198,7 @@ static void ConfigureBallDontLieHttpClient(IServiceCollection services, IConfigu
     .AddPolicyHandler(GetCircuitBreakerPolicy());
 }
 
-// ✅ POLLY POLICIES 
+// POLLY POLICIES 
 static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
 {
     return HttpPolicyExtensions
@@ -228,7 +228,7 @@ static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
             onReset: () => Log.Information("Circuit breaker closed"));
 }
 
-// ✅ HEALTH CHECKS BÁSICOS (sem custom health check)
+// HEALTH CHECKS BÁSICOS (sem custom health check)
 static void ConfigureBasicHealthChecks(IServiceCollection services, string connectionString)
 {
     services.AddHealthChecks()
@@ -236,7 +236,7 @@ static void ConfigureBasicHealthChecks(IServiceCollection services, string conne
     
 }
 
-// ✅ RATE LIMITING 
+// RATE LIMITING 
 static void ConfigureRateLimiting(IServiceCollection services, IConfiguration configuration)
 {
     services.AddRateLimiter(options =>
@@ -245,7 +245,6 @@ static void ConfigureRateLimiting(IServiceCollection services, IConfiguration co
         {
             limiterOptions.PermitLimit = 100;
             limiterOptions.Window = TimeSpan.FromMinutes(1);
-            // ✅ REMOVIDO QueueProcessingOrder - não existe no .NET 8
             limiterOptions.QueueLimit = 10;
         });
 
@@ -322,7 +321,7 @@ static void ConfigureCors(IServiceCollection services, IConfiguration configurat
     });
 }
 
-// ✅ DATABASE INITIALIZATION SIMPLES
+// DATABASE INITIALIZATION SIMPLES
 static async Task InitializeDatabase(WebApplication app)
 {
     try

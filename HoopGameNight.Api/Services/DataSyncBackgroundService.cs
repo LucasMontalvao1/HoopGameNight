@@ -21,7 +21,7 @@ namespace HoopGameNight.Api.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("🤖 Data Sync Background Service started");
+            _logger.LogInformation("Data Sync Background Service started");
 
             // Wait 30 seconds after startup before first sync
             await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
@@ -38,12 +38,12 @@ namespace HoopGameNight.Api.Services
                 }
                 catch (OperationCanceledException)
                 {
-                    _logger.LogInformation("🛑 Data Sync Background Service is stopping");
+                    _logger.LogInformation("Data Sync Background Service is stopping");
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "❌ Error in Data Sync Background Service");
+                    _logger.LogError(ex, "Error in Data Sync Background Service");
                 }
             }
         }
@@ -57,31 +57,31 @@ namespace HoopGameNight.Api.Services
                 var teamService = scope.ServiceProvider.GetRequiredService<ITeamService>();
                 var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
 
-                _logger.LogInformation("🔄 Starting {SyncType} data synchronization", syncType);
+                _logger.LogInformation("Starting {SyncType} data synchronization", syncType);
 
                 // Check if teams need sync (only if less than 30 teams)
                 var teams = await teamService.GetAllTeamsAsync();
                 if (teams.Count < 30)
                 {
-                    _logger.LogInformation("📝 Syncing teams ({Count} found, expected 30)", teams.Count);
+                    _logger.LogInformation("Syncing teams ({Count} found, expected 30)", teams.Count);
                     await teamService.SyncAllTeamsAsync();
                 }
 
                 // Always sync today's games
-                _logger.LogInformation("🏀 Syncing today's games");
+                _logger.LogInformation("Syncing today's games");
                 await gameService.SyncTodayGamesAsync();
 
-                _logger.LogInformation("✅ {SyncType} data synchronization completed successfully", syncType);
+                _logger.LogInformation("{SyncType} data synchronization completed successfully", syncType);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Error during {SyncType} data synchronization", syncType);
+                _logger.LogError(ex, "Error during {SyncType} data synchronization", syncType);
             }
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("🛑 Data Sync Background Service is stopping...");
+            _logger.LogInformation("Data Sync Background Service is stopping...");
             await base.StopAsync(cancellationToken);
         }
     }
