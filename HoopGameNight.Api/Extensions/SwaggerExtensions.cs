@@ -10,7 +10,6 @@ namespace HoopGameNight.Api.Extensions
             try
             {
                 var apiConfig = configuration.GetSection("ApiSettings");
-
                 services.AddSwaggerGen(c =>
                 {
                     c.SwaggerDoc("v1", new OpenApiInfo
@@ -25,26 +24,20 @@ namespace HoopGameNight.Api.Extensions
                         }
                     });
 
-                    // Configurações seguras
                     c.SupportNonNullableReferenceTypes();
 
-                    // Schema IDs únicos e seguros
                     c.CustomSchemaIds(type => GetSafeSchemaId(type));
 
-                    // Ignorar propriedades problemáticas
                     c.IgnoreObsoleteActions();
                     c.IgnoreObsoleteProperties();
 
-                    // Incluir XML comments de forma segura
                     TryAddXmlComments(c);
                 });
             }
             catch (Exception ex)
             {
-                // Log do erro mas não quebra a aplicação
                 Console.WriteLine($"Swagger configuration error: {ex.Message}");
 
-                // Configuração mínima como fallback
                 services.AddSwaggerGen(c =>
                 {
                     c.SwaggerDoc("v1", new OpenApiInfo
@@ -54,7 +47,6 @@ namespace HoopGameNight.Api.Extensions
                     });
                 });
             }
-
             return services;
         }
 
@@ -66,19 +58,79 @@ namespace HoopGameNight.Api.Extensions
 
                 if (type.IsGenericType)
                 {
-                    name = type.Name.Split('`')[0];
+                    var genericType = type.GetGenericTypeDefinition();
                     var genericArgs = type.GetGenericArguments();
-                    if (genericArgs.Length > 0)
+
+                    name = genericType.Name.Split('`')[0];
+
+                    var argNames = new List<string>();
+                    foreach (var arg in genericArgs)
                     {
-                        name += "Of" + string.Join("", genericArgs.Select(arg => arg.Name));
+                        if (arg == typeof(object))
+                        {
+                            argNames.Add("Object");
+                        }
+                        else if (arg.IsGenericType)
+                        {
+                            argNames.Add(GetSafeSchemaId(arg));
+                        }
+                        else
+                        {
+                            var argName = arg.Name;
+                            argName = argName.Replace("Response", "")
+                                           .Replace("Request", "")
+                                           .Replace("Dto", "");
+                            argNames.Add(argName);
+                        }
                     }
+
+                    name = $"{name}Of{string.Join("And", argNames)}";
                 }
 
-                return name.Replace("Response", "").Replace("Request", "").Replace("+", "");
+                if (type.IsNested)
+                {
+                    name = $"{type.DeclaringType?.Name ?? "Nested"}{name}";
+                }
+
+                if (type.Namespace != null)
+                {
+                    if (type.Namespace.Contains("DTOs.Response"))
+                        name = "Response" + name;
+                    else if (type.Namespace.Contains("DTOs.Request"))
+                        name = "Request" + name;
+                    else if (type.Namespace.Contains("DTOs.External"))
+                        name = "External" + name;
+                }
+
+                name = name.Replace("`", "")
+                          .Replace("+", "")
+                          .Replace("[]", "Array")
+                          .Replace("<", "")
+                          .Replace(">", "")
+                          .Replace(",", "")
+                          .Replace(" ", "");
+
+                if ((name.StartsWith("Response") || name.StartsWith("Request")) &&
+                    (name.EndsWith("Response") || name.EndsWith("Request")))
+                {
+                    if (name.EndsWith("Response"))
+                        name = name.Substring(0, name.Length - 8);
+                    else if (name.EndsWith("Request"))
+                        name = name.Substring(0, name.Length - 7);
+                }
+
+                return name;
             }
             catch
             {
-                return type.FullName?.Replace(".", "") ?? type.Name;
+                var fullName = type.FullName ?? type.Name;
+                return fullName.Replace(".", "")
+                              .Replace("+", "")
+                              .Replace("`", "")
+                              .Replace("[", "")
+                              .Replace("]", "")
+                              .Replace(",", "")
+                              .Replace(" ", "");
             }
         }
 
@@ -88,7 +140,6 @@ namespace HoopGameNight.Api.Extensions
             {
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-
                 if (File.Exists(xmlPath))
                 {
                     c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);

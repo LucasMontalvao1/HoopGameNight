@@ -20,6 +20,20 @@
         public bool IsLive { get; set; }
         public bool IsCompleted { get; set; }
         public TeamSummaryResponse? WinningTeam { get; set; }
+        public bool IsFutureGame { get; set; }
+        public string DataSource { get; set; } = "Database";
+        public FutureGameInfo? FutureGameInfo { get; set; }
+    }
+
+    /// <summary>
+    /// Informações adicionais para jogos futuros
+    /// </summary>
+    public class FutureGameInfo
+    {
+        public string? TvChannel { get; set; }
+        public string? BettingLine { get; set; }
+        public string? Venue { get; set; }
+        public string? Weather { get; set; }
     }
 
     public class GameSummaryResponse

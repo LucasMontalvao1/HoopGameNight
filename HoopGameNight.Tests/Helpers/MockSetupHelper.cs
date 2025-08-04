@@ -80,6 +80,23 @@ namespace HoopGameNight.Tests.Helpers
             return mock;
         }
 
+        public static Mock<IEspnApiService> CreateEspnApiServiceMock()
+        {
+            var mock = new Mock<IEspnApiService>();
+
+            // Configure os métodos básicos do EspnApiService aqui
+            // Exemplo (ajuste conforme sua interface):
+            /*
+            mock.Setup(x => x.GetGamesAsync(It.IsAny<DateTime>()))
+                .ReturnsAsync(new List<EspnGameDto>());
+
+            mock.Setup(x => x.GetTeamStatsAsync(It.IsAny<int>()))
+                .ReturnsAsync(new EspnTeamStatsDto());
+            */
+
+            return mock;
+        }
+
         #endregion
 
         #region Infrastructure Mocks

@@ -13,16 +13,19 @@ namespace HoopGameNight.Api.Controllers.V1
     {
         private readonly IGameService _gameService;
         private readonly IBallDontLieService _ballDontLieService;
+        private readonly IEspnApiService _espnService;
         private readonly IMemoryCache _cache;
 
         public GamesController(
             IGameService gameService,
             IBallDontLieService ballDontLieService,
+            IEspnApiService espnService,
             IMemoryCache cache,
             ILogger<GamesController> logger) : base(logger)
         {
             _gameService = gameService;
             _ballDontLieService = ballDontLieService;
+            _espnService = espnService;
             _cache = cache;
         }
 
@@ -39,17 +42,7 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 Logger.LogInformation("Buscando jogos de hoje");
 
-                var cacheKey = ApiConstants.CacheKeys.TODAY_GAMES;
-
-                if (_cache.TryGetValue(cacheKey, out List<GameResponse>? cachedGames))
-                {
-                    Logger.LogDebug("Retornando jogos do cache");
-                    return Ok(cachedGames!, "Jogos de hoje (cache)");
-                }
-
                 var games = await _gameService.GetTodayGamesAsync();
-
-                _cache.Set(cacheKey, games, TimeSpan.FromMinutes(5));
 
                 Logger.LogInformation("Encontrados {GameCount} jogos para hoje", games.Count);
                 return Ok(games, "Jogos de hoje recuperados com sucesso");
@@ -76,6 +69,16 @@ namespace HoopGameNight.Api.Controllers.V1
                 Logger.LogInformation("Buscando jogos para a data: {Date}", date.ToShortDateString());
 
                 var games = await _gameService.GetGamesByDateAsync(date);
+
+                // Adicionar header indicando a fonte dos dados
+                if (date > DateTime.Today)
+                {
+                    Response.Headers.Add("X-Data-Source", "ESPN");
+                }
+                else
+                {
+                    Response.Headers.Add("X-Data-Source", "Database");
+                }
 
                 Logger.LogInformation("Encontrados {GameCount} jogos para a data {Date}", games.Count, date.ToShortDateString());
                 return Ok(games, $"Jogos do dia {date:yyyy-MM-dd} recuperados com sucesso");
@@ -190,6 +193,330 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         /// <summary>
+        /// Buscar jogos de múltiplos times em um período (COM SUPORTE A JOGOS FUTUROS)
+        /// </summary>
+        /// <param name="request">Requisição com times e período</param>
+        /// <returns>Jogos agrupados por time com estatísticas</returns>
+        [HttpPost("teams/games")]
+        [ProducesResponseType(typeof(ApiResponse<MultipleTeamsGamesResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<MultipleTeamsGamesResponse>>> GetGamesForMultipleTeams([FromBody] GetMultipleTeamsGamesRequest request)
+        {
+            try
+            {
+                if (request == null)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("É obrigatório informar o corpo da requisição"));
+                }
+
+                if (!request.IsValid())
+                {
+                    var errors = request.GetValidationErrors();
+                    var errorResponse = ApiResponse<object>.ErrorResult(
+                        "Parâmetros da requisição inválidos",
+                        errors
+                    );
+                    return BadRequest(errorResponse);
+                }
+
+                Logger.LogInformation(
+                    "Buscando jogos para os times: {TeamIds} de {StartDate} até {EndDate}",
+                    string.Join(",", request.TeamIds),
+                    request.StartDate.ToShortDateString(),
+                    request.EndDate.ToShortDateString()
+                );
+
+                // Agora sempre usa GameService que já tem suporte a jogos futuros
+                var result = await _gameService.GetGamesForMultipleTeamsAsync(request);
+
+                if (result == null)
+                {
+                    return NotFound(ApiResponse<MultipleTeamsGamesResponse>.ErrorResult(
+                        "Nenhum jogo encontrado para os critérios especificados"
+                    ));
+                }
+
+                // Adicionar informações nos headers
+                Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
+                Response.Headers.Add("X-Total-Games", result.AllGames.Count.ToString());
+
+                var futureGames = result.AllGames.Count(g => g.Date > DateTime.Today);
+                var pastGames = result.AllGames.Count(g => g.Date <= DateTime.Today);
+
+                Response.Headers.Add("X-Future-Games", futureGames.ToString());
+                Response.Headers.Add("X-Past-Games", pastGames.ToString());
+
+                Logger.LogInformation(
+                    "Recuperados com sucesso {GameCount} jogos para {TeamCount} times (Futuros: {FutureCount}, Passados: {PastCount})",
+                    result.AllGames.Count,
+                    request.TeamIds.Count,
+                    futureGames,
+                    pastGames
+                );
+
+                return Ok(result, "Jogos recuperados com sucesso");
+            }
+            catch (ArgumentException ex)
+            {
+                Logger.LogWarning(ex, "Argumentos inválidos para GetGamesForMultipleTeams");
+                return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar jogos para múltiplos times");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Buscar próximos jogos de um time específico
+        /// </summary>
+        /// <param name="teamId">ID do time</param>
+        /// <param name="days">Número de dias futuros (1-30)</param>
+        /// <returns>Lista de próximos jogos</returns>
+        [HttpGet("teams/{teamId}/upcoming")]
+        [ProducesResponseType(typeof(ApiResponse<List<GameResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<List<GameResponse>>>> GetUpcomingGamesForTeam(
+            int teamId,
+            [FromQuery] int days = 7)
+        {
+            try
+            {
+                if (teamId <= 0)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("ID do time inválido"));
+                }
+
+                if (days < 1 || days > 30)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult(
+                        "O parâmetro de dias deve estar entre 1 e 30"
+                    ));
+                }
+
+                Logger.LogInformation(
+                    "Buscando próximos jogos para o time {TeamId} nos próximos {Days} dias",
+                    teamId,
+                    days
+                );
+
+                var upcomingGames = await _gameService.GetUpcomingGamesForTeamAsync(teamId, days);
+
+                Response.Headers.Add("X-Data-Source", upcomingGames.Any(g => g.IsFutureGame) ? "ESPN" : "Database");
+
+                if (upcomingGames.Count == 0)
+                {
+                    return Ok(
+                        new List<GameResponse>(),
+                        $"Nenhum próximo jogo encontrado nos próximos {days} dias"
+                    );
+                }
+
+                return Ok(upcomingGames, $"Encontrados {upcomingGames.Count} próximos jogos");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar próximos jogos para o time {TeamId}", teamId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Buscar jogos recentes de um time específico
+        /// </summary>
+        /// <param name="teamId">ID do time</param>
+        /// <param name="days">Número de dias passados (1-30)</param>
+        /// <returns>Lista de jogos recentes</returns>
+        [HttpGet("teams/{teamId}/recent")]
+        [ProducesResponseType(typeof(ApiResponse<List<GameResponse>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<List<GameResponse>>>> GetRecentGamesForTeam(
+            int teamId,
+            [FromQuery] int days = 7)
+        {
+            try
+            {
+                if (teamId <= 0)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("ID do time inválido"));
+                }
+
+                if (days < 1 || days > 30)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult(
+                        "O parâmetro de dias deve estar entre 1 e 30"
+                    ));
+                }
+
+                Logger.LogInformation(
+                    "Buscando jogos recentes para o time {TeamId} nos últimos {Days} dias",
+                    teamId,
+                    days
+                );
+
+                var recentGames = await _gameService.GetRecentGamesForTeamAsync(teamId, days);
+
+                var summary = new
+                {
+                    TotalGames = recentGames.Count,
+                    Wins = recentGames.Count(g => g.WinningTeam?.Id == teamId),
+                    Losses = recentGames.Count(g => g.IsCompleted && g.WinningTeam?.Id != teamId),
+                    HomeGames = recentGames.Count(g => g.HomeTeam.Id == teamId),
+                    AwayGames = recentGames.Count(g => g.VisitorTeam.Id == teamId)
+                };
+
+                Response.Headers.Add("X-Games-Summary", System.Text.Json.JsonSerializer.Serialize(summary));
+
+                return Ok(recentGames, $"Encontrados {recentGames.Count} jogos recentes");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar jogos recentes para o time {TeamId}", teamId);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Buscar jogos dos times favoritos (COM SUPORTE A JOGOS FUTUROS)
+        /// </summary>
+        /// <param name="teamIds">Lista de IDs dos times favoritos</param>
+        /// <param name="startDate">Data inicial (opcional)</param>
+        /// <param name="endDate">Data final (opcional)</param>
+        /// <returns>Jogos dos times favoritos</returns>
+        [HttpPost("favorites")]
+        [ProducesResponseType(typeof(ApiResponse<MultipleTeamsGamesResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<MultipleTeamsGamesResponse>>> GetFavoriteTeamsGames(
+            [FromBody] List<int> teamIds,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
+        {
+            try
+            {
+                if (teamIds == null || teamIds.Count == 0)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Pelo menos um ID de time é obrigatório"));
+                }
+
+                if (teamIds.Count > 5)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Máximo de 5 times favoritos permitidos"));
+                }
+
+                var start = startDate ?? DateTime.Today.AddDays(-7);
+                var end = endDate ?? DateTime.Today.AddDays(7);
+
+                Logger.LogInformation(
+                    "Buscando jogos para {Count} times favoritos de {StartDate} até {EndDate}",
+                    teamIds.Count,
+                    start.ToShortDateString(),
+                    end.ToShortDateString()
+                );
+
+                var request = new GetMultipleTeamsGamesRequest
+                {
+                    TeamIds = teamIds,
+                    StartDate = start,
+                    EndDate = end,
+                    GroupByTeam = true,
+                    IncludeStats = true
+                };
+
+                var result = await _gameService.GetGamesForMultipleTeamsAsync(request);
+
+                Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
+
+                var favoriteSummary = new
+                {
+                    TotalGames = result.AllGames.Count,
+                    TodayGames = result.AllGames.Count(g => g.Date.Date == DateTime.Today),
+                    LiveGames = result.AllGames.Count(g => g.IsLive),
+                    NextGames = result.AllGames
+                        .Where(g => !g.IsCompleted && g.Date >= DateTime.Now)
+                        .OrderBy(g => g.Date)
+                        .Take(5)
+                        .ToList()
+                };
+
+                Response.Headers.Add("X-Favorites-Summary", System.Text.Json.JsonSerializer.Serialize(favoriteSummary));
+
+                Logger.LogInformation(
+                    "Encontrados {GameCount} jogos para {TeamCount} times favoritos",
+                    result.AllGames.Count,
+                    teamIds.Count
+                );
+
+                return Ok(result, "Jogos dos times favoritos recuperados com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar jogos dos times favoritos");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Buscar calendário do mês (COM JOGOS FUTUROS)
+        /// </summary>
+        /// <param name="year">Ano</param>
+        /// <param name="month">Mês</param>
+        /// <returns>Calendário de jogos do mês</returns>
+        [HttpGet("calendar/{year}/{month}")]
+        [ProducesResponseType(typeof(ApiResponse<Dictionary<DateTime, List<GameResponse>>>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<ApiResponse<Dictionary<DateTime, List<GameResponse>>>>> GetMonthCalendar(
+            int year,
+            int month)
+        {
+            try
+            {
+                if (year < 2000 || year > 2030)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Ano inválido"));
+                }
+
+                if (month < 1 || month > 12)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Mês inválido"));
+                }
+
+                Logger.LogInformation("Buscando calendário para {Year}/{Month}", year, month);
+
+                var startDate = new DateTime(year, month, 1);
+                var endDate = startDate.AddMonths(1).AddDays(-1);
+
+                // Buscar jogos de todos os times para o mês
+                var request = new GetMultipleTeamsGamesRequest
+                {
+                    TeamIds = Enumerable.Range(1, 30).ToList(), // Todos os times
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    GroupByTeam = false,
+                    IncludeStats = false
+                };
+
+                var result = await _gameService.GetGamesForMultipleTeamsAsync(request);
+
+                // Agrupar por data
+                var calendar = result.AllGames
+                    .GroupBy(g => g.Date.Date)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
+                Response.Headers.Add("X-Total-Days", calendar.Count.ToString());
+                Response.Headers.Add("X-Total-Games", result.AllGames.Count.ToString());
+
+                return Ok(calendar, $"Calendário para {month:00}/{year} recuperado com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar calendário para {Year}/{Month}", year, month);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Sincronizar jogos de hoje da API externa
         /// </summary>
         /// <returns>Resultado da sincronização</returns>
@@ -202,10 +529,13 @@ namespace HoopGameNight.Api.Controllers.V1
                 Logger.LogInformation("Iniciando sincronização manual dos jogos de hoje");
 
                 await _gameService.SyncTodayGamesAsync();
+
+                // Limpar cache após sincronização
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
+
                 var games = await _gameService.GetTodayGamesAsync();
 
-                var result = (object)new
+                var result = new
                 {
                     message = "Jogos de hoje sincronizados com sucesso",
                     gameCount = games.Count,
@@ -213,7 +543,7 @@ namespace HoopGameNight.Api.Controllers.V1
                 };
 
                 Logger.LogInformation("Sincronização manual concluída - {GameCount} jogos", games.Count);
-                return Ok(result, "Jogos de hoje sincronizados com sucesso");
+                return Ok((object)result, "Jogos de hoje sincronizados com sucesso");
             }
             catch (Exception ex)
             {
@@ -229,25 +559,32 @@ namespace HoopGameNight.Api.Controllers.V1
         /// <returns>Resultado da sincronização</returns>
         [HttpPost("sync/date/{date}")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<ApiResponse<object>>> SyncGamesByDate(DateTime date)
         {
             try
             {
-                if (date > DateTime.Today.AddDays(30))
+                if (date > DateTime.Today)
                 {
-                    return BadRequest<object>("Não é possível sincronizar jogos com mais de 30 dias no futuro");
+                    return BadRequest(ApiResponse<object>.ErrorResult("Não é possível sincronizar jogos futuros"));
+                }
+
+                if (date < DateTime.Today.AddYears(-2))
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Data muito antiga para sincronização"));
                 }
 
                 Logger.LogInformation("Sincronizando jogos para a data: {Date}", date.ToShortDateString());
 
                 var syncCount = await _gameService.SyncGamesByDateAsync(date);
 
+                // Limpar cache
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
                 _cache.Remove(string.Format(ApiConstants.CacheKeys.GAMES_BY_DATE, date.ToString("yyyy-MM-dd")));
 
                 var savedGames = await _gameService.GetGamesByDateAsync(date);
 
-                var result = (object)new
+                var result = new
                 {
                     message = $"Jogos sincronizados com sucesso para {date:yyyy-MM-dd}",
                     syncedCount = syncCount,
@@ -257,46 +594,11 @@ namespace HoopGameNight.Api.Controllers.V1
                 };
 
                 Logger.LogInformation("Sincronização concluída para {Date} - {GameCount} jogos", date.ToShortDateString(), syncCount);
-                return Ok(result, "Jogos sincronizados com sucesso");
+                return Ok((object)result, "Jogos sincronizados com sucesso");
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Erro ao sincronizar jogos para a data: {Date}", date);
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Buscar jogos diretamente da API externa (sem salvar)
-        /// </summary>
-        /// <returns>Jogos direto da Ball Don't Lie API</returns>
-        [HttpGet("external/today")]
-        [ProducesResponseType(typeof(ApiResponse<List<object>>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ApiResponse<List<object>>>> GetTodayGamesFromExternal()
-        {
-            try
-            {
-                Logger.LogInformation("Buscando jogos de hoje diretamente da API externa");
-
-                var externalGames = await _ballDontLieService.GetTodaysGamesAsync();
-                var gamesList = externalGames.Select(g => new
-                {
-                    id = g.Id,
-                    date = g.Date,
-                    homeTeam = g.HomeTeam.FullName,
-                    visitorTeam = g.VisitorTeam.FullName,
-                    status = g.Status,
-                    homeScore = g.HomeTeamScore,
-                    visitorScore = g.VisitorTeamScore
-                }).ToList<object>();
-
-                Logger.LogInformation("Recuperados {GameCount} jogos da API externa", gamesList.Count);
-                return Ok(gamesList, "Jogos de hoje da API externa");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao buscar jogos da API externa");
                 throw;
             }
         }
@@ -314,7 +616,7 @@ namespace HoopGameNight.Api.Controllers.V1
                 var localGamesCount = (await _gameService.GetTodayGamesAsync()).Count;
                 var externalGamesCount = (await _ballDontLieService.GetTodaysGamesAsync()).Count();
 
-                var status = (object)new
+                var status = new
                 {
                     localGames = localGamesCount,
                     externalGames = externalGamesCount,
@@ -322,10 +624,10 @@ namespace HoopGameNight.Api.Controllers.V1
                     lastCheck = DateTime.UtcNow,
                     recommendation = localGamesCount != externalGamesCount ?
                        "Sincronização recomendada - divergência detectada" :
-                        "Dados sincronizado"
+                        "Dados sincronizados"
                 };
 
-                return Ok(status, "Status da sincronização recuperado");
+                return Ok((object)status, "Status da sincronização recuperado");
             }
             catch (Exception ex)
             {
@@ -333,5 +635,176 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
+
+        /// <summary>
+        /// Verificar calendário da temporada atual
+        /// </summary>
+        [HttpGet("season/current")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<object>>> GetCurrentSeasonInfo()
+        {
+            try
+            {
+                var currentYear = DateTime.Today.Year;
+                var currentMonth = DateTime.Today.Month;
+                string seasonStatus;
+                string seasonYear;
+                DateTime seasonStart;
+                DateTime seasonEnd;
+
+                if (currentMonth >= 10)
+                {
+                    seasonYear = $"{currentYear}-{currentYear + 1}";
+                    seasonStart = new DateTime(currentYear, 10, 1);
+                    seasonEnd = new DateTime(currentYear + 1, 6, 30);
+                    seasonStatus = "Temporada Regular";
+                }
+                else if (currentMonth <= 6)
+                {
+                    seasonYear = $"{currentYear - 1}-{currentYear}";
+                    seasonStart = new DateTime(currentYear - 1, 10, 1);
+                    seasonEnd = new DateTime(currentYear, 6, 30);
+                    seasonStatus = currentMonth >= 4 ? "Playoffs" : "Temporada Regular";
+                }
+                else
+                {
+                    seasonYear = $"{currentYear}-{currentYear + 1}";
+                    seasonStart = new DateTime(currentYear, 10, 1);
+                    seasonEnd = new DateTime(currentYear + 1, 6, 30);
+                    seasonStatus = "Período de Descanso - Nenhum jogo agendado";
+                }
+
+                var info = new
+                {
+                    currentDate = DateTime.Today.ToString("yyyy-MM-dd"),
+                    season = seasonYear,
+                    status = seasonStatus,
+                    seasonStart = seasonStart.ToString("yyyy-MM-dd"),
+                    seasonEnd = seasonEnd.ToString("yyyy-MM-dd"),
+                    isOffseason = currentMonth >= 7 && currentMonth <= 9,
+                    note = currentMonth >= 7 && currentMonth <= 9
+                        ? "NBA está no período de descanso. A próxima temporada começa em outubro."
+                        : "Temporada está ativa. Jogos devem estar disponíveis."
+                };
+
+                return Ok((object)info, "Informações da temporada recuperadas com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao obter informações da temporada");
+                throw;
+            }
+        }
+
+        #region Endpoints de Desenvolvimento/Debug (remover em produção)
+
+        /// <summary>
+        /// Buscar jogos diretamente da API externa (sem salvar) - APENAS DESENVOLVIMENTO
+        /// </summary>
+        [HttpGet("external/today")]
+        [ProducesResponseType(typeof(ApiResponse<List<ExternalGameDto>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<List<ExternalGameDto>>>> GetTodayGamesFromExternal()
+        {
+            if (!HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
+            {
+                return NotFound();
+            }
+
+            try
+            {
+                Logger.LogInformation("Buscando jogos de hoje diretamente da API externa");
+
+                var externalGames = await _ballDontLieService.GetTodaysGamesAsync();
+                var gamesList = externalGames.Select(g => new ExternalGameDto
+                {
+                    Id = g.Id,
+                    Date = g.Date,
+                    HomeTeam = g.HomeTeam.FullName,
+                    VisitorTeam = g.VisitorTeam.FullName,
+                    Status = g.Status,
+                    HomeScore = g.HomeTeamScore,
+                    VisitorScore = g.VisitorTeamScore
+                }).ToList();
+
+                Logger.LogInformation("Recuperados {GameCount} jogos da API externa", gamesList.Count);
+                return Ok(gamesList, "Jogos de hoje da API externa");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar jogos da API externa");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Testar API da ESPN diretamente - APENAS DESENVOLVIMENTO
+        /// </summary>
+        [HttpGet("test/espn/{teamId}")]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<object>>> TestEspnApi(int teamId)
+        {
+            if (!HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
+            {
+                return NotFound();
+            }
+
+            try
+            {
+                Logger.LogInformation("Testando ESPN API para time {TeamId}", teamId);
+
+                // Buscar próximos 30 dias
+                var futureGames = await _espnService.GetTeamScheduleAsync(
+                    teamId,
+                    DateTime.Today,
+                    DateTime.Today.AddDays(30)
+                );
+
+                // Buscar últimos 30 dias
+                var pastGames = await _espnService.GetTeamScheduleAsync(
+                    teamId,
+                    DateTime.Today.AddDays(-30),
+                    DateTime.Today
+                );
+
+                var result = new
+                {
+                    teamId,
+                    currentDate = DateTime.Today.ToString("yyyy-MM-dd"),
+                    futureGames = new
+                    {
+                        count = futureGames.Count,
+                        dateRange = $"{DateTime.Today:yyyy-MM-dd} to {DateTime.Today.AddDays(30):yyyy-MM-dd}",
+                        games = futureGames.Take(5).ToList()
+                    },
+                    pastGames = new
+                    {
+                        count = pastGames.Count,
+                        dateRange = $"{DateTime.Today.AddDays(-30):yyyy-MM-dd} to {DateTime.Today:yyyy-MM-dd}",
+                        games = pastGames.TakeLast(5).ToList()
+                    },
+                    note = "Se não há jogos futuros, pode ser offseason ou a ESPN não tem dados disponíveis ainda"
+                };
+
+                return Ok((object)result, "ESPN API test completed");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao testar ESPN API");
+                return Ok((object)new { error = ex.Message }, "ESPN API test failed");
+            }
+        }
+
+        #endregion
+    }
+
+    public class ExternalGameDto
+    {
+        public int Id { get; set; }
+        public string Date { get; set; } = string.Empty;
+        public string HomeTeam { get; set; } = string.Empty;
+        public string VisitorTeam { get; set; } = string.Empty;
+        public string? Status { get; set; }
+        public int? HomeScore { get; set; }
+        public int? VisitorScore { get; set; }
     }
 }

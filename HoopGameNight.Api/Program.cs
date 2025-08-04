@@ -1,115 +1,127 @@
 ﻿using HoopGameNight.Api.Extensions;
+using HoopGameNight.Api.Options;
 using HoopGameNight.Api.Services;
 using HoopGameNight.Api.Mappings;
-using HoopGameNight.Core.Interfaces.Infrastructure;
-using HoopGameNight.Core.Interfaces.Repositories;
-using HoopGameNight.Core.Interfaces.Services;
-using HoopGameNight.Core.Services;
 using HoopGameNight.Infrastructure.Data;
-using HoopGameNight.Infrastructure.ExternalServices;
-using HoopGameNight.Infrastructure.Repositories;
-using MySqlConnector;
-using System.Data;
+using HoopGameNight.Infrastructure.Services;
 using Serilog;
-using MySqlConnection = MySqlConnector.MySqlConnection;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.OpenApi.Models;
-using System.Reflection;
-using Polly;
-using Polly.Extensions.Http;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Diagnostics;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// ===== CONFIGURAR SERILOG =====
+builder.Host.UseSerilog((context, configuration) =>
+    configuration.ReadFrom.Configuration(context.Configuration));
 
 try
 {
-    Log.Information("Starting Hoop Game Night API Configuration");
+    Log.Information("Iniciando a Configuração da API do Hoop Game Night");
 
-    var builder = WebApplication.CreateBuilder(args);
+    // ===== CONFIGURAR SERVIÇOS =====
+    ConfigureServices(builder.Services, builder.Configuration);
 
-    // CONFIGURAR SERILOG
-    builder.Host.UseSerilog((context, configuration) =>
-        configuration.ReadFrom.Configuration(context.Configuration));
+    // ===== BUILD APPLICATION =====
+    Log.Information("Aplicação Versão: {Version}", builder.Configuration["Application:Version"] ?? "1.0.0");
+    var app = builder.Build();
+    Log.Information("Aplicação construída com sucesso");
 
-    // CONFIGURAR SERVIÇOS BÁSICOS
-    builder.Services.AddControllers(options =>
+    // ===== CONFIGURAR PIPELINE =====
+    ConfigurePipeline(app);
+
+    // ===== INICIALIZAR BANCO DE DADOS =====
+    await InitializeDatabaseWithRetryAsync(app);
+
+    // ===== LOG DE STARTUP =====
+    LogStartupInformation(app);
+
+    // ===== EXECUTAR APLICAÇÃO =====
+    Log.Information("A API do Hoop Game Night já está em execução");
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "O aplicativo foi encerrado inesperadamente");
+    return 1; 
+}
+finally
+{
+    Log.Information("Desligando a API do Hoop Game Night");
+    await Log.CloseAndFlushAsync();
+}
+
+return 0;
+
+// ========== MÉTODOS DE CONFIGURAÇÃO ==========
+
+static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    Log.Information("Configurando serviços...");
+
+    services.AddControllers(options =>
     {
         options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
     });
 
-    builder.Services.AddEndpointsApiExplorer();
-
-    // CONFIGURAR DATABASE 
-    var connectionString = builder.Configuration.GetConnectionString("MySqlConnection")
-        ?? throw new InvalidOperationException("MySQL connection string not found");
-
-    // Database abstrações na ordem correta
-    builder.Services.AddScoped<IDbConnection>(sp => new MySqlConnection(connectionString));
-    builder.Services.AddSingleton<IDatabaseConnection>(sp => new HoopGameNight.Infrastructure.Data.MySqlConnection(connectionString));
-
-    //  Query Executor abstração
-    builder.Services.AddScoped<IDatabaseQueryExecutor, DapperQueryExecutor>();
-
-    builder.Services.AddSingleton<ISqlLoader, SqlLoader>();
-    builder.Services.AddScoped<DatabaseInitializer>();
-
-    // CONFIGURAR REPOSITORIES
-    builder.Services.AddScoped<IGameRepository, GameRepository>();
-    builder.Services.AddScoped<ITeamRepository, TeamRepository>();
-    builder.Services.AddScoped<IPlayerRepository, PlayerRepository>();
-
-    // CONFIGURAR SERVICES
-    builder.Services.AddScoped<IGameService, GameService>();
-    builder.Services.AddScoped<ITeamService, TeamService>();
-    builder.Services.AddScoped<IPlayerService, PlayerService>();
-
-    // CONFIGURAR EXTERNAL SERVICES (BALL DON'T LIE)
-    ConfigureBallDontLieHttpClient(builder.Services, builder.Configuration);
-
-    // CONFIGURAR AUTOMAPPER
-    builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
-
-    // CONFIGURAR CACHE
-    builder.Services.AddMemoryCache();
-
-    // HEALTH CHECKS BÁSICOS 
-    ConfigureBasicHealthChecks(builder.Services, connectionString);
-
-    // RATE LIMITING 
-    ConfigureRateLimiting(builder.Services, builder.Configuration);
-
-    // CONFIGURAR SWAGGER 
-    ConfigureSwagger(builder.Services);
-
-    // CONFIGURAR CORS
-    ConfigureCors(builder.Services, builder.Configuration);
-
-    // CONFIGURAR BACKGROUND SERVICES 
-    try
+    services.ConfigureHttpJsonOptions(options =>
     {
-        builder.Services.AddHostedService<DataSyncBackgroundService>();
-        Log.Information("Background services configured");
-    }
-    catch (Exception ex)
+        options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.SerializerOptions.WriteIndented = false; 
+        options.SerializerOptions.PropertyNameCaseInsensitive = true;
+    });
+
+    services.AddEndpointsApiExplorer();
+
+    // Validação de configuração crítica
+    ValidateCriticalConfiguration(configuration);
+
+    // Cache e Métricas 
+    services.AddCacheAndMetrics();
+
+    // Serviços da aplicação
+    services.AddApplicationServices(configuration);
+
+    // Options Pattern
+    services.AddApplicationOptions(configuration);
+
+    // Health Checks
+    services.AddCustomHealthChecks(configuration);
+
+    // Rate Limiting
+    services.AddRateLimiting(configuration);
+
+    // Swagger
+    services.AddSwaggerDocumentation(configuration);
+
+    // CORS
+    services.AddCustomCors(configuration);
+
+    // Background Services
+    services.AddHostedService<DataSyncBackgroundService>();
+
+    Log.Information("Serviços configurados com sucesso");
+}
+
+static void ConfigurePipeline(WebApplication app)
+{
+    Log.Information("Configurando o pipeline de solicitação...");
+
+    // Middleware de segurança
+    if (!app.Environment.IsDevelopment())
     {
-        Log.Warning(ex, "⚠Error configuring background services");
+        app.UseHsts(); 
+        app.UseHttpsRedirection();
     }
 
-    // BUILD APPLICATION
-    var app = builder.Build();
-    Log.Information("Application built successfully");
+    // Middleware customizado
+    app.UseApplicationMiddleware(app.Environment);
 
-    // CONFIGURAR MIDDLEWARE PIPELINE - 
-
-    // 1. Error Handling (sempre primeiro)
-    app.UseMiddleware<HoopGameNight.Api.Middleware.ErrorHandlingMiddleware>();
-
-    // 2. Security Headers (cedo no pipeline)
-    app.UseSecurityHeaders();
-
-    // 3. Development middleware
+    // Development middleware
     if (app.Environment.IsDevelopment())
     {
-        app.UseDeveloperExceptionPage();
         app.UseSwagger();
         app.UseSwaggerUI(c =>
         {
@@ -117,239 +129,214 @@ try
             c.RoutePrefix = string.Empty;
             c.DisplayRequestDuration();
             c.EnableTryItOutByDefault();
+            c.EnableDeepLinking();
+            c.ShowExtensions();
+            c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
         });
-        Log.Information("Swagger UI available at root path");
     }
 
-    // 4. HTTPS Redirection
-    app.UseHttpsRedirection();
-
-    // 5. Rate Limiting (antes de routing)
-    app.UseRateLimiter();
-
-    // 6. CORS
+    // 4. CORS 
     var corsPolicy = app.Configuration.GetSection("Cors")["PolicyName"] ?? "HoopGameNightPolicy";
     app.UseCors(corsPolicy);
 
-    // 7. Routing
+    // 5. Routing
     app.UseRouting();
 
-    // 8. Health Checks BÁSICOS
-    app.MapHealthChecks("/health");
+    // 6. Rate Limiting 
+   // app.UseRateLimiter();
 
-    // 9. Controllers
+    // 7. Authentication/Authorization 
+    // app.UseAuthentication();
+    // app.UseAuthorization();
+
+    // 8. Controllers
     app.MapControllers();
 
-    // 10. Info endpoints
-    app.MapGet("/info", () => Results.Ok(new
+    // 9. Health Checks
+    app.UseHealthChecksEndpoints();
+
+    // 10. Endpoints customizados
+    MapCustomEndpoints(app);
+
+    Log.Information("O pipeline de solicitação foi configurado com sucesso");
+}
+
+static void MapCustomEndpoints(WebApplication app)
+{
+    // Info endpoint com mais detalhes
+    app.MapGet("/info", (IConfiguration config) =>
     {
-        name = "Hoop Game Night API",
-        version = "1.0.0",
-        environment = app.Environment.EnvironmentName,
-        timestamp = DateTime.UtcNow
-    }));
+        var version = config["Application:Version"] ?? "1.0.0";
+        var buildDate = config["Application:BuildDate"] ?? DateTime.UtcNow.ToString("yyyy-MM-dd");
 
-    // INICIALIZAR BANCO DE DADOS -
-    await InitializeDatabase(app);
-
-    // INICIAR APLICAÇÃO
-    Log.Information("Starting Hoop Game Night API");
-    Log.Information("Environment: {Environment}", app.Environment.EnvironmentName);
-    Log.Information("Swagger available at: https://localhost:7000 (or configured port)");
-    Log.Information("Health checks available at: /health");
-
-    app.Run();
-}
-catch (Exception ex)
-{
-    Log.Fatal(ex, "Application terminated unexpectedly");
-    throw;
-}
-finally
-{
-    Log.Information("Shutting down Hoop Game Night API");
-    await Log.CloseAndFlushAsync();
-}
-
-// MÉTODOS DE CONFIGURAÇÃO
-
-static void ConfigureBallDontLieHttpClient(IServiceCollection services, IConfiguration configuration)
-{
-    services.AddHttpClient<IBallDontLieService, BallDontLieService>((serviceProvider, client) =>
-    {
-        var config = serviceProvider.GetRequiredService<IConfiguration>();
-        var section = config.GetSection("ExternalApis:BallDontLie");
-
-        var baseUrl = section["BaseUrl"];
-        var apiKey = section["ApiKey"];
-
-        if (string.IsNullOrEmpty(baseUrl))
-            throw new InvalidOperationException("BallDontLie BaseUrl not configured");
-
-        if (string.IsNullOrEmpty(apiKey))
-            throw new InvalidOperationException("BallDontLie ApiKey not configured");
-
-        client.BaseAddress = new Uri(baseUrl!);
-        client.Timeout = TimeSpan.FromSeconds(30);
-        client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
-        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        return Results.Ok(new
+        {
+            name = "Hoop Game Night API",
+            version,
+            buildDate,
+            environment = app.Environment.EnvironmentName,
+            timestamp = DateTime.UtcNow,
+            uptime = GetUptime()
+        });
     })
-    .AddPolicyHandler(GetRetryPolicy())
-    .AddPolicyHandler(GetCircuitBreakerPolicy());
-}
+    .WithName("GetApiInfo")
+    .WithTags("System")
+    .AllowAnonymous()
+    .Produces<object>(200);
 
-// POLLY POLICIES 
-static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
-{
-    return HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .WaitAndRetryAsync(
-            retryCount: 3,
-            sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-            onRetry: (outcome, timespan, retryCount, context) => 
+    app.MapGet("/metrics", async (ICacheService cache, ISyncMetricsService sync) =>
+    {
+        try
+        {
+            var cacheStats = cache.GetStatistics();
+            var syncMetrics = sync.GetMetrics();
+
+            return Results.Ok(new
             {
-                Log.Warning("Retry {RetryCount} after {Delay}ms. Reason: {Reason}",
-                    retryCount, timespan.TotalMilliseconds, outcome.Exception?.Message ?? "Unknown");
+                cache = new
+                {
+                    hitRate = $"{cacheStats.HitRate:P}",
+                    requests = cacheStats.TotalRequests,
+                    hits = cacheStats.Hits,
+                    misses = cacheStats.Misses,
+                    entries = cacheStats.CurrentEntries,
+                    evictions = cacheStats.Evictions
+                },
+                sync = new
+                {
+                    successRate = $"{syncMetrics.SuccessRate:F1}%",
+                    totalSyncs = syncMetrics.TotalSyncs,
+                    successful = syncMetrics.SuccessfulSyncs,
+                    failed = syncMetrics.FailedSyncs,
+                    lastSync = syncMetrics.LastSyncTime?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Never"
+                },
+                timestamp = DateTime.UtcNow,
+                uptime = GetUptime()
             });
-}
-
-static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
-{
-    return HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .CircuitBreakerAsync(
-            handledEventsAllowedBeforeBreaking: 3,
-            durationOfBreak: TimeSpan.FromSeconds(30),
-            onBreak: (exception, duration) => 
-            {
-                Log.Warning("Circuit breaker opened for {Duration}. Reason: {Reason}",
-                    duration, exception.Exception?.Message ?? "Unknown");
-            },
-            onReset: () => Log.Information("Circuit breaker closed"));
-}
-
-// HEALTH CHECKS BÁSICOS (sem custom health check)
-static void ConfigureBasicHealthChecks(IServiceCollection services, string connectionString)
-{
-    services.AddHealthChecks()
-        .AddMySql(connectionString, name: "mysql", tags: new[] { "database", "mysql" });
-    
-}
-
-// RATE LIMITING 
-static void ConfigureRateLimiting(IServiceCollection services, IConfiguration configuration)
-{
-    services.AddRateLimiter(options =>
-    {
-        options.AddFixedWindowLimiter("ApiPolicy", limiterOptions =>
-        {
-            limiterOptions.PermitLimit = 100;
-            limiterOptions.Window = TimeSpan.FromMinutes(1);
-            limiterOptions.QueueLimit = 10;
-        });
-
-        options.OnRejected = async (context, token) =>
-        {
-            context.HttpContext.Response.StatusCode = 429;
-            await context.HttpContext.Response.WriteAsync("Rate limit exceeded", token);
-        };
-    });
-}
-
-static void ConfigureSwagger(IServiceCollection services)
-{
-    services.AddSwaggerGen(c =>
-    {
-        c.SwaggerDoc("v1", new OpenApiInfo
-        {
-            Title = "Hoop Game Night API",
-            Version = "v1",
-            Description = "API completa para acompanhamento de jogos da NBA",
-            Contact = new OpenApiContact
-            {
-                Name = "Support Team",
-                Email = "support@hoopgamenight.com"
-            }
-        });
-
-        // Include XML comments if available
-        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-        if (File.Exists(xmlPath))
-        {
-            c.IncludeXmlComments(xmlPath);
         }
-    });
-}
-
-static void ConfigureCors(IServiceCollection services, IConfiguration configuration)
-{
-    var corsConfig = configuration.GetSection("Cors");
-
-    services.AddCors(options =>
-    {
-        options.AddPolicy(corsConfig["PolicyName"] ?? "HoopGameNightPolicy", policy =>
+        catch (Exception ex)
         {
-            var allowedOrigins = corsConfig.GetSection("AllowedOrigins").Get<string[]>()
-                ?? new[] { "http://localhost:3000", "https://localhost:3000" };
+            Log.Warning(ex, "Erro ao recuperar métricas");
+            return Results.Problem("Erro ao recuperar métricas", statusCode: 500);
+        }
+    })
+    .WithName("GetMetrics")
+    .WithTags("Monitoring")
+    .AllowAnonymous()
+    .Produces<object>(200)
+    .Produces(500);
 
-            var allowedMethods = corsConfig.GetSection("AllowedMethods").Get<string[]>()
-                ?? new[] { "GET", "POST", "PUT", "DELETE", "OPTIONS" };
-
-            var allowedHeaders = corsConfig.GetSection("AllowedHeaders").Get<string[]>()
-                ?? new[] { "*" };
-
-            var allowCredentials = corsConfig.GetValue<bool>("AllowCredentials");
-
-            if (allowedOrigins.Contains("*"))
-            {
-                policy.AllowAnyOrigin();
-            }
-            else
-            {
-                policy.WithOrigins(allowedOrigins);
-            }
-
-            policy.WithMethods(allowedMethods)
-                  .WithHeaders(allowedHeaders);
-
-            if (allowCredentials && !allowedOrigins.Contains("*"))
-            {
-                policy.AllowCredentials();
-            }
-        });
-    });
+    app.MapGet("/status", () => Results.Ok(new
+    {
+        status = "healthy",
+        timestamp = DateTime.UtcNow,
+        uptime = GetUptime()
+    }))
+    .WithName("GetStatus")
+    .WithTags("System")
+    .AllowAnonymous()
+    .Produces<object>(200);
 }
 
-// DATABASE INITIALIZATION SIMPLES
-static async Task InitializeDatabase(WebApplication app)
+static async Task InitializeDatabaseWithRetryAsync(WebApplication app)
 {
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var dbInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-        await dbInitializer.InitializeAsync();
-        Log.Information("✅ Database initialized successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "❌ Error initializing database - continuing without it");
-    }
-}
+    const int maxRetries = 3;
+    const int delayMs = 2000;
 
-// EXTENSION METHOD PARA SECURITY HEADERS
-public static class SecurityHeadersExtensions
-{
-    public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app)
+    for (int attempt = 1; attempt <= maxRetries; attempt++)
     {
-        return app.Use(async (context, next) =>
+        try
         {
-            context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
-            context.Response.Headers.Add("X-Frame-Options", "DENY");
-            context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
-            context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
-            context.Response.Headers.Add("Content-Security-Policy", "default-src 'self'");
-            await next();
-        });
+            Log.Information("Inicializando banco de dados (attempt {Attempt}/{MaxRetries})", attempt, maxRetries);
+            await app.InitializeDatabaseAsync();
+            Log.Information("Banco de dados inicializado com sucesso");
+            return;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "A inicialização do banco de dados falhou na tentativa {Attempt}/{MaxRetries}", attempt, maxRetries);
+
+            if (attempt == maxRetries)
+            {
+                Log.Fatal("A inicialização do banco de dados falhou após {MaxRetries} tentativas", maxRetries);
+                throw;
+            }
+
+            Log.Information("Aguardando {DelayMs}ms antes da próxima tentativa...", delayMs);
+            await Task.Delay(delayMs);
+        }
     }
+}
+
+static void ValidateCriticalConfiguration(IConfiguration configuration)
+{
+    Log.Information("Validando configuração crítica...");
+
+    var criticalSettings = new[]
+    {
+        "ConnectionStrings:DefaultConnection",
+        "SyncOptions:ApiKey",
+    };
+
+    var missingSettings = criticalSettings
+        .Where(setting => string.IsNullOrWhiteSpace(configuration[setting]))
+        .ToList();
+
+    if (missingSettings.Any())
+    {
+        var missing = string.Join(", ", missingSettings);
+        Log.Fatal("Definições de configuração críticas ausentes: {MissingSettings}", missing);
+        throw new InvalidOperationException($"Configurações críticas ausentes: {missing}");
+    }
+
+    Log.Information("Configuração crítica validada com sucesso");
+}
+
+static void LogStartupInformation(WebApplication app)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    var configuration = app.Services.GetRequiredService<IConfiguration>();
+    var syncOptions = configuration.GetSection("SyncOptions").Get<SyncOptions>() ?? new SyncOptions();
+
+    // Informações básicas
+    logger.LogInformation("API do Hoop Game Night iniciada com sucesso");
+    logger.LogInformation("Ambiente: {Environment}", app.Environment.EnvironmentName);
+    logger.LogInformation("URLs: {Urls}", string.Join(", ", app.Urls));
+
+    // Endpoints importantes
+    logger.LogInformation("Health check: /health");
+    logger.LogInformation("Metrics: /metrics");
+    logger.LogInformation("Info: /info");
+    logger.LogInformation("Status: /status");
+
+    // Swagger apenas em desenvolvimento
+    if (app.Environment.IsDevelopment())
+    {
+        logger.LogInformation("Swagger UI: / (root)");
+        logger.LogInformation("Recursos do modo de desenvolvimento habilitados");
+    }
+
+    // Informações de sincronização
+    logger.LogInformation("Background sync: {Status}",
+        syncOptions.EnableAutoSync ? "Enabled" : "Disabled");
+
+    if (syncOptions.EnableAutoSync)
+    {
+        logger.LogInformation("Sync interval: {Interval} minutes", syncOptions.SyncIntervalMinutes);
+    }
+
+    // Informações de performance
+    var gcMemory = GC.GetTotalMemory(false);
+    logger.LogInformation("Initial memory usage: {Memory:N0} bytes", gcMemory);
+
+    // Timezone info
+    logger.LogInformation("Server timezone: {Timezone}", TimeZoneInfo.Local.DisplayName);
+    logger.LogInformation("Server time: {Time}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+    logger.LogInformation("UTC time: {Time}", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss"));
+}
+
+static string GetUptime()
+{
+    var uptime = DateTime.UtcNow.Subtract(Process.GetCurrentProcess().StartTime.ToUniversalTime());
+    return $"{uptime.Days}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
 }

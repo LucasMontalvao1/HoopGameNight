@@ -7,6 +7,7 @@ using HoopGameNight.Core.Services;
 using HoopGameNight.Infrastructure.Data;
 using HoopGameNight.Infrastructure.ExternalServices;
 using HoopGameNight.Infrastructure.Repositories;
+using HoopGameNight.Infrastructure.Services;
 using AspNetCoreRateLimit;
 using Polly;
 using Polly.Extensions.Http;
@@ -37,9 +38,6 @@ namespace HoopGameNight.Api.Extensions
             // External Services
             services.AddExternalServices(configuration);
 
-            // Caching
-            services.AddMemoryCache();
-
             // AutoMapper 
             services.AddAutoMapper(typeof(AutoMapperProfile));
 
@@ -60,12 +58,12 @@ namespace HoopGameNight.Api.Extensions
             var connectionString = configuration.GetConnectionString("MySqlConnection")
                 ?? throw new InvalidOperationException("MySQL connection string not found");
 
-            // Registrar IDbConnection para Dapper
             services.AddScoped<IDbConnection>(sp => new MySqlConnection(connectionString));
 
-            // Registrar IDatabaseConnection customizado
             services.AddSingleton<IDatabaseConnection>(provider =>
                 new HoopGameNight.Infrastructure.Data.MySqlConnection(connectionString));
+
+            services.AddScoped<IDatabaseQueryExecutor, DapperQueryExecutor>();
 
             services.AddSingleton<ISqlLoader, SqlLoader>();
             services.AddScoped<DatabaseInitializer>();
@@ -93,11 +91,11 @@ namespace HoopGameNight.Api.Extensions
 
         private static IServiceCollection AddExternalServices(this IServiceCollection services, IConfiguration configuration)
         {
+            // BALL DON'T LIE API SERVICE
             var ballDontLieConfig = configuration.GetSection("ExternalApis:BallDontLie");
             var baseUrl = ballDontLieConfig["BaseUrl"] ?? "https://api.balldontlie.io/v1";
             var apiKey = ballDontLieConfig["ApiKey"];
 
-            // Configurar HttpClient com Polly (resilience)
             services.AddHttpClient<IBallDontLieService, BallDontLieService>(client =>
             {
                 client.BaseAddress = new Uri(baseUrl);
@@ -110,6 +108,17 @@ namespace HoopGameNight.Api.Extensions
             .AddPolicyHandler(GetRetryPolicy())
             .AddPolicyHandler(GetCircuitBreakerPolicy());
 
+            // ESPN API SERVICE
+            services.AddHttpClient<IEspnApiService, EspnApiService>(client =>
+            {
+                client.BaseAddress = new Uri("https://site.api.espn.com/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+                client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+            })
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+
             return services;
         }
 
@@ -117,9 +126,14 @@ namespace HoopGameNight.Api.Extensions
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
+                .OrResult(msg => !msg.IsSuccessStatusCode)
                 .WaitAndRetryAsync(
                     retryCount: 3,
-                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (outcome, timespan, retryCount, context) =>
+                    {
+                        Console.WriteLine($"Tentar novamente {retryCount} após {timespan.TotalMilliseconds}ms");
+                    });
         }
 
         private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
@@ -128,15 +142,23 @@ namespace HoopGameNight.Api.Extensions
                 .HandleTransientHttpError()
                 .CircuitBreakerAsync(
                     handledEventsAllowedBeforeBreaking: 5,
-                    durationOfBreak: TimeSpan.FromSeconds(30));
+                    durationOfBreak: TimeSpan.FromSeconds(30),
+                    onBreak: (result, duration) =>
+                    {
+                        Console.WriteLine($"Disjuntor aberto por {duration.TotalSeconds}s");
+                    },
+                    onReset: () =>
+                    {
+                        Console.WriteLine("Reinicialização do disjuntor");
+                    });
         }
 
         public static IServiceCollection AddRateLimiting(this IServiceCollection services, IConfiguration configuration)
         {
-            services.AddMemoryCache();
             services.Configure<IpRateLimitOptions>(configuration.GetSection("RateLimiting"));
             services.AddInMemoryRateLimiting();
             services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+            services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
 
             return services;
         }

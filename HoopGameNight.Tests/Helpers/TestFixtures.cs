@@ -15,6 +15,7 @@ namespace HoopGameNight.Tests.Helpers
         public Mock<IGameRepository> MockGameRepository { get; }
         public Mock<ITeamRepository> MockTeamRepository { get; }
         public Mock<IBallDontLieService> MockBallDontLieService { get; }
+        public Mock<IEspnApiService> MockEspnApiService { get; }
         public Mock<IMapper> MockMapper { get; }
         public Mock<ILogger<GameService>> MockLogger { get; }
         public IMemoryCache MemoryCache { get; }
@@ -25,6 +26,7 @@ namespace HoopGameNight.Tests.Helpers
             MockGameRepository = MockSetupHelper.CreateGameRepositoryMock();
             MockTeamRepository = MockSetupHelper.CreateTeamRepositoryMock();
             MockBallDontLieService = MockSetupHelper.CreateBallDontLieServiceMock();
+            MockEspnApiService = MockSetupHelper.CreateEspnApiServiceMock();
             MockMapper = MockSetupHelper.CreateMapperMock();
             MockLogger = MockSetupHelper.CreateLoggerMock<GameService>();
             MemoryCache = MockSetupHelper.CreateMemoryCache();
@@ -33,6 +35,7 @@ namespace HoopGameNight.Tests.Helpers
                 MockGameRepository.Object,
                 MockTeamRepository.Object,
                 MockBallDontLieService.Object,
+                MockEspnApiService.Object,
                 MockMapper.Object,
                 MemoryCache,
                 MockLogger.Object
@@ -54,6 +57,7 @@ namespace HoopGameNight.Tests.Helpers
             MockGameRepository.Reset();
             MockTeamRepository.Reset();
             MockBallDontLieService.Reset();
+            MockEspnApiService.Reset();
             MockMapper.Reset();
             MockLogger.Reset();
 
