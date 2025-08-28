@@ -1,69 +1,605 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
+﻿using HoopGameNight.Core.Interfaces.Infrastructure;
+using HoopGameNight.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace HoopGameNight.Api.Controllers
 {
+    /// <summary>
+    /// Controller para health checks e status da API
+    /// </summary>
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/health")]
+    [AllowAnonymous]
+    [ApiExplorerSettings(GroupName = "Health")]
     public class HealthController : ControllerBase
     {
         private static readonly DateTime _startTime = DateTime.UtcNow;
         private readonly ILogger<HealthController> _logger;
+        private readonly HealthCheckService _healthCheckService;
+        private readonly IDatabaseConnection _databaseConnection;
+        private readonly IBallDontLieService _ballDontLieService;
+        private readonly IConfiguration _configuration;
 
-        public HealthController(ILogger<HealthController> logger)
+        public HealthController(
+            ILogger<HealthController> logger,
+            HealthCheckService healthCheckService,
+            IDatabaseConnection databaseConnection,
+            IBallDontLieService ballDontLieService,
+            IConfiguration configuration)
         {
             _logger = logger;
+            _healthCheckService = healthCheckService;
+            _databaseConnection = databaseConnection;
+            _ballDontLieService = ballDontLieService;
+            _configuration = configuration;
         }
 
         /// <summary>
-        /// Verifica o status geral da API
+        /// Health check simples - sempre retorna 200 se a API está rodando
         /// </summary>
-        /// <returns>Dados como uptime, versão e ambiente</returns>
+        [HttpGet("live")]
+        [ProducesResponseType(typeof(LivenessCheck), StatusCodes.Status200OK)]
+        public IActionResult GetLiveness()
+        {
+            var response = new LivenessCheck
+            {
+                Status = "alive",
+                Timestamp = DateTime.UtcNow,
+                Service = "HoopGameNight API"
+            };
+
+            return Ok(response);
+        }
+
+        /// <summary>
+        /// Health check de prontidão - verifica dependências críticas
+        /// </summary>
+        [HttpGet("ready")]
+        [ProducesResponseType(typeof(ReadinessCheck), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ReadinessCheck), StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GetReadiness()
+        {
+            var checks = new List<DependencyCheck>();
+            var overallHealthy = true;
+
+            // Check Database
+            var dbCheck = await CheckDatabaseAsync();
+            checks.Add(dbCheck);
+            if (!dbCheck.IsHealthy) overallHealthy = false;
+
+            // Check External API
+            var apiCheck = await CheckExternalApiAsync();
+            checks.Add(apiCheck);
+            // API externa não é crítica para readiness
+
+            // Check Configuration
+            var configCheck = CheckConfiguration();
+            checks.Add(configCheck);
+            if (!configCheck.IsHealthy) overallHealthy = false;
+
+            var response = new ReadinessCheck
+            {
+                Status = overallHealthy ? "ready" : "not_ready",
+                IsReady = overallHealthy,
+                Timestamp = DateTime.UtcNow,
+                Checks = checks
+            };
+
+            return overallHealthy ? Ok(response) : StatusCode(503, response);
+        }
+
+        /// <summary>
+        /// Health check completo - informações detalhadas do sistema
+        /// </summary>
         [HttpGet]
-        [ProducesResponseType(typeof(object), 200)]
-        [ProducesResponseType(typeof(object), 500)]
-        public IActionResult Get()
+        [ProducesResponseType(typeof(HealthCheckResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(HealthCheckResponse), StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GetHealth()
         {
             try
             {
-                var now = DateTime.UtcNow;
-                var uptimeSeconds = Math.Round((now - _startTime).TotalSeconds);
+                var report = await _healthCheckService.CheckHealthAsync();
+                var response = BuildHealthResponse(report);
 
-                var version = Assembly.GetExecutingAssembly()
-                                      .GetName()
-                                      .Version?
-                                      .ToString() ?? "1.0.0";
+                _logger.LogInformation("Health check completed: {Status}", response.Status);
 
-                var response = new
-                {
-                    status = "healthy",
-                    uptime = uptimeSeconds,
-                    timestamp = now.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-                    version,
-                    environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
-                    server = Environment.MachineName
-                };
-
-                _logger.LogInformation("Health check OK: {@Response}", response);
-                return Ok(response);
+                return report.Status == HealthStatus.Healthy
+                    ? Ok(response)
+                    : StatusCode(503, response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao verificar a saúde da API");
-                return StatusCode(500, new { status = "unhealthy", error = ex.Message });
+                _logger.LogError(ex, "Error during health check");
+
+                var errorResponse = new HealthCheckResponse
+                {
+                    Status = "unhealthy",
+                    Timestamp = DateTime.UtcNow,
+                    Error = ex.Message
+                };
+
+                return StatusCode(503, errorResponse);
             }
         }
 
         /// <summary>
-        /// Verificação simples da API
+        /// Informações detalhadas sobre o sistema
         /// </summary>
-        /// <returns>Confirmação textual</returns>
-        [HttpGet("simple")]
-        [ProducesResponseType(200)]
-        public IActionResult Simple()
+        [HttpGet("info")]
+        [ProducesResponseType(typeof(SystemInfo), StatusCodes.Status200OK)]
+        public IActionResult GetSystemInfo()
         {
-            return Ok("API is running!");
+            var uptime = DateTime.UtcNow - _startTime;
+            var assembly = Assembly.GetExecutingAssembly();
+            var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+
+            var info = new SystemInfo
+            {
+                Application = new ApplicationInfo
+                {
+                    Name = "HoopGameNight API",
+                    Version = version,
+                    Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+                    StartTime = _startTime,
+                    Uptime = new UptimeInfo
+                    {
+                        Days = (int)uptime.TotalDays,
+                        Hours = uptime.Hours,
+                        Minutes = uptime.Minutes,
+                        Seconds = uptime.Seconds,
+                        TotalSeconds = (long)uptime.TotalSeconds,
+                        Formatted = FormatUptime(uptime)
+                    }
+                },
+                System = new SystemDetails
+                {
+                    MachineName = Environment.MachineName,
+                    OSVersion = RuntimeInformation.OSDescription,
+                    ProcessorCount = Environment.ProcessorCount,
+                    Is64BitProcess = Environment.Is64BitProcess,
+                    Is64BitOS = RuntimeInformation.OSArchitecture == Architecture.X64 ||
+                               RuntimeInformation.OSArchitecture == Architecture.Arm64,
+                    DotNetVersion = RuntimeInformation.FrameworkDescription,
+                    TimeZone = TimeZoneInfo.Local.DisplayName,
+                    CurrentTime = DateTime.Now,
+                    UtcTime = DateTime.UtcNow
+                },
+                Process = GetProcessInfo(),
+                Features = new FeaturesInfo
+                {
+                    SwaggerEnabled = _configuration.GetValue<bool>("Features:Swagger", false),
+                    RateLimitingEnabled = _configuration.GetValue<bool>("Features:RateLimiting", true),
+                    CachingEnabled = _configuration.GetValue<bool>("Features:Caching", true),
+                    BackgroundSyncEnabled = _configuration.GetValue<bool>("Sync:EnableAutoSync", true)
+                }
+            };
+
+            return Ok(info);
         }
+
+        /// <summary>
+        /// Diagnóstico detalhado do sistema
+        /// </summary>
+        [HttpGet("diagnostics")]
+        [ProducesResponseType(typeof(DiagnosticsInfo), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetDiagnostics()
+        {
+            var diagnostics = new DiagnosticsInfo
+            {
+                Timestamp = DateTime.UtcNow,
+                Memory = GetMemoryDiagnostics(),
+                Performance = GetPerformanceDiagnostics(),
+                Dependencies = await GetDependenciesDiagnosticsAsync(),
+                Configuration = GetConfigurationDiagnostics()
+            };
+
+            return Ok(diagnostics);
+        }
+
+        #region Private Methods
+
+        private async Task<DependencyCheck> CheckDatabaseAsync()
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                using var connection = _databaseConnection.CreateConnection();
+                connection.Open(); // Usar Open síncrono ao invés de OpenAsync
+
+                stopwatch.Stop();
+
+                return new DependencyCheck
+                {
+                    Name = "MySQL Database",
+                    IsHealthy = true,
+                    ResponseTime = stopwatch.ElapsedMilliseconds,
+                    Message = "Connection successful"
+                };
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                _logger.LogError(ex, "Database health check failed");
+
+                return new DependencyCheck
+                {
+                    Name = "MySQL Database",
+                    IsHealthy = false,
+                    ResponseTime = stopwatch.ElapsedMilliseconds,
+                    Message = $"Connection failed: {ex.Message}"
+                };
+            }
+        }
+
+        private async Task<DependencyCheck> CheckExternalApiAsync()
+        {
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                var teams = await _ballDontLieService.GetAllTeamsAsync();
+                stopwatch.Stop();
+
+                var isHealthy = teams.Any();
+
+                return new DependencyCheck
+                {
+                    Name = "Ball Don't Lie API",
+                    IsHealthy = isHealthy,
+                    ResponseTime = stopwatch.ElapsedMilliseconds,
+                    Message = isHealthy ? $"API responding, {teams.Count()} teams found" : "API returned no data"
+                };
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+                _logger.LogWarning(ex, "External API health check failed");
+
+                return new DependencyCheck
+                {
+                    Name = "Ball Don't Lie API",
+                    IsHealthy = false,
+                    ResponseTime = stopwatch.ElapsedMilliseconds,
+                    Message = $"API call failed: {ex.Message}"
+                };
+            }
+        }
+
+        private DependencyCheck CheckConfiguration()
+        {
+            var errors = new List<string>();
+
+            if (string.IsNullOrEmpty(_configuration.GetConnectionString("MySqlConnection")))
+                errors.Add("Database connection string missing");
+
+            var apiKey = _configuration["ExternalApis:BallDontLie:ApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
+                errors.Add("External API key missing");
+
+            return new DependencyCheck
+            {
+                Name = "Configuration",
+                IsHealthy = errors.Count == 0,
+                Message = errors.Count == 0 ? "All required configurations present" : string.Join("; ", errors)
+            };
+        }
+
+        private HealthCheckResponse BuildHealthResponse(HealthReport report)
+        {
+            var response = new HealthCheckResponse
+            {
+                Status = report.Status.ToString().ToLower(),
+                Timestamp = DateTime.UtcNow,
+                Duration = report.TotalDuration.TotalMilliseconds,
+                Checks = report.Entries.Select(entry => new HealthCheckResult
+                {
+                    Name = entry.Key,
+                    Status = entry.Value.Status.ToString().ToLower(),
+                    Description = entry.Value.Description,
+                    Duration = entry.Value.Duration.TotalMilliseconds,
+                    Tags = entry.Value.Tags.ToList(),
+                    Error = entry.Value.Exception?.Message
+                }).ToList()
+            };
+
+            return response;
+        }
+
+        private ProcessInfo GetProcessInfo()
+        {
+            var process = Process.GetCurrentProcess();
+
+            return new ProcessInfo
+            {
+                Id = process.Id,
+                Name = process.ProcessName,
+                StartTime = process.StartTime,
+                TotalProcessorTime = process.TotalProcessorTime.TotalSeconds,
+                UserProcessorTime = process.UserProcessorTime.TotalSeconds,
+                WorkingSetMB = process.WorkingSet64 / (1024 * 1024),
+                PrivateMemoryMB = process.PrivateMemorySize64 / (1024 * 1024),
+                VirtualMemoryMB = process.VirtualMemorySize64 / (1024 * 1024),
+                ThreadCount = process.Threads.Count,
+                HandleCount = process.HandleCount
+            };
+        }
+
+        private MemoryDiagnostics GetMemoryDiagnostics()
+        {
+            var process = Process.GetCurrentProcess();
+
+            return new MemoryDiagnostics
+            {
+                WorkingSetMB = process.WorkingSet64 / (1024 * 1024),
+                PrivateMemoryMB = process.PrivateMemorySize64 / (1024 * 1024),
+                VirtualMemoryMB = process.VirtualMemorySize64 / (1024 * 1024),
+                GCMemoryMB = GC.GetTotalMemory(false) / (1024 * 1024),
+                Gen0Collections = GC.CollectionCount(0),
+                Gen1Collections = GC.CollectionCount(1),
+                Gen2Collections = GC.CollectionCount(2),
+                TotalAllocatedBytes = GC.GetTotalAllocatedBytes(),
+                LargeObjectHeapSize = GC.GetTotalMemory(false)
+            };
+        }
+
+        private PerformanceDiagnostics GetPerformanceDiagnostics()
+        {
+            var process = Process.GetCurrentProcess();
+
+            return new PerformanceDiagnostics
+            {
+                TotalProcessorTimeSeconds = process.TotalProcessorTime.TotalSeconds,
+                UserProcessorTimeSeconds = process.UserProcessorTime.TotalSeconds,
+                PrivilegedProcessorTimeSeconds = process.PrivilegedProcessorTime.TotalSeconds,
+                ThreadCount = process.Threads.Count,
+                HandleCount = process.HandleCount,
+                PeakWorkingSetMB = process.PeakWorkingSet64 / (1024 * 1024),
+                PeakVirtualMemoryMB = process.PeakVirtualMemorySize64 / (1024 * 1024)
+            };
+        }
+
+        private async Task<List<DependencyDiagnostic>> GetDependenciesDiagnosticsAsync()
+        {
+            var dependencies = new List<DependencyDiagnostic>();
+
+            // Database
+            dependencies.Add(new DependencyDiagnostic
+            {
+                Name = "MySQL Database",
+                Type = "Database",
+                ConnectionString = MaskConnectionString(_configuration.GetConnectionString("MySqlConnection")),
+                Status = (await CheckDatabaseAsync()).IsHealthy ? "Connected" : "Disconnected"
+            });
+
+            // External API
+            dependencies.Add(new DependencyDiagnostic
+            {
+                Name = "Ball Don't Lie API",
+                Type = "External API",
+                ConnectionString = _configuration["ExternalApis:BallDontLie:BaseUrl"] ?? "Not configured",
+                Status = (await CheckExternalApiAsync()).IsHealthy ? "Available" : "Unavailable"
+            });
+
+            return dependencies;
+        }
+
+        private ConfigurationDiagnostics GetConfigurationDiagnostics()
+        {
+            return new ConfigurationDiagnostics
+            {
+                Environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production",
+                ConfigurationSources = _configuration.AsEnumerable()
+                    .Take(10)
+                    .Select(kvp => $"{kvp.Key}={MaskSensitiveValue(kvp.Key, kvp.Value)}")
+                    .ToList(),
+                EnvironmentVariables = Environment.GetEnvironmentVariables()
+                    .Cast<System.Collections.DictionaryEntry>()
+                    .Where(e => e.Key.ToString()?.StartsWith("ASPNETCORE_") == true)
+                    .Select(e => $"{e.Key}={e.Value}")
+                    .ToList()
+            };
+        }
+
+        private static string FormatUptime(TimeSpan uptime)
+        {
+            if (uptime.TotalDays >= 1)
+                return $"{(int)uptime.TotalDays}d {uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+            if (uptime.TotalHours >= 1)
+                return $"{uptime.Hours}h {uptime.Minutes}m {uptime.Seconds}s";
+            if (uptime.TotalMinutes >= 1)
+                return $"{uptime.Minutes}m {uptime.Seconds}s";
+            return $"{uptime.Seconds}s";
+        }
+
+        private static string MaskConnectionString(string? connectionString)
+        {
+            if (string.IsNullOrEmpty(connectionString))
+                return "Not configured";
+
+            // Mask password in connection string
+            var pattern = @"(password|pwd)=([^;]+)";
+            return System.Text.RegularExpressions.Regex.Replace(
+                connectionString,
+                pattern,
+                "$1=****",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        private static string MaskSensitiveValue(string key, string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return "null";
+
+            var sensitiveKeys = new[] { "password", "pwd", "key", "secret", "token", "connectionstring" };
+
+            if (sensitiveKeys.Any(k => key.ToLower().Contains(k)))
+                return "****";
+
+            return value.Length > 50 ? value.Substring(0, 47) + "..." : value;
+        }
+
+        #endregion
     }
+
+    #region DTOs
+
+    public class LivenessCheck
+    {
+        public string Status { get; set; } = "";
+        public DateTime Timestamp { get; set; }
+        public string Service { get; set; } = "";
+    }
+
+    public class ReadinessCheck
+    {
+        public string Status { get; set; } = "";
+        public bool IsReady { get; set; }
+        public DateTime Timestamp { get; set; }
+        public List<DependencyCheck> Checks { get; set; } = new();
+    }
+
+    public class DependencyCheck
+    {
+        public string Name { get; set; } = "";
+        public bool IsHealthy { get; set; }
+        public long ResponseTime { get; set; }
+        public string Message { get; set; } = "";
+    }
+
+    public class HealthCheckResponse
+    {
+        public string Status { get; set; } = "";
+        public DateTime Timestamp { get; set; }
+        public double Duration { get; set; }
+        public string? Error { get; set; }
+        public List<HealthCheckResult> Checks { get; set; } = new();
+    }
+
+    public class HealthCheckResult
+    {
+        public string Name { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string? Description { get; set; }
+        public double Duration { get; set; }
+        public List<string> Tags { get; set; } = new();
+        public string? Error { get; set; }
+    }
+
+    public class SystemInfo
+    {
+        public ApplicationInfo Application { get; set; } = new();
+        public SystemDetails System { get; set; } = new();
+        public ProcessInfo Process { get; set; } = new();
+        public FeaturesInfo Features { get; set; } = new();
+    }
+
+    public class ApplicationInfo
+    {
+        public string Name { get; set; } = "";
+        public string Version { get; set; } = "";
+        public string Environment { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public UptimeInfo Uptime { get; set; } = new();
+    }
+
+    public class UptimeInfo
+    {
+        public int Days { get; set; }
+        public int Hours { get; set; }
+        public int Minutes { get; set; }
+        public int Seconds { get; set; }
+        public long TotalSeconds { get; set; }
+        public string Formatted { get; set; } = "";
+    }
+
+    public class SystemDetails
+    {
+        public string MachineName { get; set; } = "";
+        public string OSVersion { get; set; } = "";
+        public int ProcessorCount { get; set; }
+        public bool Is64BitProcess { get; set; }
+        public bool Is64BitOS { get; set; }
+        public string DotNetVersion { get; set; } = "";
+        public string TimeZone { get; set; } = "";
+        public DateTime CurrentTime { get; set; }
+        public DateTime UtcTime { get; set; }
+    }
+
+    public class ProcessInfo
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public double TotalProcessorTime { get; set; }
+        public double UserProcessorTime { get; set; }
+        public long WorkingSetMB { get; set; }
+        public long PrivateMemoryMB { get; set; }
+        public long VirtualMemoryMB { get; set; }
+        public int ThreadCount { get; set; }
+        public int HandleCount { get; set; }
+    }
+
+    public class FeaturesInfo
+    {
+        public bool SwaggerEnabled { get; set; }
+        public bool RateLimitingEnabled { get; set; }
+        public bool CachingEnabled { get; set; }
+        public bool BackgroundSyncEnabled { get; set; }
+    }
+
+    public class DiagnosticsInfo
+    {
+        public DateTime Timestamp { get; set; }
+        public MemoryDiagnostics Memory { get; set; } = new();
+        public PerformanceDiagnostics Performance { get; set; } = new();
+        public List<DependencyDiagnostic> Dependencies { get; set; } = new();
+        public ConfigurationDiagnostics Configuration { get; set; } = new();
+    }
+
+    public class MemoryDiagnostics
+    {
+        public long WorkingSetMB { get; set; }
+        public long PrivateMemoryMB { get; set; }
+        public long VirtualMemoryMB { get; set; }
+        public long GCMemoryMB { get; set; }
+        public int Gen0Collections { get; set; }
+        public int Gen1Collections { get; set; }
+        public int Gen2Collections { get; set; }
+        public long TotalAllocatedBytes { get; set; }
+        public long LargeObjectHeapSize { get; set; }
+    }
+
+    public class PerformanceDiagnostics
+    {
+        public double TotalProcessorTimeSeconds { get; set; }
+        public double UserProcessorTimeSeconds { get; set; }
+        public double PrivilegedProcessorTimeSeconds { get; set; }
+        public int ThreadCount { get; set; }
+        public int HandleCount { get; set; }
+        public long PeakWorkingSetMB { get; set; }
+        public long PeakVirtualMemoryMB { get; set; }
+    }
+
+    public class DependencyDiagnostic
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+        public string ConnectionString { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+
+    public class ConfigurationDiagnostics
+    {
+        public string Environment { get; set; } = "";
+        public List<string> ConfigurationSources { get; set; } = new();
+        public List<string> EnvironmentVariables { get; set; } = new();
+    }
+
+    #endregion
 }

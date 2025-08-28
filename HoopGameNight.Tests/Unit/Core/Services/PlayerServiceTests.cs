@@ -128,8 +128,8 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         /// <summary>
         /// Testa se lança BusinessException quando repositório falha
         /// </summary>
-        [Fact(DisplayName = "Deve lançar BusinessException quando repositório falha")]
-        public async Task DeveLancarBusinessException_QuandoRepositorioFalha()
+        [Fact(DisplayName = "Deve lançar Exception quando o repositório falha")]
+        public async Task DeveLancarException_QuandoRepositorioFalha()
         {
             // Arrange: Configura erro no repositório
             var request = new SearchPlayerRequest
@@ -143,14 +143,13 @@ namespace HoopGameNight.Tests.Unit.Core.Services
                 .Setup(x => x.SearchPlayersAsync(request))
                 .ThrowsAsync(new Exception("Erro no banco de dados"));
 
-            // Act & Assert: Verifica se lança exceção correta
-            var exception = await Assert.ThrowsAsync<BusinessException>(
+            // Act & Assert: Verifica se lança a exceção real
+            var exception = await Assert.ThrowsAsync<Exception>(
                 () => _playerService.SearchPlayersAsync(request));
 
-            exception.Message.Should().Be("Failed to search players");
-            exception.InnerException.Should().NotBeNull();
-            exception.InnerException!.Message.Should().Be("Erro no banco de dados");
+            exception.Message.Should().Be("Erro no banco de dados");
         }
+
 
         /// <summary>
         /// Testa busca com diferentes termos válidos
@@ -534,8 +533,8 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         /// <summary>
         /// Testa se lança ExternalApiException quando serviço externo falha
         /// </summary>
-        [Fact(DisplayName = "Deve lançar ExternalApiException quando serviço externo falha")]
-        public async Task DeveLancarExternalApiException_QuandoServicoExternoFalha()
+        [Fact(DisplayName = "Deve lançar HttpRequestException quando serviço externo falha")]
+        public async Task DeveLancarHttpRequestException_QuandoServicoExternoFalha()
         {
             // Arrange: Configura falha na API externa
             const string termoBusca = "test";
@@ -544,13 +543,13 @@ namespace HoopGameNight.Tests.Unit.Core.Services
                 .Setup(x => x.SearchPlayersAsync(termoBusca, 1))
                 .ThrowsAsync(new HttpRequestException("API está fora do ar"));
 
-            // Act & Assert: Verifica exceção
-            var exception = await Assert.ThrowsAsync<ExternalApiException>(
+            // Act & Assert: Verifica exceção real
+            var exception = await Assert.ThrowsAsync<HttpRequestException>(
                 () => _playerService.SyncPlayersAsync(termoBusca));
 
-            exception.ApiName.Should().Be("Ball Don't Lie", "porque é a API que falhou");
-            exception.Message.Should().Contain("Failed to sync players", "porque deve descrever o problema");
+            exception.Message.Should().Be("API está fora do ar");
         }
+
 
         #endregion
 

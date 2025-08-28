@@ -6,6 +6,8 @@ namespace HoopGameNight.Infrastructure.Services
     public interface ISyncMetricsService
     {
         void RecordSyncEvent(string syncType, bool success, TimeSpan duration, int? recordsProcessed = null);
+        void RecordSuccess(string syncType, TimeSpan duration, int recordsProcessed = 0);
+        void RecordFailure(string syncType, TimeSpan duration);
         SyncMetrics GetMetrics();
         SyncMetrics GetMetricsByType(string syncType);
         void ResetMetrics();
@@ -51,6 +53,16 @@ namespace HoopGameNight.Infrastructure.Services
             SaveMetricsToCache();
         }
 
+        public void RecordSuccess(string syncType, TimeSpan duration, int recordsProcessed = 0)
+        {
+            RecordSyncEvent(syncType, true, duration, recordsProcessed);
+        }
+
+        public void RecordFailure(string syncType, TimeSpan duration)
+        {
+            RecordSyncEvent(syncType, false, duration, 0);
+        }
+
         public SyncMetrics GetMetrics()
         {
             _globalMetrics.MetricsByType = _metricsByType.ToDictionary(
@@ -91,12 +103,14 @@ namespace HoopGameNight.Infrastructure.Services
             {
                 metrics.SuccessfulSyncs++;
                 metrics.LastSuccessfulSync = syncEvent.Timestamp;
+                metrics.LastSuccessTime = syncEvent.Timestamp;
                 metrics.TotalRecordsProcessed += syncEvent.RecordsProcessed;
             }
             else
             {
                 metrics.FailedSyncs++;
                 metrics.ConsecutiveFailures++;
+                metrics.LastFailureTime = syncEvent.Timestamp;
             }
 
             // Resetar falhas consecutivas em caso de sucesso
@@ -208,6 +222,8 @@ namespace HoopGameNight.Infrastructure.Services
         public DateTime StartedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastSyncTime { get; set; }
         public DateTime? LastSuccessfulSync { get; set; }
+        public DateTime? LastSuccessTime { get; set; }
+        public DateTime? LastFailureTime { get; set; }
         public int TotalSyncs { get; set; }
         public int SuccessfulSyncs { get; set; }
         public int FailedSyncs { get; set; }

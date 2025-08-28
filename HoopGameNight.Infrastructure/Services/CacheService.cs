@@ -1,91 +1,102 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using System.Collections;
 using System.Collections.Concurrent;
 
 namespace HoopGameNight.Infrastructure.Services
 {
-    public interface ICacheService
-    {
-        Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, CacheOptions? options = null);
-        T? GetOrSet<T>(string key, Func<T> factory, CacheOptions? options = null);
-        void Remove(string key);
-        void RemoveByPattern(string pattern);
-        void Clear();
-        CacheStatistics GetStatistics();
-    }
-
+    /// <summary>
+    /// Serviço de cache centralizado
+    /// </summary>
     public class CacheService : ICacheService
     {
         private readonly IMemoryCache _cache;
         private readonly ILogger<CacheService> _logger;
-        private readonly ConcurrentDictionary<string, CacheEntryInfo> _cacheRegistry = new();
-        private readonly CacheStatistics _statistics = new();
+        private readonly ConcurrentDictionary<string, DateTime> _cacheKeys;
+        private long _totalRequests;
+        private long _hits;
+        private long _misses;
+        private long _evictions;
 
         public CacheService(IMemoryCache cache, ILogger<CacheService> logger)
         {
             _cache = cache;
             _logger = logger;
+            _cacheKeys = new ConcurrentDictionary<string, DateTime>();
         }
 
-        public async Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, CacheOptions? options = null)
+        public T? Get<T>(string key)
         {
-            _statistics.TotalRequests++;
+            Interlocked.Increment(ref _totalRequests);
 
-            if (_cache.TryGetValue<T>(key, out var cachedValue))
+            if (_cache.TryGetValue(key, out T? value))
             {
-                _statistics.Hits++;
-                _logger.LogDebug("Cache hit for key: {Key} (Hit rate: {Rate:P})",
-                    key, _statistics.HitRate);
-                return cachedValue;
-            }
-
-            _statistics.Misses++;
-            _logger.LogDebug("Cache miss for key: {Key}", key);
-
-            var value = await factory();
-            if (value != null)
-            {
-                Set(key, value, options ?? CacheOptions.Default);
-            }
-
-            return value;
-        }
-
-        public T? GetOrSet<T>(string key, Func<T> factory, CacheOptions? options = null)
-        {
-            _statistics.TotalRequests++;
-
-            if (_cache.TryGetValue<T>(key, out var cachedValue))
-            {
-                _statistics.Hits++;
+                Interlocked.Increment(ref _hits);
                 _logger.LogDebug("Cache hit for key: {Key}", key);
-                return cachedValue;
+                return value;
             }
 
-            _statistics.Misses++;
+            Interlocked.Increment(ref _misses);
             _logger.LogDebug("Cache miss for key: {Key}", key);
+            return default;
+        }
 
-            var value = factory();
-            if (value != null)
+        public Task<T?> GetAsync<T>(string key) => Task.FromResult(Get<T>(key));
+
+        public void Set<T>(string key, T value, TimeSpan? expiration = null)
+        {
+            var options = new MemoryCacheEntryOptions
             {
-                Set(key, value, options ?? CacheOptions.Default);
-            }
+                SlidingExpiration = expiration ?? TimeSpan.FromMinutes(15)
+            };
 
-            return value;
+            options.RegisterPostEvictionCallback((evictedKey, evictedValue, reason, state) =>
+            {
+                _cacheKeys.TryRemove(evictedKey.ToString()!, out _);
+                Interlocked.Increment(ref _evictions);
+                _logger.LogDebug("Cache evicted: {Key}, Reason: {Reason}", evictedKey, reason);
+            });
+
+            _cache.Set(key, value, options);
+            _cacheKeys[key] = DateTime.UtcNow;
+
+            _logger.LogDebug("Cache set: {Key}, Expiration: {Expiration}", key, expiration);
+        }
+
+        public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
+        {
+            Set(key, value, expiration);
+            return Task.CompletedTask;
         }
 
         public void Remove(string key)
         {
             _cache.Remove(key);
-            _cacheRegistry.TryRemove(key, out _);
-            _statistics.Evictions++;
-            _logger.LogDebug("Removed cache key: {Key}", key);
+            _cacheKeys.TryRemove(key, out _);
+            _logger.LogDebug("Cache removed: {Key}", key);
         }
 
-        public void RemoveByPattern(string pattern)
+        public Task RemoveAsync(string key)
         {
-            var keysToRemove = _cacheRegistry.Keys
+            Remove(key);
+            return Task.CompletedTask;
+        }
+
+        public bool Exists(string key) => _cache.TryGetValue(key, out _);
+
+        public void Clear()
+        {
+            var keys = _cacheKeys.Keys.ToList();
+            foreach (var key in keys)
+            {
+                _cache.Remove(key);
+            }
+            _cacheKeys.Clear();
+            _logger.LogInformation("Cache cleared - {Count} entries removed", keys.Count);
+        }
+
+        public void InvalidatePattern(string pattern)
+        {
+            var keysToRemove = _cacheKeys.Keys
                 .Where(k => k.Contains(pattern, StringComparison.OrdinalIgnoreCase))
                 .ToList();
 
@@ -94,150 +105,20 @@ namespace HoopGameNight.Infrastructure.Services
                 Remove(key);
             }
 
-            _logger.LogInformation("Removed {Count} cache keys matching pattern: {Pattern}",
+            _logger.LogInformation("Invalidated {Count} cache entries matching pattern: {Pattern}",
                 keysToRemove.Count, pattern);
-        }
-
-        public void Clear()
-        {
-            var count = _cacheRegistry.Count;
-            foreach (var key in _cacheRegistry.Keys.ToList())
-            {
-                _cache.Remove(key);
-            }
-            _cacheRegistry.Clear();
-            _statistics.Evictions += count;
-
-            _logger.LogInformation("Cleared all {Count} cache entries", count);
         }
 
         public CacheStatistics GetStatistics()
         {
-            _statistics.CurrentEntries = _cacheRegistry.Count;
-            _statistics.EntriesByCategory = _cacheRegistry.Values
-                .GroupBy(e => e.Category)
-                .ToDictionary(g => g.Key, g => g.Count());
-
-            return _statistics;
-        }
-
-        private void Set<T>(string key, T value, CacheOptions options)
-        {
-            var memoryCacheOptions = new MemoryCacheEntryOptions
+            return new CacheStatistics
             {
-                AbsoluteExpirationRelativeToNow = options.AbsoluteExpiration,
-                SlidingExpiration = options.SlidingExpiration,
-                Priority = options.Priority
-            };
-
-            memoryCacheOptions.RegisterPostEvictionCallback((evictedKey, evictedValue, reason, state) =>
-            {
-                _cacheRegistry.TryRemove(evictedKey.ToString()!, out _);
-                _statistics.Evictions++;
-                _logger.LogDebug("Cache entry evicted: {Key}, Reason: {Reason}", evictedKey, reason);
-            });
-
-            _cache.Set(key, value, memoryCacheOptions);
-
-            _cacheRegistry[key] = new CacheEntryInfo
-            {
-                Key = key,
-                Category = DetermineCategory(key),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow + (options.AbsoluteExpiration ?? TimeSpan.FromHours(1)),
-                Size = EstimateSize(value)
-            };
-
-            _logger.LogDebug("Cached value for key: {Key} with expiration: {Expiration}",
-                key, options.AbsoluteExpiration);
-        }
-
-        private string DetermineCategory(string key)
-        {
-            if (key.Contains("game", StringComparison.OrdinalIgnoreCase))
-                return "Games";
-            if (key.Contains("team", StringComparison.OrdinalIgnoreCase))
-                return "Teams";
-            if (key.Contains("player", StringComparison.OrdinalIgnoreCase))
-                return "Players";
-            return "Other";
-        }
-
-        private long EstimateSize<T>(T value)
-        {
-            // Estimativa simples baseada no tipo
-            return value switch
-            {
-                string s => s.Length * 2, // chars são 2 bytes
-                ICollection collection => collection.Count * 100, // estimativa
-                _ => 100 // default
+                TotalRequests = Interlocked.Read(ref _totalRequests),
+                Hits = Interlocked.Read(ref _hits),
+                Misses = Interlocked.Read(ref _misses),
+                CurrentEntries = _cacheKeys.Count,
+                Evictions = Interlocked.Read(ref _evictions)
             };
         }
-    }
-
-    public class CacheOptions
-    {
-        public TimeSpan? AbsoluteExpiration { get; set; }
-        public TimeSpan? SlidingExpiration { get; set; }
-        public CacheItemPriority Priority { get; set; } = CacheItemPriority.Normal;
-
-        public static CacheOptions Default => new()
-        {
-            AbsoluteExpiration = TimeSpan.FromMinutes(5),
-            Priority = CacheItemPriority.Normal
-        };
-
-        public static CacheOptions Short => new()
-        {
-            AbsoluteExpiration = TimeSpan.FromMinutes(1),
-            Priority = CacheItemPriority.Low
-        };
-
-        public static CacheOptions Long => new()
-        {
-            AbsoluteExpiration = TimeSpan.FromHours(1),
-            Priority = CacheItemPriority.High
-        };
-
-        public static CacheOptions Sliding => new()
-        {
-            SlidingExpiration = TimeSpan.FromMinutes(15),
-            AbsoluteExpiration = TimeSpan.FromHours(1),
-            Priority = CacheItemPriority.Normal
-        };
-
-        public static CacheOptions Games => new()
-        {
-            AbsoluteExpiration = TimeSpan.FromMinutes(5),
-            Priority = CacheItemPriority.High
-        };
-
-        public static CacheOptions Teams => new()
-        {
-            AbsoluteExpiration = TimeSpan.FromHours(24),
-            Priority = CacheItemPriority.High
-        };
-    }
-
-    public class CacheEntryInfo
-    {
-        public string Key { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public DateTime ExpiresAt { get; set; }
-        public long Size { get; set; }
-    }
-
-    public class CacheStatistics
-    {
-        public int TotalRequests { get; set; }
-        public int Hits { get; set; }
-        public int Misses { get; set; }
-        public int Evictions { get; set; }
-        public int CurrentEntries { get; set; }
-        public Dictionary<string, int> EntriesByCategory { get; set; } = new();
-
-        public double HitRate => TotalRequests > 0 ? (double)Hits / TotalRequests : 0;
-        public double MissRate => TotalRequests > 0 ? (double)Misses / TotalRequests : 0;
     }
 }

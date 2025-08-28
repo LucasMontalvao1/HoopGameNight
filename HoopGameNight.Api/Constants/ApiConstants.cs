@@ -11,6 +11,7 @@
             public const string GAMES = $"{API_PREFIX}/{API_VERSION}/games";
             public const string TEAMS = $"{API_PREFIX}/{API_VERSION}/teams";
             public const string PLAYERS = $"{API_PREFIX}/{API_VERSION}/players";
+            public const string SYNC = $"{API_PREFIX}/{API_VERSION}/sync";
         }
 
         public static class CacheKeys
@@ -22,6 +23,9 @@
             public const string GAMES_BY_DATE = "games:date:{0}";
             public const string GAMES_BY_TEAM = "games:team:{0}";
             public const string PLAYERS_BY_TEAM = "players:team:{0}";
+
+            public const string TEAM_PATTERN = "team:*";
+            public const string GAMES_PATTERN = "games:*";
         }
 
         public static class Headers
@@ -41,10 +45,10 @@
 
         public static class ValidationMessages
         {
-            public const string INVALID_PAGE_SIZE = "Page size must be between 1 and 100";
-            public const string INVALID_PAGE_NUMBER = "Page number must be greater than 0";
-            public const string INVALID_SEARCH_TERM = "Search term must be at least 2 characters";
-            public const string INVALID_DATE_RANGE = "Start date cannot be greater than end date";
+            public const string INVALID_PAGE_SIZE = "O tamanho da página deve estar entre 1 e 100";
+            public const string INVALID_PAGE_NUMBER = "O número da página deve ser maior que 0";
+            public const string INVALID_SEARCH_TERM = "O termo de busca deve ter no mínimo 2 caracteres";
+            public const string INVALID_DATE_RANGE = "A data de início não pode ser maior que a data de término";
         }
 
         public static class ExternalApis
