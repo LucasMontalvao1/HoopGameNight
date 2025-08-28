@@ -118,7 +118,7 @@ namespace HoopGameNight.Core.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao sincronizar jogadores");
-                throw new ExternalApiException("Ball Don't Lie", "Falha ao sincronizar jogadores da API externa", null);
+                throw new ExternalApiException("Ball Don't Lie", "Falha ao sincronizar jogadores da API externa", ex);
             }
         }
     }

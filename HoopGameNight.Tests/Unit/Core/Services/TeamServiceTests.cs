@@ -113,8 +113,8 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         /// <summary>
         /// Testa se lança BusinessException quando repositório falha
         /// </summary>
-        [Fact(DisplayName = "Deve lançar Exception quando repositório falha")]
-        public async Task DeveLancarException_QuandoRepositorioFalha()
+        [Fact(DisplayName = "Deve lançar BusinessException quando repositório falha")]
+        public async Task DeveLancarBusinessException_QuandoRepositorioFalha()
         {
             // Arrange
             _mockTeamRepository
@@ -122,10 +122,15 @@ namespace HoopGameNight.Tests.Unit.Core.Services
                 .ThrowsAsync(new Exception("Falha na conexão com banco de dados"));
 
             // Act & Assert
-            var exception = await Assert.ThrowsAsync<Exception>(
+            var exception = await Assert.ThrowsAsync<BusinessException>(
                 () => _teamService.GetAllTeamsAsync());
 
-            exception.Message.Should().Be("Falha na conexão com banco de dados");
+            // Verificar a mensagem da BusinessException
+            exception.Message.Should().Be("Falha ao recuperar os times");
+
+            // Verificar a exception interna original
+            exception.InnerException.Should().NotBeNull();
+            exception.InnerException!.Message.Should().Be("Falha na conexão com banco de dados");
         }
 
 
@@ -385,19 +390,20 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         /// <summary>
         /// Testa se lança ExternalApiException quando serviço externo falha
         /// </summary>
-        [Fact(DisplayName = "Deve lançar HttpRequestException quando serviço externo falha")]
-        public async Task DeveLancarHttpRequestException_QuandoServicoExternoFalha()
+        [Fact(DisplayName = "Deve lançar ExternalApiException quando serviço externo falha")]
+        public async Task DeveLancarExternalApiException_QuandoServicoExternoFalha()
         {
-            // Arrange: Configura falha na API externa
+            // Arrange
             _mockBallDontLieService
                 .Setup(x => x.GetAllTeamsAsync())
                 .ThrowsAsync(new HttpRequestException("API está fora do ar"));
 
-            // Act & Assert: Verifica exceção real lançada
-            var exception = await Assert.ThrowsAsync<HttpRequestException>(
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<ExternalApiException>(
                 () => _teamService.SyncAllTeamsAsync());
 
-            exception.Message.Should().Be("API está fora do ar");
+            // Verificar apenas a mensagem da ExternalApiException
+            exception.Message.Should().Be("Falha ao sincronizar times da API externa");
         }
 
 

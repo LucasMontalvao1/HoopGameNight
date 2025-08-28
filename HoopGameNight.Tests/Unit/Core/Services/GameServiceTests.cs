@@ -72,23 +72,23 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         [Fact(DisplayName = "Deve retornar lista vazia quando não há jogos hoje")]
         public async Task DeveRetornarListaVazia_QuandoNaoHaJogosHoje()
         {
-            // Arrange: Configura repositório para retornar lista vazia
-            var jogosVazios = new List<Game>();
+            // RESET: Limpar qualquer estado anterior
+            _fixture.MockGameRepository.Reset();
+            _fixture.MockMapper.Reset();
 
+            // Arrange: Configurar mocks para retornar vazio
             _fixture.MockGameRepository
                 .Setup(x => x.GetTodayGamesAsync())
-                .ReturnsAsync(jogosVazios);
+                .ReturnsAsync(new List<Game>());
 
-            // Força o mapper a retornar lista vazia também
             _fixture.MockMapper
                 .Setup(x => x.Map<List<GameResponse>>(It.IsAny<List<Game>>()))
                 .Returns(new List<GameResponse>());
 
-            // Act: Chama o serviço
+            // Act
             var resultado = await _fixture.GameService.GetTodayGamesAsync();
 
-            // Assert: Deve retornar lista vazia
-            resultado.Should().NotBeNull("porque sempre deve retornar uma lista");
+            // Assert
             resultado.Should().BeEmpty("porque não há jogos configurados");
         }
 
