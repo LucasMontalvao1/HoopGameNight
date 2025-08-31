@@ -242,51 +242,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
 
         #endregion
 
-        #region Integration Test Placeholders
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetAllAsync_DeveRetornarTodosPlayersDoDatabase()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task InsertAsync_DeveInserirPlayerNoDatabase()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task SearchPlayersAsync_DeveFiltrarCorretamente()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetPlayersByTeamAsync_DeveRetornarApenasPlayersDoTime()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetPlayersByPositionAsync_DeveFiltrarPorPosicao()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetPlayersByHeightRangeAsync_DeveFiltrarPorAltura()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        #endregion
+        
 
         #region Helper Methods
 

@@ -164,33 +164,4 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
 
         #endregion
     }
-
-    /// <summary>
-    /// Testes de integração para TeamRepository
-    /// Estes testes devem ser executados contra um banco de dados real (ou em memória)
-    /// </summary>
-    public class TeamRepositoryIntegrationTests : IDisposable
-    {
-        // Aqui você colocaria os testes reais que interagem com o banco
-        // Usando TestContainers, banco em memória, ou um banco de testes
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetAllAsync_DeveRetornarTodosOsTimesDoDatabase()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task InsertAsync_DeveInserirTimeNoDatabase()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        public void Dispose()
-        {
-            // Limpar recursos do banco de testes
-        }
-    }
 }

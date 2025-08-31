@@ -72,24 +72,32 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         [Fact(DisplayName = "Deve retornar lista vazia quando não há jogos hoje")]
         public async Task DeveRetornarListaVazia_QuandoNaoHaJogosHoje()
         {
-            // RESET: Limpar qualquer estado anterior
-            _fixture.MockGameRepository.Reset();
-            _fixture.MockMapper.Reset();
+            // IMPORTANTE: Criar nova instância do fixture para garantir isolamento
+            var fixture = new GameServiceTestFixture();
 
             // Arrange: Configurar mocks para retornar vazio
-            _fixture.MockGameRepository
+            fixture.MockGameRepository
                 .Setup(x => x.GetTodayGamesAsync())
                 .ReturnsAsync(new List<Game>());
 
-            _fixture.MockMapper
-                .Setup(x => x.Map<List<GameResponse>>(It.IsAny<List<Game>>()))
+            fixture.MockMapper
+                .Setup(x => x.Map<List<GameResponse>>(It.IsAny<IEnumerable<Game>>()))
+                .Returns(new List<GameResponse>());
+
+            // Configurar também o Map genérico caso seja usado
+            fixture.MockMapper
+                .Setup(x => x.Map<IEnumerable<GameResponse>>(It.IsAny<IEnumerable<Game>>()))
                 .Returns(new List<GameResponse>());
 
             // Act
-            var resultado = await _fixture.GameService.GetTodayGamesAsync();
+            var resultado = await fixture.GameService.GetTodayGamesAsync();
 
             // Assert
+            resultado.Should().NotBeNull("o resultado não deve ser nulo");
             resultado.Should().BeEmpty("porque não há jogos configurados");
+
+            // Verificar que o repositório foi chamado
+            fixture.MockGameRepository.Verify(x => x.GetTodayGamesAsync(), Times.Once);
         }
 
         /// <summary>

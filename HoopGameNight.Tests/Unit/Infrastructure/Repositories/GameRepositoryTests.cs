@@ -363,59 +363,6 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
 
         #endregion
 
-        #region Integration Test Placeholders
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetTodayGamesAsync_DeveRetornarJogosDeHoje()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetGamesByDateAsync_DeveRetornarJogosDaData()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetGamesAsync_DeveFiltrarCorretamente()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task GetGamesByTeamAsync_DeveRetornarJogosDoTime()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task InsertAsync_DeveInserirJogoNoDatabase()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task UpdateAsync_DeveAtualizarScoreEStatus()
-        {
-            // Este seria um teste real contra o banco
-            await Task.CompletedTask;
-        }
-
-        [Fact(Skip = "Teste de integração - requer banco de dados")]
-        public async Task ExecuteQueryWithTeamsAsync_DeveMapearTimesCorretamente()
-        {
-            // Este seria um teste real contra o banco para verificar o mapeamento manual
-            await Task.CompletedTask;
-        }
-
-        #endregion
-
         #region Helper Methods
 
         private Game CriarJogo(int id = 0, int externalId = 0)
