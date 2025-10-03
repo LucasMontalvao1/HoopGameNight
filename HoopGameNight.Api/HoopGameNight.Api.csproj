@@ -23,6 +23,7 @@
 
 		<!-- Database -->
 		<PackageReference Include="Dapper" Version="2.1.66" />
+		<PackageReference Include="DotNetEnv" Version="3.1.1" />
 		<PackageReference Include="MySqlConnector" Version="2.4.0" />
 
 		<!-- HTTP Client com Polly -->

@@ -54,7 +54,7 @@ namespace HoopGameNight.Api.Filters
                     break;
 
                 case UnauthorizedAccessException:
-                    response.Message = "Access denied";
+                    response.Message = "Acesso negado";
                     context.Result = new UnauthorizedObjectResult(response);
                     context.HttpContext.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                     break;

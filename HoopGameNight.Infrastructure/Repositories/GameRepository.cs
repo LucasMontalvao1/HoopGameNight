@@ -19,6 +19,7 @@ namespace HoopGameNight.Infrastructure.Repositories
         {
         }
 
+        // Métodos básicos de consulta
         public async Task<IEnumerable<Game>> GetTodayGamesAsync()
         {
             Logger.LogDebug("Getting today's games");
@@ -41,6 +42,72 @@ namespace HoopGameNight.Infrastructure.Repositories
             return games;
         }
 
+        public async Task<IEnumerable<Game>> GetByDateAsync(DateTime date)
+        {
+            // Redireciona para o método principal
+            return await GetGamesByDateAsync(date);
+        }
+
+        public async Task<IEnumerable<Game>> GetByDateRangeAsync(DateTime startDate, DateTime endDate)
+        {
+            Logger.LogDebug("Getting games between {StartDate} and {EndDate}",
+                startDate.ToShortDateString(), endDate.ToShortDateString());
+
+            var sql = await LoadSqlAsync("GetByDateRange");
+            var games = await ExecuteQueryWithTeamsAsync(sql, new { StartDate = startDate, EndDate = endDate });
+
+            Logger.LogDebug("Retrieved {GameCount} games between {StartDate} and {EndDate}",
+                games.Count(), startDate.ToShortDateString(), endDate.ToShortDateString());
+            return games;
+        }
+
+        public async Task<IEnumerable<Game>> GetLiveGamesAsync()
+        {
+            var sql = "SELECT * FROM Games WHERE Status = 'Live' ORDER BY DateTime";
+            return await ExecuteQueryAsync<Game>(sql);
+        }
+
+        // Métodos de consulta por time
+        public async Task<IEnumerable<Game>> GetByTeamAsync(int teamId, DateTime? startDate = null, DateTime? endDate = null)
+        {
+            Logger.LogDebug("Getting games for team: {TeamId}", teamId);
+
+            var sql = await LoadSqlAsync("GetByTeam");
+            var parameters = new
+            {
+                TeamId = teamId,
+                StartDate = startDate,
+                EndDate = endDate
+            };
+
+            var games = await ExecuteQueryWithTeamsAsync(sql, parameters);
+
+            Logger.LogDebug("Retrieved {GameCount} games for team {TeamId}", games.Count(), teamId);
+            return games;
+        }
+
+        public async Task<(IEnumerable<Game> Games, int TotalCount)> GetGamesByTeamAsync(int teamId, int page, int pageSize)
+        {
+            Logger.LogDebug("Getting games for team: {TeamId} with pagination", teamId);
+
+            var sql = await LoadSqlAsync("GetByTeam");
+            var countSql = await LoadSqlAsync("GetByTeamCount");
+
+            var parameters = new
+            {
+                TeamId = teamId,
+                Offset = (page - 1) * pageSize,
+                PageSize = pageSize
+            };
+
+            var games = await ExecuteQueryWithTeamsAsync(sql, parameters);
+            var totalCount = await ExecuteScalarAsync<int>(countSql, new { TeamId = teamId });
+
+            Logger.LogDebug("Retrieved {GameCount} games for team {TeamId}", games.Count(), teamId);
+            return (games, totalCount);
+        }
+
+        // Métodos de consulta com filtros
         public async Task<(IEnumerable<Game> Games, int TotalCount)> GetGamesAsync(GetGamesRequest request)
         {
             Logger.LogDebug("Getting games with filters: {@Request}", request);
@@ -68,27 +135,51 @@ namespace HoopGameNight.Infrastructure.Repositories
             return (games, totalCount);
         }
 
-        public async Task<(IEnumerable<Game> Games, int TotalCount)> GetGamesByTeamAsync(int teamId, int page, int pageSize)
+        // Métodos por ID externo
+        public async Task<Game?> GetByExternalIdAsync(int externalId)
         {
-            Logger.LogDebug("Getting games for team: {TeamId}", teamId);
+            Logger.LogDebug("Getting game by external ID: {ExternalId}", externalId);
 
-            var sql = await LoadSqlAsync("GetByTeam");
-            var countSql = await LoadSqlAsync("GetByTeamCount");
+            var sql = await LoadSqlAsync("GetByExternalId");
+            var games = await ExecuteQueryWithTeamsAsync(sql, new { ExternalId = externalId });
+            var game = games.FirstOrDefault();
 
-            var parameters = new
-            {
-                TeamId = teamId,
-                Offset = (page - 1) * pageSize,
-                PageSize = pageSize
-            };
-
-            var games = await ExecuteQueryWithTeamsAsync(sql, parameters);
-            var totalCount = await ExecuteScalarAsync<int>(countSql, new { TeamId = teamId });
-
-            Logger.LogDebug("Retrieved {GameCount} games for team {TeamId}", games.Count(), teamId);
-            return (games, totalCount);
+            Logger.LogDebug("Game {Found} with external ID: {ExternalId}", game != null ? "found" : "not found", externalId);
+            return game;
         }
 
+        public async Task<bool> ExistsAsync(int externalId)
+        {
+            Logger.LogDebug("Checking if game exists with external ID: {ExternalId}", externalId);
+
+            var sql = await LoadSqlAsync("Exists");
+            var count = await ExecuteScalarAsync<int>(sql, new { ExternalId = externalId });
+
+            var exists = count > 0;
+            Logger.LogDebug("Game {Exists} with external ID: {ExternalId}", exists ? "exists" : "does not exist", externalId);
+            return exists;
+        }
+
+        // Métodos de atualização específicos
+        public async Task<bool> UpdateScoreAsync(int gameId, int homeScore, int visitorScore)
+        {
+            var sql = @"UPDATE Games 
+                       SET HomeTeamScore = @HomeScore, 
+                           VisitorTeamScore = @VisitorScore, 
+                           UpdatedAt = NOW() 
+                       WHERE Id = @GameId";
+
+            var result = await ExecuteAsync(sql, new
+            {
+                GameId = gameId,
+                HomeScore = homeScore,
+                VisitorScore = visitorScore
+            });
+
+            return result > 0;
+        }
+
+        // Métodos herdados do BaseRepository
         public async Task<Game?> GetByIdAsync(int id)
         {
             Logger.LogDebug("Getting game by ID: {GameId}", id);
@@ -101,17 +192,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return game;
         }
 
-        public async Task<Game?> GetByExternalIdAsync(int externalId)
-        {
-            Logger.LogDebug("Getting game by external ID: {ExternalId}", externalId);
-
-            var sql = await LoadSqlAsync("GetByExternalId");
-            var game = await ExecuteQuerySingleOrDefaultAsync<Game>(sql, new { ExternalId = externalId });
-
-            Logger.LogDebug("Game {Found} with external ID: {ExternalId}", game != null ? "found" : "not found", externalId);
-            return game;
-        }
-
         public async Task<IEnumerable<Game>> GetAllAsync()
         {
             Logger.LogDebug("Getting all games");
@@ -121,90 +201,6 @@ namespace HoopGameNight.Infrastructure.Repositories
 
             Logger.LogDebug("Retrieved {GameCount} games", games.Count());
             return games;
-        }
-
-        // Método helper para executar queries com mapeamento de times
-        private async Task<IEnumerable<Game>> ExecuteQueryWithTeamsAsync(string sql, object? parameters = null)
-        {
-            using var connection = _connection.CreateConnection();
-
-            Logger.LogInformation("🔍 EXECUTING SQL: {Sql}", sql);
-            Logger.LogInformation("🔍 PARAMETERS: {@Parameters}", parameters);
-
-            try
-            {
-                var results = await connection.QueryAsync(sql, parameters);
-                var games = new List<Game>();
-
-                foreach (dynamic row in results)
-                {
-                    var game = new Game
-                    {
-                        Id = row.id,
-                        ExternalId = row.external_id,
-                        Date = row.date,
-                        DateTime = row.datetime,
-                        HomeTeamId = row.home_team_id,
-                        VisitorTeamId = row.visitor_team_id,
-                        HomeTeamScore = row.home_team_score,
-                        VisitorTeamScore = row.visitor_team_score,
-                        Status = Enum.Parse<GameStatus>(row.status ?? "Scheduled"),
-                        Period = row.period,
-                        TimeRemaining = row.time_remaining,
-                        PostSeason = row.postseason,
-                        Season = row.season,
-                        CreatedAt = row.created_at,
-                        UpdatedAt = row.updated_at
-                    };
-
-                    if (row.HomeTeam_Id != null && row.HomeTeam_Id > 0)
-                    {
-                        game.HomeTeam = new Team
-                        {
-                            Id = row.HomeTeam_Id,
-                            ExternalId = row.HomeTeam_ExternalId ?? 0,
-                            Name = row.HomeTeam_Name ?? "",
-                            FullName = row.HomeTeam_FullName ?? "",
-                            Abbreviation = row.HomeTeam_Abbreviation ?? "",
-                            City = row.HomeTeam_City ?? "",
-                            Conference = Enum.Parse<Conference>(row.HomeTeam_Conference ?? "East"),
-                            Division = row.HomeTeam_Division ?? "",
-                            CreatedAt = row.HomeTeam_CreatedAt,
-                            UpdatedAt = row.HomeTeam_UpdatedAt
-                        };
-                    }
-
-                    if (row.VisitorTeam_Id != null && row.VisitorTeam_Id > 0)
-                    {
-                        game.VisitorTeam = new Team
-                        {
-                            Id = row.VisitorTeam_Id,
-                            ExternalId = row.VisitorTeam_ExternalId ?? 0,
-                            Name = row.VisitorTeam_Name ?? "",
-                            FullName = row.VisitorTeam_FullName ?? "",
-                            Abbreviation = row.VisitorTeam_Abbreviation ?? "",
-                            City = row.VisitorTeam_City ?? "",
-                            Conference = Enum.Parse<Conference>(row.VisitorTeam_Conference ?? "East"),
-                            Division = row.VisitorTeam_Division ?? "",
-                            CreatedAt = row.VisitorTeam_CreatedAt,
-                            UpdatedAt = row.VisitorTeam_UpdatedAt
-                        };
-                    }
-
-                    Logger.LogInformation("🏀 MANUAL MAPPING -> Game: {GameId} | HomeTeam: {HomeTeamId}-{HomeTeamName} | VisitorTeam: {VisitorTeamId}-{VisitorTeamName}",
-                        game.Id, game.HomeTeam?.Id, game.HomeTeam?.Name, game.VisitorTeam?.Id, game.VisitorTeam?.Name);
-
-                    games.Add(game);
-                }
-
-                Logger.LogInformation("✅ SUCCESSFULLY MAPPED {GameCount} games with manual mapping", games.Count);
-                return games;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "❌ ERROR in ExecuteQueryWithTeamsAsync");
-                throw;
-            }
         }
 
         public async Task<int> InsertAsync(Game game)
@@ -268,16 +264,123 @@ namespace HoopGameNight.Infrastructure.Repositories
             return deleted;
         }
 
-        public async Task<bool> ExistsAsync(int externalId)
+        // Método helper para executar queries com mapeamento de times - MELHORADO com Dapper Multi-Mapping
+        private async Task<IEnumerable<Game>> ExecuteQueryWithTeamsAsync(string sql, object? parameters = null)
         {
-            Logger.LogDebug("Checking if game exists with external ID: {ExternalId}", externalId);
+            using var connection = _connection.CreateConnection();
 
-            var sql = await LoadSqlAsync("Exists");
-            var count = await ExecuteScalarAsync<int>(sql, new { ExternalId = externalId });
+            Logger.LogDebug("🔍 EXECUTING SQL: {Sql}", sql);
+            Logger.LogDebug("🔍 PARAMETERS: {@Parameters}", parameters);
 
-            var exists = count > 0;
-            Logger.LogDebug("Game {Exists} with external ID: {ExternalId}", exists ? "exists" : "does not exist", externalId);
-            return exists;
+            try
+            {
+                var games = await connection.QueryAsync<Game, Team, Team, Game>(
+                    sql,
+                    (game, homeTeam, visitorTeam) =>
+                    {
+                        // Mapear times apenas se os IDs forem válidos
+                        game.HomeTeam = homeTeam?.Id > 0 ? homeTeam : null;
+                        game.VisitorTeam = visitorTeam?.Id > 0 ? visitorTeam : null;
+
+                        return game;
+                    },
+                    parameters,
+                    splitOn: "HomeTeam_Id,VisitorTeam_Id"
+                );
+
+                var gamesList = games.ToList();
+                Logger.LogDebug("✅ SUCCESSFULLY MAPPED {GameCount} games with Dapper multi-mapping", gamesList.Count);
+
+                return gamesList;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "❌ ERROR in ExecuteQueryWithTeamsAsync - SQL: {Sql}", sql);
+
+                // Fallback para o método manual em caso de erro no multi-mapping
+                Logger.LogWarning("🔄 FALLING BACK to manual mapping due to error");
+                return await ExecuteQueryWithTeamsManualAsync(sql, parameters);
+            }
+        }
+
+        // Método de fallback com mapeamento manual (mantido para compatibilidade)
+        private async Task<IEnumerable<Game>> ExecuteQueryWithTeamsManualAsync(string sql, object? parameters = null)
+        {
+            using var connection = _connection.CreateConnection();
+
+            try
+            {
+                var results = await connection.QueryAsync(sql, parameters);
+                var games = new List<Game>();
+
+                foreach (dynamic row in results)
+                {
+                    var game = new Game
+                    {
+                        Id = row.id,
+                        ExternalId = row.external_id,
+                        Date = row.date,
+                        DateTime = row.datetime,
+                        HomeTeamId = row.home_team_id,
+                        VisitorTeamId = row.visitor_team_id,
+                        HomeTeamScore = row.home_team_score,
+                        VisitorTeamScore = row.visitor_team_score,
+                        Status = Enum.TryParse<GameStatus>(row.status?.ToString(), out GameStatus status) ? status : GameStatus.Scheduled,
+                        Period = row.period,
+                        TimeRemaining = row.time_remaining,
+                        PostSeason = row.postseason,
+                        Season = row.season,
+                        CreatedAt = row.created_at,
+                        UpdatedAt = row.updated_at
+                    };
+
+                    // Mapear HomeTeam se existir
+                    if (row.HomeTeam_Id != null && row.HomeTeam_Id > 0)
+                    {
+                        game.HomeTeam = new Team
+                        {
+                            Id = row.HomeTeam_Id,
+                            ExternalId = row.HomeTeam_ExternalId ?? 0,
+                            Name = row.HomeTeam_Name ?? "",
+                            FullName = row.HomeTeam_FullName ?? "",
+                            Abbreviation = row.HomeTeam_Abbreviation ?? "",
+                            City = row.HomeTeam_City ?? "",
+                            Conference = Enum.TryParse<Conference>(row.HomeTeam_Conference?.ToString(), out Conference homeConf) ? homeConf : Conference.East,
+                            Division = row.HomeTeam_Division ?? "",
+                            CreatedAt = row.HomeTeam_CreatedAt,
+                            UpdatedAt = row.HomeTeam_UpdatedAt
+                        };
+                    }
+
+                    // Mapear VisitorTeam se existir
+                    if (row.VisitorTeam_Id != null && row.VisitorTeam_Id > 0)
+                    {
+                        game.VisitorTeam = new Team
+                        {
+                            Id = row.VisitorTeam_Id,
+                            ExternalId = row.VisitorTeam_ExternalId ?? 0,
+                            Name = row.VisitorTeam_Name ?? "",
+                            FullName = row.VisitorTeam_FullName ?? "",
+                            Abbreviation = row.VisitorTeam_Abbreviation ?? "",
+                            City = row.VisitorTeam_City ?? "",
+                            Conference = Enum.TryParse<Conference>(row.VisitorTeam_Conference?.ToString(), out Conference visitorConf) ? visitorConf : Conference.East,
+                            Division = row.VisitorTeam_Division ?? "",
+                            CreatedAt = row.VisitorTeam_CreatedAt,
+                            UpdatedAt = row.VisitorTeam_UpdatedAt
+                        };
+                    }
+
+                    games.Add(game);
+                }
+
+                Logger.LogDebug("FALLBACK MAPPING completed - {GameCount} games", games.Count);
+                return games;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "CRITICAL ERROR in manual mapping fallback");
+                throw;
+            }
         }
     }
 }

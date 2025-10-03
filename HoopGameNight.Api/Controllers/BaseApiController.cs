@@ -38,7 +38,10 @@ namespace HoopGameNight.Api.Controllers
                     operationName, _stopwatch.ElapsedMilliseconds, requestId);
 
                 // Adicionar headers de resposta úteis
-                Response.Headers.Add("X-Request-ID", requestId);
+                if (!Response.Headers.ContainsKey("X-Request-ID"))
+                {
+                    Response.Headers.Add("X-Request-ID", requestId);
+                }
                 Response.Headers.Add("X-Response-Time", $"{_stopwatch.ElapsedMilliseconds}ms");
 
                 return result;

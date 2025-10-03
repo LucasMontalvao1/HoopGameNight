@@ -20,12 +20,12 @@
     public class EntityNotFoundException : BusinessException
     {
         public EntityNotFoundException(string entityName, object id)
-            : base($"{entityName} with ID '{id}' was not found", "ENTITY_NOT_FOUND")
+            : base($"{entityName} com ID '{id}' não foi encontrado", "ENTITY_NOT_FOUND")
         {
         }
 
         public EntityNotFoundException(string entityName, string property, object value)
-            : base($"{entityName} with {property} '{value}' was not found", "ENTITY_NOT_FOUND")
+            : base($"{entityName} com {property} '{value}' não foi encontrado", "ENTITY_NOT_FOUND")
         {
         }
     }

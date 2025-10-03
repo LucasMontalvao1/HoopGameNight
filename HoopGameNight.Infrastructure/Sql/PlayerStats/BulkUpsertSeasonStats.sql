@@ -1,0 +1,40 @@
+﻿INSERT INTO PlayerSeasonStats (
+    PlayerId, Season, TeamId, GamesPlayed, GamesStarted,
+    MinutesPlayed, Points, FieldGoalsMade, FieldGoalsAttempted,
+    FieldGoalPercentage, ThreePointersMade, ThreePointersAttempted,
+    ThreePointPercentage, FreeThrowsMade, FreeThrowsAttempted,
+    FreeThrowPercentage, OffensiveRebounds, DefensiveRebounds,
+    TotalRebounds, Assists, Steals, Blocks, Turnovers,
+    PersonalFouls, AvgPoints, AvgRebounds, AvgAssists, AvgMinutes,
+    CreatedAt, UpdatedAt
+)
+VALUES 
+    @BulkValues
+ON DUPLICATE KEY UPDATE
+    TeamId = VALUES(TeamId),
+    GamesPlayed = VALUES(GamesPlayed),
+    GamesStarted = VALUES(GamesStarted),
+    MinutesPlayed = VALUES(MinutesPlayed),
+    Points = VALUES(Points),
+    FieldGoalsMade = VALUES(FieldGoalsMade),
+    FieldGoalsAttempted = VALUES(FieldGoalsAttempted),
+    FieldGoalPercentage = VALUES(FieldGoalPercentage),
+    ThreePointersMade = VALUES(ThreePointersMade),
+    ThreePointersAttempted = VALUES(ThreePointersAttempted),
+    ThreePointPercentage = VALUES(ThreePointPercentage),
+    FreeThrowsMade = VALUES(FreeThrowsMade),
+    FreeThrowsAttempted = VALUES(FreeThrowsAttempted),
+    FreeThrowPercentage = VALUES(FreeThrowPercentage),
+    OffensiveRebounds = VALUES(OffensiveRebounds),
+    DefensiveRebounds = VALUES(DefensiveRebounds),
+    TotalRebounds = VALUES(TotalRebounds),
+    Assists = VALUES(Assists),
+    Steals = VALUES(Steals),
+    Blocks = VALUES(Blocks),
+    Turnovers = VALUES(Turnovers),
+    PersonalFouls = VALUES(PersonalFouls),
+    AvgPoints = VALUES(AvgPoints),
+    AvgRebounds = VALUES(AvgRebounds),
+    AvgAssists = VALUES(AvgAssists),
+    AvgMinutes = VALUES(AvgMinutes),
+    UpdatedAt = NOW();

@@ -1,4 +1,5 @@
-﻿using HoopGameNight.Core.Models.Entities;
+﻿using HoopGameNight.Core.Enums;
+using HoopGameNight.Core.Models.Entities;
 
 namespace HoopGameNight.Core.Interfaces.Repositories
 {
@@ -11,5 +12,7 @@ namespace HoopGameNight.Core.Interfaces.Repositories
         Task<int> InsertAsync(Team team);
         Task<bool> UpdateAsync(Team team);
         Task<bool> ExistsAsync(int externalId);
+        Task<IEnumerable<Team>> GetByConferenceAsync(Conference conference);
+        Task<IEnumerable<Team>> GetByDivisionAsync(string division);
     }
 }

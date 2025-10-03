@@ -1,4 +1,5 @@
-﻿using HoopGameNight.Core.Interfaces.Infrastructure;
+﻿using HoopGameNight.Core.Enums;
+using HoopGameNight.Core.Interfaces.Infrastructure;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Models.Entities;
 using Microsoft.Extensions.Logging;
@@ -58,6 +59,28 @@ namespace HoopGameNight.Infrastructure.Repositories
 
             Logger.LogDebug("Team {Found} with abbreviation: {Abbreviation}", team != null ? "found" : "not found", abbreviation);
             return team;
+        }
+
+        public async Task<IEnumerable<Team>> GetByConferenceAsync(Conference conference)
+        {
+            Logger.LogDebug("Getting teams by conference: {Conference}", conference);
+
+            var sql = "SELECT * FROM Teams WHERE Conference = @Conference ORDER BY Name";
+            var teams = await ExecuteQueryAsync<Team>(sql, new { Conference = conference.ToString() });
+
+            Logger.LogDebug("Found {TeamCount} teams in conference {Conference}", teams.Count(), conference);
+            return teams;
+        }
+
+        public async Task<IEnumerable<Team>> GetByDivisionAsync(string division)
+        {
+            Logger.LogDebug("Getting teams by division: {Division}", division);
+
+            var sql = "SELECT * FROM Teams WHERE Division = @Division ORDER BY Name";
+            var teams = await ExecuteQueryAsync<Team>(sql, new { Division = division });
+
+            Logger.LogDebug("Found {TeamCount} teams in division {Division}", teams.Count(), division);
+            return teams;
         }
 
         public async Task<int> InsertAsync(Team team)

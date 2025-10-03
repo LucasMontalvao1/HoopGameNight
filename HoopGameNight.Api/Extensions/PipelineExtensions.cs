@@ -281,19 +281,31 @@ namespace HoopGameNight.Api.Extensions
                     var dbInitializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
                     await dbInitializer.InitializeAsync();
 
-                    Log.Information("✅ Banco de dados inicializado com sucesso");
+                    Log.Information("Banco de dados inicializado com sucesso");
                     return;
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "❌ Falha na inicialização do banco (tentativa {Attempt}/{MaxRetries})",
+                    Log.Warning(ex, "Falha na inicialização do banco (tentativa {Attempt}/{MaxRetries})",
                         attempt, maxRetries);
 
                     if (attempt == maxRetries)
                     {
-                        // Não falhar a aplicação, apenas logar o erro
-                        Log.Error("Banco de dados não pôde ser inicializado após {MaxRetries} tentativas. " +
-                                 "A aplicação continuará sem garantia de schema atualizado.", maxRetries);
+                        // Verificar se o banco é obrigatório
+                        var requireDb = config.GetValue<bool>("RequiredForStartup", true);
+
+                        if (requireDb)
+                        {
+                            Log.Fatal("Banco de dados é obrigatório mas não pôde ser inicializado após {MaxRetries} tentativas. " +
+                                     "Aplicação será encerrada.", maxRetries);
+                            throw new InvalidOperationException("Falha crítica na inicialização do banco de dados");
+                        }
+                        else
+                        {
+                            Log.Warning("Banco de dados não pôde ser inicializado após {MaxRetries} tentativas. " +
+                                       "Aplicação continuará em MODO SOMENTE-APIs (sem persistência local).", maxRetries);
+                            Log.Information("Use /api/v1/diagnostics/connectivity para verificar status dos serviços");
+                        }
                         return;
                     }
 

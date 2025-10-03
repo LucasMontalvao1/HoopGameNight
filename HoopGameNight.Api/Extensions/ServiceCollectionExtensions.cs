@@ -179,6 +179,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<IGameRepository, GameRepository>();
             services.AddScoped<ITeamRepository, TeamRepository>();
             services.AddScoped<IPlayerRepository, PlayerRepository>();
+            services.AddScoped<IPlayerStatsRepository, PlayerStatsRepository>();
 
             return services;
         }
@@ -192,6 +193,8 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<IGameService, GameService>();
             services.AddScoped<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
+            services.AddScoped<IPlayerStatsService, PlayerStatsService>();
+            services.AddScoped<IPlayerStatsSyncService, PlayerStatsSyncService>();
 
             return services;
         }
@@ -406,11 +409,6 @@ namespace HoopGameNight.Api.Extensions
                     name: "mysql-database",
                     tags: new[] { "database", "mysql", "ready" },
                     timeout: TimeSpan.FromSeconds(3))
-                .AddUrlGroup(
-                    new Uri($"{ballDontLieUrl}/teams"),
-                    name: "balldontlie-api",
-                    tags: new[] { "external", "api" },
-                    timeout: TimeSpan.FromSeconds(5))
                 .AddCheck<CacheHealthCheck>(
                     "cache-memory",
                     tags: new[] { "cache", "performance" })
@@ -429,7 +427,7 @@ namespace HoopGameNight.Api.Extensions
 
         #endregion
 
-        #region API Documentation - CORRIGIDO
+        #region API Documentation 
 
         private static IServiceCollection AddApiDocumentation(
             this IServiceCollection services,
@@ -554,12 +552,13 @@ namespace HoopGameNight.Api.Extensions
         private static IServiceCollection AddBackgroundServices(this IServiceCollection services)
         {
             services.AddHostedService<DataSyncBackgroundService>();
+            services.AddHostedService<PlayerStatsSyncBackgroundService>();
             return services;
         }
 
         #endregion
 
-        #region API Versioning - CORRIGIDO
+        #region API Versioning 
 
         private static IServiceCollection AddApiVersioning(this IServiceCollection services)
         {
@@ -613,17 +612,14 @@ namespace HoopGameNight.Api.Extensions
         #endregion
     }
 
-    // Custom operation filter to simplify response descriptions
     public class SimplifyResponsesOperationFilter : IOperationFilter
     {
         public void Apply(OpenApiOperation operation, OperationFilterContext context)
         {
-            // Simplify response descriptions and schema names
             foreach (var response in operation.Responses)
             {
                 if (response.Value.Content.TryGetValue("application/json", out var mediaType))
                 {
-                    // Simplify the schema reference if it's a complex generic type
                     if (mediaType.Schema?.Reference?.Id?.Contains("[[") == true)
                     {
                         var originalId = mediaType.Schema.Reference.Id;
@@ -636,7 +632,6 @@ namespace HoopGameNight.Api.Extensions
                     }
                 }
 
-                // Add default description if missing
                 if (string.IsNullOrWhiteSpace(response.Value.Description))
                 {
                     response.Value.Description = response.Key switch
@@ -652,7 +647,6 @@ namespace HoopGameNight.Api.Extensions
                 }
             }
 
-            // Add common response headers to all responses
             foreach (var response in operation.Responses.Values)
             {
                 response.Headers ??= new Dictionary<string, OpenApiHeader>();

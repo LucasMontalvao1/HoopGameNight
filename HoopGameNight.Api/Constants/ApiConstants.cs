@@ -12,6 +12,7 @@
             public const string TEAMS = $"{API_PREFIX}/{API_VERSION}/teams";
             public const string PLAYERS = $"{API_PREFIX}/{API_VERSION}/players";
             public const string SYNC = $"{API_PREFIX}/{API_VERSION}/sync";
+            public const string PLAYERSTATS = $"{API_PREFIX}/{API_VERSION}/players/stats";
         }
 
         public static class CacheKeys

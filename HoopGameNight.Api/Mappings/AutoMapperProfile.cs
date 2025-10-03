@@ -4,6 +4,7 @@ using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Extensions;
 using HoopGameNight.Core.Models.Entities;
+using static HoopGameNight.Core.Models.Entities.Player;
 
 namespace HoopGameNight.Api.Mappings
 {
@@ -13,6 +14,7 @@ namespace HoopGameNight.Api.Mappings
         {
             CreateEntityToResponseMaps();
             CreateExternalToEntityMaps();
+            CreatePlayerStatsMaps(); 
         }
 
         private void CreateEntityToResponseMaps()
@@ -80,6 +82,118 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.VisitorTeam, opt => opt.Ignore())
                 .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
                 .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
+
+            // Ball Don't Lie Player Season Stats to Entity
+            CreateMap<BallDontLiePlayerSeasonStatsDto, PlayerSeasonStats>()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.PlayerId, opt => opt.Ignore())
+                .ForMember(dest => dest.Season, opt => opt.Ignore())
+                .ForMember(dest => dest.TeamId, opt => opt.Ignore())
+                .ForMember(dest => dest.GamesPlayed, opt => opt.MapFrom(src => src.GamesPlayed))
+                .ForMember(dest => dest.Points, opt => opt.MapFrom(src => (int)(src.Pts * src.GamesPlayed)))
+                .ForMember(dest => dest.TotalRebounds, opt => opt.MapFrom(src => (int)(src.Reb * src.GamesPlayed)))
+                .ForMember(dest => dest.Assists, opt => opt.MapFrom(src => (int)(src.Ast * src.GamesPlayed)))
+                .ForMember(dest => dest.Steals, opt => opt.MapFrom(src => (int)(src.Stl * src.GamesPlayed)))
+                .ForMember(dest => dest.Blocks, opt => opt.MapFrom(src => (int)(src.Blk * src.GamesPlayed)))
+                .ForMember(dest => dest.Turnovers, opt => opt.MapFrom(src => (int)(src.Turnover * src.GamesPlayed)))
+                .ForMember(dest => dest.AvgPoints, opt => opt.MapFrom(src => (decimal)src.Pts))
+                .ForMember(dest => dest.AvgRebounds, opt => opt.MapFrom(src => (decimal)src.Reb))
+                .ForMember(dest => dest.AvgAssists, opt => opt.MapFrom(src => (decimal)src.Ast))
+                .ForMember(dest => dest.FieldGoalPercentage, opt => opt.MapFrom(src => src.FgPct.HasValue ? (decimal)src.FgPct.Value : (decimal?)null))
+                .ForMember(dest => dest.ThreePointPercentage, opt => opt.MapFrom(src => src.Fg3Pct.HasValue ? (decimal)src.Fg3Pct.Value : (decimal?)null))
+                .ForMember(dest => dest.FreeThrowPercentage, opt => opt.MapFrom(src => src.FtPct.HasValue ? (decimal)src.FtPct.Value : (decimal?)null))
+                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+                .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
+
+            // Ball Don't Lie Player Game Stats to Entity
+            CreateMap<BallDontLiePlayerGameStatsDto, PlayerGameStats>()
+                .ForMember(dest => dest.Id, opt => opt.Ignore())
+                .ForMember(dest => dest.PlayerId, opt => opt.Ignore())
+                .ForMember(dest => dest.GameId, opt => opt.Ignore())
+                .ForMember(dest => dest.TeamId, opt => opt.Ignore())
+                .ForMember(dest => dest.Points, opt => opt.MapFrom(src => src.Pts))
+                .ForMember(dest => dest.TotalRebounds, opt => opt.MapFrom(src => src.Reb))
+                .ForMember(dest => dest.Assists, opt => opt.MapFrom(src => src.Ast))
+                .ForMember(dest => dest.Steals, opt => opt.MapFrom(src => src.Stl))
+                .ForMember(dest => dest.Blocks, opt => opt.MapFrom(src => src.Blk))
+                .ForMember(dest => dest.Turnovers, opt => opt.MapFrom(src => src.Turnover))
+                .ForMember(dest => dest.FieldGoalsMade, opt => opt.MapFrom(src => src.Fgm))
+                .ForMember(dest => dest.FieldGoalsAttempted, opt => opt.MapFrom(src => src.Fga))
+                .ForMember(dest => dest.ThreePointersMade, opt => opt.MapFrom(src => src.Fg3m))
+                .ForMember(dest => dest.ThreePointersAttempted, opt => opt.MapFrom(src => src.Fg3a))
+                .ForMember(dest => dest.FreeThrowsMade, opt => opt.MapFrom(src => src.Ftm))
+                .ForMember(dest => dest.FreeThrowsAttempted, opt => opt.MapFrom(src => src.Fta))
+                .ForMember(dest => dest.OffensiveRebounds, opt => opt.MapFrom(src => src.Oreb))
+                .ForMember(dest => dest.DefensiveRebounds, opt => opt.MapFrom(src => src.Dreb))
+                .ForMember(dest => dest.PersonalFouls, opt => opt.MapFrom(src => src.Pf))
+                .ForMember(dest => dest.MinutesPlayed, opt => opt.MapFrom(src => ParseMinutesFromString(src.Min)))
+                .ForMember(dest => dest.SecondsPlayed, opt => opt.MapFrom(src => ParseSecondsFromString(src.Min)))
+                .ForMember(dest => dest.DidNotPlay, opt => opt.MapFrom(src => string.IsNullOrEmpty(src.Min) || src.Min == "00:00"))
+                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+                .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
+        }
+
+        private void CreatePlayerStatsMaps()
+        {
+            // Player para PlayerDetailedResponse
+            CreateMap<Player, PlayerDetailedResponse>()
+                .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName))
+                .ForMember(dest => dest.Height, opt => opt.MapFrom(src => src.Height))
+                .ForMember(dest => dest.Weight, opt => opt.MapFrom(src => src.Weight))
+                .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
+                .ForMember(dest => dest.Position, opt => opt.MapFrom(src =>
+                    src.Position.HasValue ? src.Position.Value.ToString() : null))
+                .ForMember(dest => dest.Draft, opt => opt.MapFrom(src =>
+                    src.DraftYear.HasValue && src.DraftRound.HasValue && src.DraftPick.HasValue
+                    ? new DraftInfo
+                    {
+                        Year = src.DraftYear.Value,
+                        Round = src.DraftRound.Value,
+                        Pick = src.DraftPick.Value
+                    }
+                    : null))
+                .ForMember(dest => dest.CurrentTeam, opt => opt.MapFrom(src => src.Team))
+                .ForMember(dest => dest.CurrentSeasonStats, opt => opt.Ignore())
+                .ForMember(dest => dest.CareerStats, opt => opt.Ignore())
+                .ForMember(dest => dest.RecentGames, opt => opt.Ignore());
+
+            // PlayerSeasonStats para PlayerSeasonStatsResponse
+            CreateMap<PlayerSeasonStats, PlayerSeasonStatsResponse>()
+                .ForMember(dest => dest.PPG, opt => opt.MapFrom(src => src.AvgPoints))
+                .ForMember(dest => dest.RPG, opt => opt.MapFrom(src => src.AvgRebounds))
+                .ForMember(dest => dest.APG, opt => opt.MapFrom(src => src.AvgAssists))
+                .ForMember(dest => dest.SPG, opt => opt.MapFrom(src =>
+                    src.GamesPlayed > 0 ? Math.Round((decimal)src.Steals / src.GamesPlayed, 1) : 0))
+                .ForMember(dest => dest.BPG, opt => opt.MapFrom(src =>
+                    src.GamesPlayed > 0 ? Math.Round((decimal)src.Blocks / src.GamesPlayed, 1) : 0))
+                .ForMember(dest => dest.MPG, opt => opt.MapFrom(src => src.AvgMinutes))
+                .ForMember(dest => dest.FGPercentage, opt => opt.MapFrom(src => src.FieldGoalPercentage ?? 0))
+                .ForMember(dest => dest.ThreePointPercentage, opt => opt.MapFrom(src => src.ThreePointPercentage ?? 0))
+                .ForMember(dest => dest.FTPercentage, opt => opt.MapFrom(src => src.FreeThrowPercentage ?? 0))
+                .ForMember(dest => dest.TotalPoints, opt => opt.MapFrom(src => src.Points))
+                .ForMember(dest => dest.TotalRebounds, opt => opt.MapFrom(src => src.TotalRebounds))
+                .ForMember(dest => dest.TotalAssists, opt => opt.MapFrom(src => src.Assists))
+                .ForMember(dest => dest.TeamName, opt => opt.Ignore()); 
+
+            // PlayerCareerStats para PlayerCareerStatsResponse
+            CreateMap<PlayerCareerStats, PlayerCareerStatsResponse>()
+                .ForMember(dest => dest.CareerHighPoints, opt => opt.MapFrom(src => src.HighestPointsGame))
+                .ForMember(dest => dest.CareerHighRebounds, opt => opt.MapFrom(src => src.HighestReboundsGame))
+                .ForMember(dest => dest.CareerHighAssists, opt => opt.MapFrom(src => src.HighestAssistsGame));
+
+            // PlayerGameStats para PlayerRecentGameResponse
+            CreateMap<PlayerGameStats, PlayerRecentGameResponse>()
+                .ForMember(dest => dest.GameDate, opt => opt.MapFrom(src =>
+                    src.Game != null ? src.Game.Date : DateTime.MinValue))
+                .ForMember(dest => dest.Opponent, opt => opt.Ignore())
+                .ForMember(dest => dest.IsHome, opt => opt.Ignore())
+                .ForMember(dest => dest.Result, opt => opt.Ignore())
+                .ForMember(dest => dest.Minutes, opt => opt.MapFrom(src => src.MinutesFormatted))
+                .ForMember(dest => dest.FieldGoals, opt => opt.MapFrom(src => src.FieldGoalsFormatted))
+                .ForMember(dest => dest.ThreePointers, opt => opt.MapFrom(src => src.ThreePointersFormatted))
+                .ForMember(dest => dest.FreeThrows, opt => opt.MapFrom(src => src.FreeThrowsFormatted))
+                .ForMember(dest => dest.DoubleDouble, opt => opt.MapFrom(src => src.DoubleDouble))
+                .ForMember(dest => dest.TripleDouble, opt => opt.MapFrom(src => src.TripleDouble));
         }
 
         private static TeamSummaryResponse? GetWinningTeamSummary(Game game)
@@ -142,6 +256,28 @@ namespace HoopGameNight.Api.Mappings
                 return date;
 
             return DateTime.UtcNow;
+        }
+
+        private static int ParseMinutesFromString(string? minutesStr)
+        {
+            if (string.IsNullOrEmpty(minutesStr)) return 0;
+
+            var parts = minutesStr.Split(':');
+            if (parts.Length == 2 && int.TryParse(parts[0], out int minutes))
+                return minutes;
+
+            return 0;
+        }
+
+        private static int ParseSecondsFromString(string? minutesStr)
+        {
+            if (string.IsNullOrEmpty(minutesStr)) return 0;
+
+            var parts = minutesStr.Split(':');
+            if (parts.Length == 2 && int.TryParse(parts[1], out int seconds))
+                return seconds;
+
+            return 0;
         }
     }
 }

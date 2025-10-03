@@ -94,6 +94,64 @@ namespace HoopGameNight.Infrastructure.Repositories
             return players;
         }
 
+        public async Task<bool> ExistsAsync(int externalId)
+        {
+            Logger.LogDebug("Checking if player exists with external ID: {ExternalId}", externalId);
+
+            var sql = await LoadSqlAsync("Exists");
+            var count = await ExecuteScalarAsync<int>(sql, new { ExternalId = externalId });
+
+            var exists = count > 0;
+            Logger.LogDebug("Player {Exists} with external ID: {ExternalId}", exists ? "exists" : "does not exist", externalId);
+            return exists;
+        }
+
+        public async Task<IEnumerable<Player>> GetByTeamIdAsync(int teamId)
+        {
+            Logger.LogDebug("Getting players by team ID: {TeamId}", teamId);
+
+            var sql = await LoadSqlAsync("GetByTeamId");
+            var players = await ExecuteQueryAsync<Player>(sql, new { TeamId = teamId });
+
+            Logger.LogDebug("Found {PlayerCount} players for team {TeamId}", players.Count(), teamId);
+            return players;
+        }
+
+        public async Task<IEnumerable<Player>> GetActivePlayersAsync()
+        {
+            Logger.LogDebug("Getting active players");
+
+            var sql = await LoadSqlAsync("GetActivePlayers");
+            var players = await ExecuteQueryAsync<Player>(sql);
+
+            Logger.LogDebug("Found {PlayerCount} active players", players.Count());
+            return players;
+        }
+
+        // NOVO: Implementação do método SearchAsync da interface
+        public async Task<IEnumerable<Player>> SearchAsync(string searchTerm)
+        {
+            Logger.LogDebug("Searching players with term: {SearchTerm}", searchTerm);
+
+            var sql = await LoadSqlAsync("Search");
+            var players = await ExecuteQueryAsync<Player>(sql, new { SearchTerm = $"%{searchTerm}%" });
+
+            Logger.LogDebug("Found {PlayerCount} players matching '{SearchTerm}'", players.Count(), searchTerm);
+            return players;
+        }
+
+        public async Task<bool> UpdateTeamAsync(int playerId, int? teamId)
+        {
+            Logger.LogDebug("Updating team for player: {PlayerId} to team: {TeamId}", playerId, teamId);
+
+            var sql = "UPDATE Players SET TeamId = @TeamId, UpdatedAt = NOW() WHERE Id = @PlayerId";
+            var result = await ExecuteAsync(sql, new { PlayerId = playerId, TeamId = teamId });
+
+            var updated = result > 0;
+            Logger.LogDebug("Player team {Updated}: {PlayerId}", updated ? "updated" : "not updated", playerId);
+            return updated;
+        }
+
         public async Task<int> InsertAsync(Player player)
         {
             Logger.LogDebug("Inserting player: {PlayerName}", player.FullName);
@@ -152,19 +210,7 @@ namespace HoopGameNight.Infrastructure.Repositories
             return deleted;
         }
 
-        public async Task<bool> ExistsAsync(int externalId)
-        {
-            Logger.LogDebug("Checking if player exists with external ID: {ExternalId}", externalId);
-
-            var sql = await LoadSqlAsync("Exists");
-            var count = await ExecuteScalarAsync<int>(sql, new { ExternalId = externalId });
-
-            var exists = count > 0;
-            Logger.LogDebug("Player {Exists} with external ID: {ExternalId}", exists ? "exists" : "does not exist", externalId);
-            return exists;
-        }
-
-        // Método adicional para busca avançada
+        // Métodos adicionais úteis (não estão na interface mas podem ser úteis)
         public async Task<IEnumerable<Player>> GetPlayersByPositionAsync(string position)
         {
             Logger.LogDebug("Getting players by position: {Position}", position);
@@ -176,7 +222,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return players;
         }
 
-        // Método para buscar jogadores por altura
         public async Task<IEnumerable<Player>> GetPlayersByHeightRangeAsync(int minHeightInches, int maxHeightInches)
         {
             Logger.LogDebug("Getting players by height range: {MinHeight}-{MaxHeight} inches", minHeightInches, maxHeightInches);

@@ -1,6 +1,9 @@
 ﻿using HoopGameNight.Api.Extensions;
 using Serilog;
 
+// ===== CARREGAR VARIÁVEIS DE AMBIENTE PRIMEIRO =====
+DotNetEnv.Env.Load("../.env");
+
 // ===== CONFIGURAR SERILOG =====
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -13,6 +16,24 @@ try
 
     // ===== BUILDER =====
     var builder = WebApplication.CreateBuilder(args);
+
+    // Configurar connection string com variáveis de ambiente
+    var dbServer = Environment.GetEnvironmentVariable("DB_SERVER");
+    var dbPort = Environment.GetEnvironmentVariable("DB_PORT");
+    var dbName = Environment.GetEnvironmentVariable("DB_NAME");
+    var dbUser = Environment.GetEnvironmentVariable("DB_USER");
+    var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
+
+    Log.Information("DB Config - Server: {Server}, Port: {Port}, Database: {Database}, User: {User}, HasPassword: {HasPassword}",
+        dbServer ?? "NULL", dbPort ?? "NULL", dbName ?? "NULL", dbUser ?? "NULL", !string.IsNullOrEmpty(dbPassword));
+
+    var connectionString = $"Server={dbServer};Port={dbPort};Database={dbName};Uid={dbUser};Pwd={dbPassword};CharSet=utf8mb4;AllowUserVariables=true;";
+    builder.Configuration.GetSection("ConnectionStrings")["MySqlConnection"] = connectionString;
+
+    // Configurar API Key do Ball Don't Lie
+    var ballDontLieApiKey = Environment.GetEnvironmentVariable("BALLDONTLIE_API_KEY");
+    builder.Configuration.GetSection("ExternalApis:BallDontLie")["ApiKey"] = ballDontLieApiKey;
+    builder.Configuration.GetSection("Sync")["ApiKey"] = ballDontLieApiKey;
 
     // Configurar Serilog do appsettings.json
     builder.Host.UseSerilog((context, configuration) =>

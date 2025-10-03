@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using HoopGameNight.Core.DTOs.External;
+using HoopGameNight.Core.DTOs.External.ESPN;
 using HoopGameNight.Core.Interfaces.Services;
 
 namespace HoopGameNight.Infrastructure.ExternalServices
@@ -13,6 +14,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         private readonly HttpClient _httpClient;
         private readonly ILogger<EspnApiService> _logger;
         private const string BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
+        private const string CORE_API_BASE_URL = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba";
 
         // Mapeamento de IDs do sistema para IDs da ESPN
         private readonly Dictionary<int, string> _teamIdMapping = new()
@@ -184,6 +186,226 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             catch
             {
                 return false;
+            }
+        }
+
+        public async Task<List<EspnAthleteRefDto>> GetAllPlayersAsync()
+        {
+            try
+            {
+                var url = $"{CORE_API_BASE_URL}/athletes?lang=en&region=us";
+                _logger.LogInformation("Fetching all ESPN athletes from: {Url}", url);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                var athletes = new List<EspnAthleteRefDto>();
+
+                if (root.TryGetProperty("items", out var items))
+                {
+                    foreach (var item in items.EnumerateArray())
+                    {
+                        if (item.TryGetProperty("$ref", out var refProperty))
+                        {
+                            athletes.Add(new EspnAthleteRefDto
+                            {
+                                Ref = refProperty.GetString() ?? ""
+                            });
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Found {Count} athletes from ESPN", athletes.Count);
+                return athletes;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN athletes");
+                return new List<EspnAthleteRefDto>();
+            }
+        }
+
+        public async Task<EspnPlayerDetailsDto?> GetPlayerDetailsAsync(string playerId)
+        {
+            try
+            {
+                var url = $"{CORE_API_BASE_URL}/athletes/{playerId}?lang=en&region=us";
+                _logger.LogInformation("Fetching ESPN player details for ID: {PlayerId}", playerId);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                var playerDetails = JsonSerializer.Deserialize<EspnPlayerDetailsDto>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return playerDetails;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN player details for ID: {PlayerId}", playerId);
+                return null;
+            }
+        }
+
+        public async Task<EspnPlayerStatsDto?> GetPlayerStatsAsync(string playerId)
+        {
+            try
+            {
+                var url = $"{CORE_API_BASE_URL}/athletes/{playerId}/statistics?lang=en&region=us";
+                _logger.LogInformation("Fetching ESPN player stats for ID: {PlayerId}", playerId);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                var playerStats = JsonSerializer.Deserialize<EspnPlayerStatsDto>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return playerStats;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN player stats for ID: {PlayerId}", playerId);
+                return null;
+            }
+        }
+
+        public async Task<EspnPlayerStatsDto?> GetPlayerSeasonStatsAsync(string playerId, int season)
+        {
+            try
+            {
+                var url = $"{CORE_API_BASE_URL}/seasons/{season}/types/3/athletes/{playerId}/statistics/0?lang=en&region=us";
+                _logger.LogInformation("Fetching ESPN player season stats for ID: {PlayerId}, Season: {Season}", playerId, season);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                var seasonStats = JsonSerializer.Deserialize<EspnPlayerStatsDto>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return seasonStats;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN player season stats for ID: {PlayerId}, Season: {Season}", playerId, season);
+                return null;
+            }
+        }
+
+        public async Task<List<EspnPlayerStatsDto>> GetPlayerCareerStatsAsync(string playerId)
+        {
+            try
+            {
+                var url = $"{CORE_API_BASE_URL}/athletes/{playerId}/statisticslog?lang=en&region=us";
+                _logger.LogInformation("Fetching ESPN player career stats for ID: {PlayerId}", playerId);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                var careerStats = new List<EspnPlayerStatsDto>();
+
+                if (root.TryGetProperty("entries", out var entries))
+                {
+                    foreach (var entry in entries.EnumerateArray())
+                    {
+                        if (entry.TryGetProperty("statistics", out var statistics))
+                        {
+                            foreach (var stat in statistics.EnumerateArray())
+                            {
+                                if (stat.TryGetProperty("type", out var type) &&
+                                    type.GetString() == "total" &&
+                                    stat.TryGetProperty("statistics", out var statsRef) &&
+                                    statsRef.TryGetProperty("$ref", out var refUrl))
+                                {
+                                    var seasonStats = await GetPlayerStatsFromUrl(refUrl.GetString());
+                                    if (seasonStats != null)
+                                    {
+                                        careerStats.Add(seasonStats);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Found {Count} career seasons for player {PlayerId}", careerStats.Count, playerId);
+                return careerStats;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN player career stats for ID: {PlayerId}", playerId);
+                return new List<EspnPlayerStatsDto>();
+            }
+        }
+
+        public async Task<EspnPlayerStatsDto?> GetPlayerGameStatsAsync(string playerId, string gameId)
+        {
+            try
+            {
+                var url = $"{CORE_API_BASE_URL}/events/{gameId}/competitions/{gameId}/competitors/home/roster/{playerId}/statistics?lang=en&region=us";
+                _logger.LogInformation("Fetching ESPN player game stats for Player ID: {PlayerId}, Game ID: {GameId}", playerId, gameId);
+
+                var response = await _httpClient.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // Try away team if home team request fails
+                    url = $"{CORE_API_BASE_URL}/events/{gameId}/competitions/{gameId}/competitors/away/roster/{playerId}/statistics?lang=en&region=us";
+                    response = await _httpClient.GetAsync(url);
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                var gameStats = JsonSerializer.Deserialize<EspnPlayerStatsDto>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                return gameStats;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN player game stats for Player ID: {PlayerId}, Game ID: {GameId}", playerId, gameId);
+                return null;
+            }
+        }
+
+        private async Task<EspnPlayerStatsDto?> GetPlayerStatsFromUrl(string? url)
+        {
+            if (string.IsNullOrEmpty(url)) return null;
+
+            try
+            {
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<EspnPlayerStatsDto>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching stats from URL: {Url}", url);
+                return null;
             }
         }
 
