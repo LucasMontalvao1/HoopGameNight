@@ -1,4 +1,4 @@
-﻿SELECT 
+﻿SELECT
     id,
     external_id,
     name,
@@ -9,5 +9,7 @@
     division,
     created_at,
     updated_at
-FROM teams 
-WHERE UPPER(abbreviation) = UPPER(@Abbreviation);
+FROM teams
+WHERE UPPER(TRIM(abbreviation)) = UPPER(TRIM(@Abbreviation))
+ORDER BY external_id DESC
+LIMIT 1;

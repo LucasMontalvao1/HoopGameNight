@@ -153,7 +153,7 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         /// <summary>
-        /// Sincroniza e atualiza as estatísticas de carreira de um jogador
+        /// Sincroniza e atualiza as estatísticas de carreira de um jogador (últimas 5 temporadas)
         /// </summary>
         [HttpPost("{playerId}/career/sync")]
         public async Task<ActionResult<ApiResponse<object>>> SyncAndUpdatePlayerCareerStats(int playerId)
@@ -161,22 +161,7 @@ namespace HoopGameNight.Api.Controllers.V1
             return await ExecuteAsync(async () =>
             {
                 var currentYear = DateTime.Now.Year;
-                int syncedSeasons = 0;
-
-                for (int year = currentYear; year >= currentYear - 4; year--)
-                {
-                    try
-                    {
-                        var seasonSuccess = await _syncService.SyncPlayerSeasonStatsAsync(playerId, year);
-                        if (seasonSuccess) syncedSeasons++;
-
-                        await Task.Delay(2000);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Falha ao sincronizar a temporada {Year} para o jogador {PlayerId}", year, playerId);
-                    }
-                }
+                var syncedSeasons = await _syncService.SyncPlayerCareerHistoryAsync(playerId, currentYear - 4, currentYear);
 
                 var careerUpdated = await _statsService.UpdatePlayerCareerStatsAsync(playerId);
 
@@ -193,6 +178,50 @@ namespace HoopGameNight.Api.Controllers.V1
                     data = careerStats,
                     timestamp = DateTime.UtcNow
                 }, "Estatísticas de carreira sincronizadas com sucesso");
+            });
+        }
+
+        /// <summary>
+        /// Sincroniza o histórico completo de carreira de um jogador 
+        /// </summary>
+        [HttpPost("{playerId}/career/full-history")]
+        public async Task<ActionResult<ApiResponse<object>>> SyncPlayerFullHistory(
+            int playerId,
+            [FromQuery] int? startYear = null,
+            [FromQuery] int? endYear = null)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                var currentYear = DateTime.Now.Year;
+                var start = startYear ?? 2003;
+                var end = endYear ?? currentYear;
+
+                if (start > end)
+                    return BadRequest<object>("O ano inicial não pode ser maior que o ano final");
+
+                if (end > currentYear + 1)
+                    return BadRequest<object>($"O ano final não pode ser maior que {currentYear + 1}");
+
+                var syncedSeasons = await _syncService.SyncPlayerCareerHistoryAsync(playerId, start, end);
+
+                var careerUpdated = await _statsService.UpdatePlayerCareerStatsAsync(playerId);
+
+                if (!careerUpdated)
+                    return BadRequest<object>("Falha ao atualizar estatísticas de carreira após sincronização");
+
+                var careerStats = await _statsService.GetPlayerCareerStatsAsync(playerId);
+                var allSeasons = await _statsService.GetPlayerAllSeasonsAsync(playerId);
+
+                return Ok((object)new
+                {
+                    success = true,
+                    message = $"Histórico completo sincronizado para o jogador {playerId} ({start}-{end})",
+                    syncedSeasons = syncedSeasons,
+                    totalSeasons = end - start + 1,
+                    careerStats = careerStats,
+                    seasonStats = allSeasons,
+                    timestamp = DateTime.UtcNow
+                }, "Histórico completo sincronizado com sucesso");
             });
         }
 

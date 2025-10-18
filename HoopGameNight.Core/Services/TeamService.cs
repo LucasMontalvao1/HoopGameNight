@@ -143,11 +143,18 @@ namespace HoopGameNight.Core.Services
                 var syncCount = 0;
                 foreach (var team in entities)
                 {
-                    var exists = await _teamRepository.ExistsAsync(team.ExternalId);
-                    if (!exists)
+                    // Verificar por external_id E por abbreviation para evitar duplicatas
+                    var existsByExternalId = await _teamRepository.ExistsAsync(team.ExternalId);
+                    var existsByAbbreviation = await _teamRepository.GetByAbbreviationAsync(team.Abbreviation);
+
+                    if (!existsByExternalId && existsByAbbreviation == null)
                     {
                         await _teamRepository.InsertAsync(team);
                         syncCount++;
+                    }
+                    else if (existsByAbbreviation != null)
+                    {
+                        _logger.LogDebug("Time já existe com abreviação {Abbreviation}, pulando inserção", team.Abbreviation);
                     }
                 }
 

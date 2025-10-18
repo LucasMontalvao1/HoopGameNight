@@ -1,8 +1,12 @@
 ﻿using HoopGameNight.Api.Extensions;
 using Serilog;
+using Dapper;
 
 // ===== CARREGAR VARIÁVEIS DE AMBIENTE PRIMEIRO =====
 DotNetEnv.Env.Load("../.env");
+
+// ===== CONFIGURAR DAPPER PARA MAPEAR SNAKE_CASE → PASCALCASE =====
+DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 // ===== CONFIGURAR SERILOG =====
 Log.Logger = new LoggerConfiguration()

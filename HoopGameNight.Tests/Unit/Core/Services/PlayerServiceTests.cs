@@ -36,9 +36,14 @@ namespace HoopGameNight.Tests.Unit.Core.Services
             _mockLogger = new Mock<ILogger<PlayerService>>();
             _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
+            var mockEspnService = new Mock<IEspnApiService>();
+            var mockNbaStatsService = new Mock<INbaStatsApiService>();
+
             _playerService = new PlayerService(
                 _mockPlayerRepository.Object,
                 _mockBallDontLieService.Object,
+                mockEspnService.Object,
+                mockNbaStatsService.Object,
                 _mockMapper.Object,
                 _memoryCache,
                 _mockLogger.Object

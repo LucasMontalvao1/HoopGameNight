@@ -29,7 +29,8 @@ namespace HoopGameNight.Api.Mappings
             // Player Mappings
             CreateMap<Player, PlayerResponse>()
                 .ForMember(dest => dest.Position, opt => opt.MapFrom(src => src.Position.HasValue ? src.Position.Value.ToString() : null))
-                .ForMember(dest => dest.PositionDisplay, opt => opt.MapFrom(src => src.Position.HasValue ? src.Position.Value.GetDescription() : null));
+                .ForMember(dest => dest.PositionDisplay, opt => opt.MapFrom(src => src.Position.HasValue ? src.Position.Value.GetDescription() : null))
+                .ForMember(dest => dest.Team, opt => opt.MapFrom(src => src.Team));
 
             CreateMap<Player, PlayerSummaryResponse>()
                 .ForMember(dest => dest.Position, opt => opt.MapFrom(src => src.Position.HasValue ? src.Position.Value.ToString() : null))
@@ -61,9 +62,16 @@ namespace HoopGameNight.Api.Mappings
             CreateMap<BallDontLiePlayerDto, Player>()
                 .ForMember(dest => dest.Id, opt => opt.Ignore())
                 .ForMember(dest => dest.ExternalId, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
+                .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
                 .ForMember(dest => dest.Position, opt => opt.MapFrom(src => ParsePlayerPosition(src.Position)))
+                .ForMember(dest => dest.HeightFeet, opt => opt.MapFrom(src => src.HeightFeet))
+                .ForMember(dest => dest.HeightInches, opt => opt.MapFrom(src => src.HeightInches))
+                .ForMember(dest => dest.WeightPounds, opt => opt.MapFrom(src => src.WeightPounds))
                 .ForMember(dest => dest.TeamId, opt => opt.MapFrom(src => src.Team != null ? (int?)src.Team.Id : null))
                 .ForMember(dest => dest.Team, opt => opt.Ignore())
+                .ForMember(dest => dest.NbaStatsId, opt => opt.Ignore()) // Será preenchido pela busca híbrida
+                .ForMember(dest => dest.EspnId, opt => opt.Ignore()) // Será preenchido pela busca híbrida
                 .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
                 .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
 
@@ -99,6 +107,34 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.AvgPoints, opt => opt.MapFrom(src => (decimal)src.Pts))
                 .ForMember(dest => dest.AvgRebounds, opt => opt.MapFrom(src => (decimal)src.Reb))
                 .ForMember(dest => dest.AvgAssists, opt => opt.MapFrom(src => (decimal)src.Ast))
+                // Cálculo aproximado de Field Goals Made/Attempted a partir de pontos e porcentagem
+                // Assumindo mix de 2pts (65%), 3pts (25%) e FT (10%), média ~2.2 pts por FG
+                .ForMember(dest => dest.FieldGoalsMade, opt => opt.MapFrom(src =>
+                    src.FgPct.HasValue && src.FgPct.Value > 0
+                        ? (int)Math.Round((src.Pts * src.GamesPlayed * 0.85) / 2.2)
+                        : 0))
+                .ForMember(dest => dest.FieldGoalsAttempted, opt => opt.MapFrom(src =>
+                    src.FgPct.HasValue && src.FgPct.Value > 0
+                        ? (int)Math.Round((src.Pts * src.GamesPlayed * 0.85) / 2.2 / src.FgPct.Value)
+                        : 0))
+                // Cálculo de 3-Point Made/Attempted (assumindo ~25% dos pontos vêm de 3pts)
+                .ForMember(dest => dest.ThreePointersMade, opt => opt.MapFrom(src =>
+                    src.Fg3Pct.HasValue && src.Fg3Pct.Value > 0
+                        ? (int)Math.Round((src.Pts * src.GamesPlayed * 0.25) / 3.0)
+                        : 0))
+                .ForMember(dest => dest.ThreePointersAttempted, opt => opt.MapFrom(src =>
+                    src.Fg3Pct.HasValue && src.Fg3Pct.Value > 0
+                        ? (int)Math.Round((src.Pts * src.GamesPlayed * 0.25) / 3.0 / src.Fg3Pct.Value)
+                        : 0))
+                // Cálculo de Free Throws Made/Attempted (assumindo ~15% dos pontos vêm de FTs)
+                .ForMember(dest => dest.FreeThrowsMade, opt => opt.MapFrom(src =>
+                    src.FtPct.HasValue && src.FtPct.Value > 0
+                        ? (int)Math.Round(src.Pts * src.GamesPlayed * 0.15)
+                        : 0))
+                .ForMember(dest => dest.FreeThrowsAttempted, opt => opt.MapFrom(src =>
+                    src.FtPct.HasValue && src.FtPct.Value > 0
+                        ? (int)Math.Round((src.Pts * src.GamesPlayed * 0.15) / src.FtPct.Value)
+                        : 0))
                 .ForMember(dest => dest.FieldGoalPercentage, opt => opt.MapFrom(src => src.FgPct.HasValue ? (decimal)src.FgPct.Value : (decimal?)null))
                 .ForMember(dest => dest.ThreePointPercentage, opt => opt.MapFrom(src => src.Fg3Pct.HasValue ? (decimal)src.Fg3Pct.Value : (decimal?)null))
                 .ForMember(dest => dest.FreeThrowPercentage, opt => opt.MapFrom(src => src.FtPct.HasValue ? (decimal)src.FtPct.Value : (decimal?)null))

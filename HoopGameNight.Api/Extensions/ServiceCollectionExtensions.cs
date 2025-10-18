@@ -1,5 +1,6 @@
 ﻿using HoopGameNight.Api.Configurations;
 using HoopGameNight.Api.Constants;
+using HoopGameNight.Api.Controllers.V1.Admin;
 using HoopGameNight.Api.Filters;
 using HoopGameNight.Api.HealthChecks;
 using HoopGameNight.Api.Mappings;
@@ -195,6 +196,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPlayerStatsService, PlayerStatsService>();
             services.AddScoped<IPlayerStatsSyncService, PlayerStatsSyncService>();
+            services.AddSingleton<ISyncHealthService, SyncHealthService>();
 
             return services;
         }
@@ -237,6 +239,20 @@ namespace HoopGameNight.Api.Extensions
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
             })
             .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+
+            // NBA Stats API (usando Ball Don't Lie v1 para stats oficiais da NBA)
+            services.AddHttpClient<INbaStatsApiService, NbaStatsApiService>(client =>
+            {
+                client.BaseAddress = new Uri(ballDontLieBaseUrl);
+                if (!string.IsNullOrEmpty(ballDontLieApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ballDontLieApiKey}");
+                }
+                client.Timeout = TimeSpan.FromSeconds(ballDontLieTimeout);
+                client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
+            })
+            .AddPolicyHandler(GetRetryPolicy(ballDontLieConfig))
             .AddPolicyHandler(GetCircuitBreakerPolicy());
 
             return services;
@@ -417,7 +433,15 @@ namespace HoopGameNight.Api.Extensions
                     tags: new[] { "background", "sync" })
                 .AddCheck<ExternalApiHealthCheck>(
                     "external-apis",
-                    tags: new[] { "external", "api" });
+                    tags: new[] { "external", "api" })
+                .AddCheck<BallDontLieHealthCheck>(
+                    "balldontlie-api",
+                    tags: new[] { "external", "api", "nba-data" },
+                    timeout: TimeSpan.FromSeconds(5))
+                .AddCheck<EspnApiHealthCheck>(
+                    "espn-api",
+                    tags: new[] { "external", "api", "nba-schedule" },
+                    timeout: TimeSpan.FromSeconds(5));
 
             // Metrics service
             services.AddSingleton<ISyncMetricsService, SyncMetricsService>();

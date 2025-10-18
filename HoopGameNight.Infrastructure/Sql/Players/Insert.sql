@@ -6,7 +6,9 @@
     height_feet,
     height_inches,
     weight_pounds,
-    team_id
+    team_id,
+    nba_stats_id,
+    espn_id
 ) VALUES (
     @ExternalId,
     @FirstName,
@@ -15,7 +17,9 @@
     @HeightFeet,
     @HeightInches,
     @WeightPounds,
-    @TeamId
+    @TeamId,
+    @NbaStatsId,
+    @EspnId
 );
 
 SELECT LAST_INSERT_ID();

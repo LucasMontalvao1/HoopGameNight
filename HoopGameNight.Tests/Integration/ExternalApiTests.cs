@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using HoopGameNight.Core.DTOs.External.BallDontLie;
 using HoopGameNight.Core.Exceptions;
+using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Infrastructure.ExternalServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -37,10 +38,15 @@ namespace HoopGameNight.Tests.Integration
             _mockLogger = new Mock<ILogger<BallDontLieService>>();
             _configuration = CriarConfiguracaoTeste();
 
+            var mockEspnService = new Mock<IEspnApiService>();
+            var mockNbaStatsService = new Mock<INbaStatsApiService>();
+
             _ballDontLieService = new BallDontLieService(
                 _httpClient,
                 _mockLogger.Object,
-                _configuration
+                _configuration,
+                mockEspnService.Object,
+                mockNbaStatsService.Object
             );
         }
 
@@ -448,10 +454,15 @@ namespace HoopGameNight.Tests.Integration
                 BaseAddress = new Uri("https://api.balldontlie.io/v1")
             };
 
+            var mockEspnService = new Mock<IEspnApiService>();
+            var mockNbaStatsService = new Mock<INbaStatsApiService>();
+
             var serviceMockado = new BallDontLieService(
                 httpClientMockado,
                 _mockLogger.Object,
-                _configuration
+                _configuration,
+                mockEspnService.Object,
+                mockNbaStatsService.Object
             );
 
             try
@@ -494,10 +505,15 @@ namespace HoopGameNight.Tests.Integration
                 Timeout = TimeSpan.FromMilliseconds(1) // Timeout impossível
             };
 
+            var mockEspnService = new Mock<IEspnApiService>();
+            var mockNbaStatsService = new Mock<INbaStatsApiService>();
+
             var serviceMockado = new BallDontLieService(
                 httpClientComTimeout,
                 _mockLogger.Object,
-                _configuration
+                _configuration,
+                mockEspnService.Object,
+                mockNbaStatsService.Object
             );
 
             try

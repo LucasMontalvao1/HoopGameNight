@@ -116,20 +116,21 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 if (string.IsNullOrWhiteSpace(abbreviation) || abbreviation.Length > 5)
                 {
+                    Logger.LogWarning("Abreviação inválida fornecida: {Abbreviation}", abbreviation);
                     return BadRequest<TeamResponse>("Abreviação de equipe inválida");
                 }
 
-                Logger.LogInformation("Buscando equipe com abreviação: {Abreviação}", abbreviation);
+                Logger.LogInformation("Buscando equipe com abreviação: {Abbreviation}", abbreviation);
 
-                var team = await _teamService.GetTeamByAbbreviationAsync(abbreviation.ToUpper());
+                var team = await _teamService.GetTeamByAbbreviationAsync(abbreviation.Trim().ToUpper());
 
                 if (team == null)
                 {
-                    Logger.LogWarning("Equipe não encontrada com abreviação: {Abreviação}", abbreviation);
+                    Logger.LogWarning("Equipe não encontrada com abreviação: {Abbreviation}", abbreviation);
                     return NotFound<TeamResponse>($"Equipe com abreviação '{abbreviation}' não encontrada");
                 }
 
-                Logger.LogInformation("Equipe encontrada: {TeamName}", team.DisplayName);
+                Logger.LogInformation("Equipe encontrada: {TeamName} (ID: {TeamId})", team.DisplayName, team.Id);
                 return Ok(team, "Equipe recuperada com sucesso");
             }
             catch (Exception ex)
@@ -144,7 +145,8 @@ namespace HoopGameNight.Api.Controllers.V1
         /// </summary>
         /// <returns>Resultado da sincronização</returns>
         [HttpPost("sync")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ApiResponse<object>>> SyncTeams()
         {
             try
@@ -159,11 +161,14 @@ namespace HoopGameNight.Api.Controllers.V1
                 {
                     message = "Equipes sincronizadas com sucesso",
                     teamCount = teams.Count,
-                    timestamp = DateTime.UtcNow
+                    timestamp = DateTime.UtcNow,
+                    resourcesCreated = teams.Count
                 };
 
                 Logger.LogInformation("Sincronização manual concluída - {TeamCount} equipes", teams.Count);
-                return Ok(result, "Equipes sincronizadas com sucesso");
+
+                // Usa 201 Created porque está criando/atualizando recursos
+                return StatusCode(StatusCodes.Status201Created, ApiResponse<object>.SuccessResult(result, "Equipes sincronizadas com sucesso"));
             }
             catch (Exception ex)
             {

@@ -39,35 +39,70 @@ namespace HoopGameNight.Core.Services
 
         public async Task<PlayerDetailedResponse?> GetPlayerDetailedStatsAsync(PlayerStatsRequest request)
         {
-            var cacheKey = $"player_stats_{request.PlayerId}_{request.Season}_{request.IncludeCareer}_{request.IncludeCurrentSeason}_{request.LastGames}";
-
-            if (_cache.TryGetValue(cacheKey, out PlayerDetailedResponse? cached))
-                return cached;
-
-            var player = await _playerRepository.GetByIdAsync(request.PlayerId);
-            if (player == null)
-                return null;
-
-            var response = _mapper.Map<PlayerDetailedResponse>(player);
-
-            if (request.IncludeCurrentSeason)
+            try
             {
-                var season = request.Season ?? DateTime.Now.Year;
-                response.CurrentSeasonStats = await GetPlayerSeasonStatsAsync(request.PlayerId, season);
-            }
+                var cacheKey = $"player_stats_{request.PlayerId}_{request.Season}_{request.IncludeCareer}_{request.IncludeCurrentSeason}_{request.LastGames}";
 
-            if (request.IncludeCareer)
+                if (_cache.TryGetValue(cacheKey, out PlayerDetailedResponse? cached))
+                    return cached;
+
+                var player = await _playerRepository.GetByIdAsync(request.PlayerId);
+                if (player == null)
+                {
+                    _logger.LogWarning("Player not found: {PlayerId}", request.PlayerId);
+                    return null;
+                }
+
+                var response = _mapper.Map<PlayerDetailedResponse>(player);
+
+                if (request.IncludeCurrentSeason)
+                {
+                    try
+                    {
+                        var season = request.Season ?? DateTime.Now.Year;
+                        response.CurrentSeasonStats = await GetPlayerSeasonStatsAsync(request.PlayerId, season);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error getting current season stats for player {PlayerId}", request.PlayerId);
+                        // Continua mesmo com erro
+                    }
+                }
+
+                if (request.IncludeCareer)
+                {
+                    try
+                    {
+                        response.CareerStats = await GetPlayerCareerStatsAsync(request.PlayerId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error getting career stats for player {PlayerId}", request.PlayerId);
+                        // Continua mesmo com erro
+                    }
+                }
+
+                if (request.LastGames > 0)
+                {
+                    try
+                    {
+                        response.RecentGames = await GetPlayerRecentGamesAsync(request.PlayerId, request.LastGames);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error getting recent games for player {PlayerId}", request.PlayerId);
+                        // Continua mesmo com erro
+                    }
+                }
+
+                _cache.Set(cacheKey, response, TimeSpan.FromMinutes(15));
+                return response;
+            }
+            catch (Exception ex)
             {
-                response.CareerStats = await GetPlayerCareerStatsAsync(request.PlayerId);
+                _logger.LogError(ex, "Unexpected error in GetPlayerDetailedStatsAsync for player {PlayerId}", request.PlayerId);
+                throw;
             }
-
-            if (request.LastGames > 0)
-            {
-                response.RecentGames = await GetPlayerRecentGamesAsync(request.PlayerId, request.LastGames);
-            }
-
-            _cache.Set(cacheKey, response, TimeSpan.FromMinutes(15));
-            return response;
         }
 
         public async Task<PlayerSeasonStatsResponse?> GetPlayerSeasonStatsAsync(int playerId, int season)
@@ -196,36 +231,48 @@ namespace HoopGameNight.Core.Services
 
         public async Task<PlayerComparisonResponse?> ComparePlayersAsync(int player1Id, int player2Id, int? season = null)
         {
-            var request1 = new PlayerStatsRequest
+            try
             {
-                PlayerId = player1Id,
-                Season = season,
-                IncludeCareer = true,
-                IncludeCurrentSeason = true,
-                LastGames = 5
-            };
+                var request1 = new PlayerStatsRequest
+                {
+                    PlayerId = player1Id,
+                    Season = season,
+                    IncludeCareer = true,
+                    IncludeCurrentSeason = true,
+                    LastGames = 5
+                };
 
-            var request2 = new PlayerStatsRequest
+                var request2 = new PlayerStatsRequest
+                {
+                    PlayerId = player2Id,
+                    Season = season,
+                    IncludeCareer = true,
+                    IncludeCurrentSeason = true,
+                    LastGames = 5
+                };
+
+                var player1Stats = await GetPlayerDetailedStatsAsync(request1);
+                var player2Stats = await GetPlayerDetailedStatsAsync(request2);
+
+                if (player1Stats == null || player2Stats == null)
+                {
+                    _logger.LogWarning("Cannot compare - Player1: {Player1Found}, Player2: {Player2Found}",
+                        player1Stats != null, player2Stats != null);
+                    return null;
+                }
+
+                return new PlayerComparisonResponse
+                {
+                    Player1 = player1Stats,
+                    Player2 = player2Stats,
+                    Comparison = CompareStats(player1Stats, player2Stats)
+                };
+            }
+            catch (Exception ex)
             {
-                PlayerId = player2Id,
-                Season = season,
-                IncludeCareer = true,
-                IncludeCurrentSeason = true,
-                LastGames = 5
-            };
-
-            var player1Stats = await GetPlayerDetailedStatsAsync(request1);
-            var player2Stats = await GetPlayerDetailedStatsAsync(request2);
-
-            if (player1Stats == null || player2Stats == null)
-                return null;
-
-            return new PlayerComparisonResponse
-            {
-                Player1 = player1Stats,
-                Player2 = player2Stats,
-                Comparison = CompareStats(player1Stats, player2Stats)
-            };
+                _logger.LogError(ex, "Error comparing players {Player1Id} and {Player2Id}", player1Id, player2Id);
+                throw;
+            }
         }
 
         public async Task<StatLeadersResponse> GetStatLeadersAsync(int season, int minGames, int limit)
@@ -270,14 +317,65 @@ namespace HoopGameNight.Core.Services
                 TotalSteals = seasons.Sum(s => s.Steals),
                 TotalBlocks = seasons.Sum(s => s.Blocks),
                 TotalTurnovers = seasons.Sum(s => s.Turnovers),
+
+                // Totais de arremessos (necessários para calcular porcentagens)
+                TotalFieldGoalsMade = seasons.Sum(s => s.FieldGoalsMade),
+                TotalFieldGoalsAttempted = seasons.Sum(s => s.FieldGoalsAttempted),
+                TotalThreePointersMade = seasons.Sum(s => s.ThreePointersMade),
+                TotalThreePointersAttempted = seasons.Sum(s => s.ThreePointersAttempted),
+                TotalFreeThrowsMade = seasons.Sum(s => s.FreeThrowsMade),
+                TotalFreeThrowsAttempted = seasons.Sum(s => s.FreeThrowsAttempted),
+
                 LastGameDate = DateTime.Today
             };
 
+            // Calcular médias por jogo
             if (careerStats.TotalGames > 0)
             {
                 careerStats.CareerPPG = Math.Round((decimal)careerStats.TotalPoints / careerStats.TotalGames, 2);
                 careerStats.CareerRPG = Math.Round((decimal)careerStats.TotalRebounds / careerStats.TotalGames, 2);
                 careerStats.CareerAPG = Math.Round((decimal)careerStats.TotalAssists / careerStats.TotalGames, 2);
+            }
+
+            // Calcular porcentagens de carreira
+            if (careerStats.TotalFieldGoalsAttempted > 0)
+            {
+                careerStats.CareerFgPercentage = Math.Round((decimal)careerStats.TotalFieldGoalsMade / careerStats.TotalFieldGoalsAttempted * 100, 1);
+            }
+
+            if (careerStats.TotalThreePointersAttempted > 0)
+            {
+                careerStats.Career3PtPercentage = Math.Round((decimal)careerStats.TotalThreePointersMade / careerStats.TotalThreePointersAttempted * 100, 1);
+            }
+
+            if (careerStats.TotalFreeThrowsAttempted > 0)
+            {
+                careerStats.CareerFtPercentage = Math.Round((decimal)careerStats.TotalFreeThrowsMade / careerStats.TotalFreeThrowsAttempted * 100, 1);
+            }
+
+            // Buscar estatísticas de jogos individuais para calcular career highs
+            try
+            {
+                var allGames = await _statsRepository.GetAllPlayerGamesAsync(playerId);
+                if (allGames.Any())
+                {
+                    careerStats.HighestPointsGame = allGames.Max(g => g.Points);
+                    careerStats.HighestReboundsGame = allGames.Max(g => g.TotalRebounds);
+                    careerStats.HighestAssistsGame = allGames.Max(g => g.Assists);
+                }
+                else
+                {
+                    // Se não há estatísticas de jogos individuais, usar máximos das médias de temporadas
+                    _logger.LogWarning("No game stats found for player {PlayerId}, using season maxes for career highs", playerId);
+                    careerStats.HighestPointsGame = (int)Math.Ceiling(seasons.Max(s => s.PPG));
+                    careerStats.HighestReboundsGame = (int)Math.Ceiling(seasons.Max(s => s.RPG));
+                    careerStats.HighestAssistsGame = (int)Math.Ceiling(seasons.Max(s => s.APG));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calculating career highs for player {PlayerId}", playerId);
+                // Continua sem career highs se houver erro
             }
 
             // Clear cache

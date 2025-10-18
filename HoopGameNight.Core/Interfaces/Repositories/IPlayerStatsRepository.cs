@@ -13,6 +13,7 @@ namespace HoopGameNight.Core.Interfaces.Repositories
 
         Task<PlayerGameStats?> GetGameStatsAsync(int playerId, int gameId);
         Task<IEnumerable<PlayerGameStats>> GetRecentGamesAsync(int playerId, int limit);
+        Task<IEnumerable<PlayerGameStats>> GetAllPlayerGamesAsync(int playerId);
         Task UpsertGameStatsAsync(PlayerGameStats gameStats);
 
         Task<IEnumerable<dynamic>> GetScoringLeadersAsync(int season, int minGames, int limit);

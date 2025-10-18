@@ -1,4 +1,5 @@
-﻿using HoopGameNight.Core.DTOs.Request;
+﻿using Dapper;
+using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.Interfaces.Infrastructure;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Models.Entities;
@@ -33,11 +34,39 @@ namespace HoopGameNight.Infrastructure.Repositories
                 PageSize = request.Take
             };
 
-            var players = await ExecuteQueryAsync<Player>(sql, parameters);
+            var players = await ExecuteQueryWithTeamAsync(sql, parameters);
             var totalCount = await ExecuteScalarAsync<int>(countSql, parameters);
 
             Logger.LogDebug("Found {PlayerCount} players (total: {TotalCount})", players.Count(), totalCount);
             return (players, totalCount);
+        }
+
+        private async Task<IEnumerable<Player>> ExecuteQueryWithTeamAsync(string sql, object? parameters = null)
+        {
+            var players = await ExecuteQueryAsync<Player>(sql, parameters);
+            var playersList = players.ToList();
+
+            // Get unique team IDs
+            var teamIds = playersList.Where(p => p.TeamId.HasValue).Select(p => p.TeamId!.Value).Distinct().ToList();
+
+            if (teamIds.Any())
+            {
+                // Fetch teams
+                var teamSql = "SELECT id, external_id, name, full_name, abbreviation, city, conference, division FROM teams WHERE id IN @TeamIds";
+                var teams = await ExecuteQueryAsync<Team>(teamSql, new { TeamIds = teamIds });
+                var teamDict = teams.ToDictionary(t => t.Id);
+
+                // Map teams to players
+                foreach (var player in playersList)
+                {
+                    if (player.TeamId.HasValue && teamDict.TryGetValue(player.TeamId.Value, out var team))
+                    {
+                        player.Team = team;
+                    }
+                }
+            }
+
+            return playersList;
         }
 
         public async Task<(IEnumerable<Player> Players, int TotalCount)> GetPlayersByTeamAsync(int teamId, int page, int pageSize)
@@ -54,7 +83,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                 PageSize = pageSize
             };
 
-            var players = await ExecuteQueryAsync<Player>(sql, parameters);
+            var players = await ExecuteQueryWithTeamAsync(sql, parameters);
             var totalCount = await ExecuteScalarAsync<int>(countSql, new { TeamId = teamId });
 
             Logger.LogDebug("Found {PlayerCount} players for team {TeamId}", players.Count(), teamId);
@@ -66,7 +95,8 @@ namespace HoopGameNight.Infrastructure.Repositories
             Logger.LogDebug("Getting player by ID: {PlayerId}", id);
 
             var sql = await LoadSqlAsync("GetById");
-            var player = await ExecuteQuerySingleOrDefaultAsync<Player>(sql, new { Id = id });
+            var players = await ExecuteQueryWithTeamAsync(sql, new { Id = id });
+            var player = players.FirstOrDefault();
 
             Logger.LogDebug("Player {Found} with ID: {PlayerId}", player != null ? "found" : "not found", id);
             return player;
@@ -166,7 +196,9 @@ namespace HoopGameNight.Infrastructure.Repositories
                 player.HeightFeet,
                 player.HeightInches,
                 player.WeightPounds,
-                player.TeamId
+                player.TeamId,
+                player.NbaStatsId,
+                player.EspnId
             });
 
             Logger.LogInformation("Player inserted with ID: {PlayerId}", id);

@@ -10,6 +10,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<List<EspnGameDto>> GetTeamScheduleAsync(int teamId, DateTime startDate, DateTime endDate);
         Task<bool> IsApiAvailableAsync();
         Task<List<EspnAthleteRefDto>> GetAllPlayersAsync();
+        Task<EspnAthleteRefDto?> SearchPlayerByNameAsync(string firstName, string lastName);
         Task<EspnPlayerDetailsDto?> GetPlayerDetailsAsync(string playerId);
         Task<EspnPlayerStatsDto?> GetPlayerStatsAsync(string playerId);
         Task<EspnPlayerStatsDto?> GetPlayerSeasonStatsAsync(string playerId, int season);

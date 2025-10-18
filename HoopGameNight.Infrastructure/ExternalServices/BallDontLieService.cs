@@ -16,6 +16,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly string _apiKey;
         private readonly IEspnApiService _espnApiService;
+        private readonly INbaStatsApiService _nbaStatsApiService;
 
         // RATE LIMITING - 60 requests per minute
         private static readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
@@ -27,11 +28,13 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             HttpClient httpClient,
             ILogger<BallDontLieService> logger,
             IConfiguration configuration,
-            IEspnApiService espnApiService)
+            IEspnApiService espnApiService,
+            INbaStatsApiService nbaStatsApiService)
         {
             _httpClient = httpClient;
             _logger = logger;
             _espnApiService = espnApiService;
+            _nbaStatsApiService = nbaStatsApiService;
 
             // CONFIGURAÇÃO DA API KEY
             var ballDontLieConfig = configuration.GetSection("ExternalApis:BallDontLie");
@@ -354,31 +357,62 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             try
             {
-                _logger.LogInformation("Using ESPN API for player season stats - Player: {PlayerId}, Season: {Season}", playerId, season);
+                _logger.LogInformation("🔍 Fetching season stats - Player: {PlayerId}, Season: {Season}", playerId, season);
 
-                // Map Ball Don't Lie player ID to ESPN player ID (for now we'll try to find a mapping)
+                // OPÇÃO 1: Usar NBA Stats API (melhor fonte de dados)
+                var nbaStatsId = await GetNbaStatsPlayerIdAsync(playerId);
+                if (!string.IsNullOrEmpty(nbaStatsId))
+                {
+                    _logger.LogDebug("Trying NBA Stats API for player {PlayerId} (NBA ID: {NbaId})", playerId, nbaStatsId);
+                    var nbaStats = await _nbaStatsApiService.GetPlayerSeasonStatsAsync(nbaStatsId, season);
+                    if (nbaStats != null)
+                    {
+                        _logger.LogInformation("✅ Got stats from NBA Stats API: {Points} PPG", nbaStats.Points);
+                        return new BallDontLiePlayerSeasonStatsDto
+                        {
+                            PlayerId = playerId,
+                            Season = season,
+                            GamesPlayed = nbaStats.GamesPlayed,
+                            Pts = (double)nbaStats.Points,
+                            Reb = (double)nbaStats.Rebounds,
+                            Ast = (double)nbaStats.Assists,
+                            Stl = (double)nbaStats.Steals,
+                            Blk = (double)nbaStats.Blocks,
+                            Turnover = (double)nbaStats.Turnovers,
+                            FgPct = (double)nbaStats.FieldGoalPercentage,
+                            Fg3Pct = (double)nbaStats.ThreePointPercentage,
+                            FtPct = (double)nbaStats.FreeThrowPercentage,
+                            Min = nbaStats.Minutes
+                        };
+                    }
+                }
+
+                // OPÇÃO 2: Usar ESPN API (requer mapeamento de IDs)
                 var espnPlayerId = await GetEspnPlayerIdAsync(playerId);
-                if (string.IsNullOrEmpty(espnPlayerId))
+                if (!string.IsNullOrEmpty(espnPlayerId))
                 {
-                    _logger.LogWarning("Could not find ESPN player ID for Ball Don't Lie player ID: {PlayerId}", playerId);
-                    return null;
+                    var espnStats = await _espnApiService.GetPlayerSeasonStatsAsync(espnPlayerId, season);
+                    if (espnStats?.Splits?.Categories != null)
+                    {
+                        return MapEspnToBallDontLieSeasonStats(espnStats, playerId, season);
+                    }
                 }
 
-                // Use the specific season stats endpoint
-                var espnStats = await _espnApiService.GetPlayerSeasonStatsAsync(espnPlayerId, season);
-                if (espnStats?.Splits?.Categories == null)
-                {
-                    _logger.LogWarning("No ESPN season stats found for player: {EspnPlayerId}, Season: {Season}", espnPlayerId, season);
-                    return null;
-                }
-
-                return MapEspnToBallDontLieSeasonStats(espnStats, playerId, season);
+                // OPÇÃO 3: Retornar null (dados não disponíveis)
+                _logger.LogWarning("⚠️ No season stats available for player {PlayerId}, season {Season}", playerId, season);
+                return null;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error fetching player season stats from ESPN for player {PlayerId}", playerId);
+                _logger.LogError(ex, "Error fetching player season stats for player {PlayerId}", playerId);
                 return null;
             }
+        }
+
+        private async Task<string?> GetNbaStatsPlayerIdAsync(int playerId)
+        {
+            // Placeholder - será implementado com cache de IDs
+            return await Task.FromResult<string?>(null);
         }
 
         public async Task<IEnumerable<BallDontLiePlayerGameStatsDto>> GetPlayerRecentGamesAsync(int playerId, int limit)

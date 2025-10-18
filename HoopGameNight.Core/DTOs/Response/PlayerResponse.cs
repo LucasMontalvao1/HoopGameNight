@@ -3,6 +3,9 @@
     public class PlayerResponse
     {
         public int Id { get; set; }
+        public int ExternalId { get; set; }
+        public string? NbaStatsId { get; set; }
+        public string? EspnId { get; set; }
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;

@@ -229,6 +229,22 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             }
         }
 
+        public async Task<EspnAthleteRefDto?> SearchPlayerByNameAsync(string firstName, string lastName)
+        {
+            try
+            {
+                // ESPN API não tem busca direta por nome, então retornamos null
+                // Futuramente poderia buscar todos e filtrar, mas seria muito custoso
+                _logger.LogDebug("ESPN API does not support search by name directly. Player: {FirstName} {LastName}", firstName, lastName);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error searching ESPN player: {FirstName} {LastName}", firstName, lastName);
+                return null;
+            }
+        }
+
         public async Task<EspnPlayerDetailsDto?> GetPlayerDetailsAsync(string playerId)
         {
             try

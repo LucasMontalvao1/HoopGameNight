@@ -1,6 +1,8 @@
-﻿SELECT 
+﻿SELECT
     p.id,
     p.external_id,
+    p.nba_stats_id,
+    p.espn_id,
     p.first_name,
     p.last_name,
     p.position,

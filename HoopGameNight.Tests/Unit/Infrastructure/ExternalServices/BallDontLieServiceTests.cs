@@ -1,6 +1,7 @@
 ﻿using FluentAssertions;
 using HoopGameNight.Core.DTOs.External.BallDontLie;
 using HoopGameNight.Core.Exceptions;
+using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Infrastructure.ExternalServices;
 using HoopGameNight.Tests.Helpers;
 using Microsoft.Extensions.Configuration;
@@ -43,10 +44,15 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.ExternalServices
 
             ConfigurarMocks();
 
+            var mockEspnService = new Mock<IEspnApiService>();
+            var mockNbaStatsService = new Mock<INbaStatsApiService>();
+
             _ballDontLieService = new BallDontLieService(
                 _httpClient,
                 _mockLogger.Object,
-                _mockConfiguration.Object
+                _mockConfiguration.Object,
+                mockEspnService.Object,
+                mockNbaStatsService.Object
             );
         }
 

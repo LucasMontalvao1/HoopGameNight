@@ -4,7 +4,11 @@ namespace HoopGameNight.Core.Models.Entities
 {
     public class Player : BaseEntity
     {
-        public int ExternalId { get; set; }
+        // IDs de APIs externas (para evitar duplicidades e mapear entre APIs)
+        public int ExternalId { get; set; } // Ball Don't Lie ID
+        public string? EspnId { get; set; } // ESPN API ID
+        public string? NbaStatsId { get; set; } // NBA Stats API ID (PERSON_ID)
+
         public string FirstName { get; set; } = string.Empty;
         public string LastName { get; set; } = string.Empty;
         public int? JerseyNumber { get; set; }

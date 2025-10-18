@@ -69,6 +69,12 @@ namespace HoopGameNight.Infrastructure.Repositories
             return await ExecuteQueryAsync<PlayerGameStats>(sql, new { PlayerId = playerId });
         }
 
+        public async Task<IEnumerable<PlayerGameStats>> GetAllPlayerGamesAsync(int playerId)
+        {
+            var sql = await LoadSqlAsync("GetAllPlayerGames");
+            return await ExecuteQueryAsync<PlayerGameStats>(sql, new { PlayerId = playerId });
+        }
+
         public async Task UpsertGameStatsAsync(PlayerGameStats gameStats)
         {
             var sql = await LoadSqlAsync("UpsertGameStats");

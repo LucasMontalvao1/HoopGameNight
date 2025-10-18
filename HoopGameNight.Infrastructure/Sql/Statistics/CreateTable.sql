@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Constraints
-    UNIQUE KEY unique_player_season_team (player_id, season, team_id),
+    UNIQUE KEY unique_player_season (player_id, season),
     FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL,
     

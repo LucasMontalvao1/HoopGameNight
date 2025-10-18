@@ -1,7 +1,11 @@
 ﻿CREATE TABLE IF NOT EXISTS players (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    external_id INT NOT NULL UNIQUE,
-    
+
+    -- IDs de APIs externas (para evitar duplicidades)
+    external_id INT NOT NULL UNIQUE COMMENT 'Ball Don''t Lie API ID',
+    espn_id VARCHAR(50) NULL COMMENT 'ESPN API ID',
+    nba_stats_id VARCHAR(50) NULL COMMENT 'NBA Stats API PERSON_ID',
+
     -- Informações básicas
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
@@ -35,9 +39,15 @@
     
     -- Indexes para performance
     INDEX idx_players_external_id (external_id),
+    INDEX idx_players_espn_id (espn_id),
+    INDEX idx_players_nba_stats_id (nba_stats_id),
     INDEX idx_players_team_id (team_id),
     INDEX idx_players_full_name (first_name, last_name),
     INDEX idx_players_position (position),
     INDEX idx_players_is_active (is_active),
-    INDEX idx_players_jersey (team_id, jersey_number)
+    INDEX idx_players_jersey (team_id, jersey_number),
+
+    -- Garantir que não haja duplicatas entre as APIs
+    UNIQUE KEY uk_players_espn_id (espn_id),
+    UNIQUE KEY uk_players_nba_stats_id (nba_stats_id)
 );
