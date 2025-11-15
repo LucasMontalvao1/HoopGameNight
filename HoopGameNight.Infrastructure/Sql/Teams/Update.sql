@@ -1,4 +1,5 @@
 ﻿UPDATE teams SET
+    external_espn_id = @EspnId,
     name = @Name,
     full_name = @FullName,
     abbreviation = @Abbreviation,

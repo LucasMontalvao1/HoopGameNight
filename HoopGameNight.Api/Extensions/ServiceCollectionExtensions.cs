@@ -85,6 +85,10 @@ namespace HoopGameNight.Api.Extensions
 
         private static IServiceCollection AddApiCore(this IServiceCollection services)
         {
+            // Exception Handler (ASP.NET Core 8+)
+            services.AddExceptionHandler<Api.Middleware.GlobalExceptionHandlerMiddleware>();
+            services.AddProblemDetails();
+
             // Controllers com Filters globais
             services.AddControllers(options =>
             {
@@ -195,7 +199,8 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPlayerStatsService, PlayerStatsService>();
-            services.AddScoped<IPlayerStatsSyncService, PlayerStatsSyncService>();
+            // OBSOLETO: PlayerStatsSyncService deletado - stats de jogadores serão implementados futuramente
+            // services.AddScoped<IPlayerStatsSyncService, PlayerStatsSyncService>();
             services.AddSingleton<ISyncHealthService, SyncHealthService>();
 
             return services;
@@ -209,28 +214,7 @@ namespace HoopGameNight.Api.Extensions
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            var externalApisConfig = configuration.GetSection("ExternalApis");
-
-            // Ball Don't Lie API
-            var ballDontLieConfig = externalApisConfig.GetSection("BallDontLie");
-            var ballDontLieBaseUrl = ballDontLieConfig["BaseUrl"] ?? "https://api.balldontlie.io/v1";
-            var ballDontLieApiKey = ballDontLieConfig["ApiKey"];
-            var ballDontLieTimeout = ballDontLieConfig.GetValue<int>("Timeout", 30);
-
-            services.AddHttpClient<IBallDontLieService, BallDontLieService>(client =>
-            {
-                client.BaseAddress = new Uri(ballDontLieBaseUrl);
-                if (!string.IsNullOrEmpty(ballDontLieApiKey))
-                {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ballDontLieApiKey}");
-                }
-                client.Timeout = TimeSpan.FromSeconds(ballDontLieTimeout);
-                client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
-            })
-            .AddPolicyHandler(GetRetryPolicy(ballDontLieConfig))
-            .AddPolicyHandler(GetCircuitBreakerPolicy());
-
-            // ESPN API
+            // ========== ESPN API - FONTE ÚNICA PARA JOGOS E DADOS ==========
             services.AddHttpClient<IEspnApiService, EspnApiService>(client =>
             {
                 client.BaseAddress = new Uri("https://site.api.espn.com/");
@@ -239,20 +223,6 @@ namespace HoopGameNight.Api.Extensions
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
             })
             .AddPolicyHandler(GetRetryPolicy())
-            .AddPolicyHandler(GetCircuitBreakerPolicy());
-
-            // NBA Stats API (usando Ball Don't Lie v1 para stats oficiais da NBA)
-            services.AddHttpClient<INbaStatsApiService, NbaStatsApiService>(client =>
-            {
-                client.BaseAddress = new Uri(ballDontLieBaseUrl);
-                if (!string.IsNullOrEmpty(ballDontLieApiKey))
-                {
-                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {ballDontLieApiKey}");
-                }
-                client.Timeout = TimeSpan.FromSeconds(ballDontLieTimeout);
-                client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
-            })
-            .AddPolicyHandler(GetRetryPolicy(ballDontLieConfig))
             .AddPolicyHandler(GetCircuitBreakerPolicy());
 
             return services;
@@ -300,6 +270,21 @@ namespace HoopGameNight.Api.Extensions
                 options.ExpirationScanFrequency = TimeSpan.FromMinutes(
                     cacheOptions.ExpirationScanFrequencyMinutes);
             });
+
+            // Configurar Redis (se habilitado)
+            var redisSettings = configuration.GetSection("Redis").Get<Core.Configuration.RedisSettings>();
+            if (redisSettings?.Enabled == true)
+            {
+                services.AddStackExchangeRedisCache(options =>
+                {
+                    options.Configuration = redisSettings.ConnectionString;
+                    options.InstanceName = redisSettings.InstanceName;
+                });
+
+                // Registrar configurações do Redis
+                services.Configure<Core.Configuration.RedisSettings>(
+                    configuration.GetSection("Redis"));
+            }
 
             services.AddSingleton<ICacheService, CacheService>();
 
@@ -417,7 +402,6 @@ namespace HoopGameNight.Api.Extensions
             IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("MySqlConnection");
-            var ballDontLieUrl = configuration["ExternalApis:BallDontLie:BaseUrl"] ?? "https://api.balldontlie.io/v1";
 
             services.AddHealthChecks()
                 .AddMySql(
@@ -434,14 +418,9 @@ namespace HoopGameNight.Api.Extensions
                 .AddCheck<ExternalApiHealthCheck>(
                     "external-apis",
                     tags: new[] { "external", "api" })
-                .AddCheck<BallDontLieHealthCheck>(
-                    "balldontlie-api",
-                    tags: new[] { "external", "api", "nba-data" },
-                    timeout: TimeSpan.FromSeconds(5))
                 .AddCheck<EspnApiHealthCheck>(
                     "espn-api",
-                    tags: new[] { "external", "api", "nba-schedule" },
-                    timeout: TimeSpan.FromSeconds(5));
+                    tags: new[] { "external", "api", "nba-schedule" });
 
             // Metrics service
             services.AddSingleton<ISyncMetricsService, SyncMetricsService>();
@@ -464,9 +443,9 @@ namespace HoopGameNight.Api.Extensions
             {
                 c.SwaggerDoc("v1", new OpenApiInfo
                 {
-                    Title = apiConfig.Title ?? "Hoop Game Night API",
+                    Title = "Hoop Game Night API",
                     Version = "v1",
-                    Description = apiConfig.Description ?? "NBA games tracking API",
+                    Description = "NBA games tracking API - Main endpoints",
                     Contact = new OpenApiContact
                     {
                         Name = "Hoop Game Night Team",
@@ -477,6 +456,22 @@ namespace HoopGameNight.Api.Extensions
                         Name = "MIT",
                         Url = new Uri("https://opensource.org/licenses/MIT")
                     }
+                });
+
+                // Adicionar documento Admin para endpoints administrativos
+                c.SwaggerDoc("admin", new OpenApiInfo
+                {
+                    Title = "Hoop Game Night API - Admin",
+                    Version = "v1",
+                    Description = "Endpoints administrativos: Sync, Diagnóstico, Métricas"
+                });
+
+                // Adicionar documento de Monitoramento
+                c.SwaggerDoc("monitoring", new OpenApiInfo
+                {
+                    Title = "Hoop Game Night API - Monitoring",
+                    Version = "v1",
+                    Description = "Endpoints de monitoramento e health checks"
                 });
 
                 // FIX: Simplified schema naming for generics
@@ -615,15 +610,6 @@ namespace HoopGameNight.Api.Extensions
             if (string.IsNullOrWhiteSpace(configuration.GetConnectionString("MySqlConnection")))
             {
                 errors.Add("MySQL connection string is missing");
-            }
-
-            // API Key for sync
-            var syncEnabled = configuration.GetValue<bool>("Sync:EnableAutoSync");
-            var apiKey = configuration["ExternalApis:BallDontLie:ApiKey"];
-
-            if (syncEnabled && string.IsNullOrWhiteSpace(apiKey))
-            {
-                Console.WriteLine("WARNING: Sync is enabled but BallDontLie API key is missing");
             }
 
             if (errors.Any())

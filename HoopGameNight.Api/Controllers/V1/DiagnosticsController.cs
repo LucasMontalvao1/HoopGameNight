@@ -10,43 +10,15 @@ namespace HoopGameNight.Api.Controllers.V1
     public class DiagnosticsController : BaseApiController
     {
         private readonly IDatabaseConnection _databaseConnection;
-        private readonly IBallDontLieService _ballDontLieService;
         private readonly IEspnApiService _espnApiService;
 
         public DiagnosticsController(
             IDatabaseConnection databaseConnection,
-            IBallDontLieService ballDontLieService,
             IEspnApiService espnApiService,
             ILogger<DiagnosticsController> logger) : base(logger)
         {
             _databaseConnection = databaseConnection;
-            _ballDontLieService = ballDontLieService;
             _espnApiService = espnApiService;
-        }
-
-        /// <summary>
-        /// Verifica a conectividade com todos os serviços
-        /// </summary>
-        [HttpGet("connectivity")]
-        public async Task<ActionResult<ApiResponse<object>>> CheckConnectivity()
-        {
-            try
-            {
-                var diagnostics = new
-                {
-                    Database = await CheckDatabaseAsync(),
-                    BallDontLieApi = await CheckBallDontLieAsync(),
-                    EspnApi = await CheckEspnAsync(),
-                    Timestamp = DateTime.UtcNow
-                };
-
-                return base.Ok((object)diagnostics);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro no diagnóstico de conectividade");
-                return StatusCode(500, new { Success = false, Message = "Erro interno do servidor", Error = ex.Message });
-            }
         }
 
         /// <summary>
@@ -63,29 +35,6 @@ namespace HoopGameNight.Api.Controllers.V1
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Erro no teste do banco");
-                return StatusCode(500, new { Success = false, Message = "Erro interno do servidor", Error = ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// Testa as APIs externas
-        /// </summary>
-        [HttpGet("external-apis")]
-        public async Task<ActionResult<ApiResponse<object>>> CheckExternalApis()
-        {
-            try
-            {
-                var result = new
-                {
-                    BallDontLie = await CheckBallDontLieAsync(),
-                    Espn = await CheckEspnAsync()
-                };
-
-                return base.Ok((object)result);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro no teste de APIs externas");
                 return StatusCode(500, new { Success = false, Message = "Erro interno do servidor", Error = ex.Message });
             }
         }
@@ -149,39 +98,10 @@ namespace HoopGameNight.Api.Controllers.V1
             }
         }
 
-        private async Task<object> CheckBallDontLieAsync()
-        {
-            try
-            {
-                var teams = await _ballDontLieService.GetAllTeamsAsync();
-                var teamCount = teams.Count();
-
-                return new
-                {
-                    Status = "Connected",
-                    Message = "API Ball Don't Lie funcionando",
-                    TeamsCount = teamCount,
-                    SampleData = teamCount > 0 ? teams.Take(2).Select(t => t.FullName) : null
-                };
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Falha na conexão com Ball Don't Lie API");
-                return new
-                {
-                    Status = "Failed",
-                    Message = "Falha na API Ball Don't Lie",
-                    Error = ex.Message,
-                    ErrorType = ex.GetType().Name
-                };
-            }
-        }
-
         private async Task<object> CheckEspnAsync()
         {
             try
             {
-                // Teste básico do ESPN - buscar jogos de hoje
                 var games = await _espnApiService.GetGamesByDateAsync(DateTime.Today);
                 var gameCount = games.Count();
 

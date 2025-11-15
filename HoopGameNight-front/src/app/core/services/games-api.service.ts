@@ -142,12 +142,38 @@ export class GamesApiService {
   // GET /api/v1/games/external/today
   async getTodayGamesFromExternal(): Promise<any[]> {
     const url = `${this.baseUrl}/external/today`;
-    
+
     const response = await firstValueFrom(
       this.http.get<ApiResponse<any[]>>(url)
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
+    return response.data;
+  }
+
+  // GET /api/v1/games/teams/{teamId}/recent?days=X
+  async getRecentGamesForTeam(teamId: number, days = 30): Promise<GameResponse[]> {
+    const url = `${this.baseUrl}/teams/${teamId}/recent`;
+    const params = new HttpParams().set('days', days.toString());
+
+    const response = await firstValueFrom(
+      this.http.get<ApiResponse<GameResponse[]>>(url, { params })
+        .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+    );
+
+    return response.data;
+  }
+
+  // GET /api/v1/games/teams/{teamId}/upcoming?days=X
+  async getUpcomingGamesForTeam(teamId: number, days = 7): Promise<GameResponse[]> {
+    const url = `${this.baseUrl}/teams/${teamId}/upcoming`;
+    const params = new HttpParams().set('days', days.toString());
+
+    const response = await firstValueFrom(
+      this.http.get<ApiResponse<GameResponse[]>>(url, { params })
+        .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+    );
+
     return response.data;
   }
 }

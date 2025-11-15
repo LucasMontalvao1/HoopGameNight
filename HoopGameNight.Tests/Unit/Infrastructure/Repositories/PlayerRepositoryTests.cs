@@ -194,7 +194,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
             var totalInches = (player.HeightFeet * 12) + player.HeightInches;
 
             // Assert
-            totalInches.Should().Be(80); // 6'8" = 80 inches
+            totalInches.Should().Be(80); 
         }
 
         [Fact(DisplayName = "Player deve aceitar posição nula")]

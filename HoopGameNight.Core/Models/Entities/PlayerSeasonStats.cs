@@ -6,53 +6,33 @@ namespace HoopGameNight.Core.Models.Entities
         public int PlayerId { get; set; }
         public int Season { get; set; }
         public int? TeamId { get; set; }
-
-        // Jogos
         public int GamesPlayed { get; set; }
         public int GamesStarted { get; set; }
-
-        // Minutos
         public decimal MinutesPlayed { get; set; }
-
-        // Pontuação
         public int Points { get; set; }
         public int FieldGoalsMade { get; set; }
         public int FieldGoalsAttempted { get; set; }
         public decimal? FieldGoalPercentage { get; set; }
-
-        // Arremessos de 3 pontos
         public int ThreePointersMade { get; set; }
         public int ThreePointersAttempted { get; set; }
         public decimal? ThreePointPercentage { get; set; }
-
-        // Lances livres
         public int FreeThrowsMade { get; set; }
         public int FreeThrowsAttempted { get; set; }
         public decimal? FreeThrowPercentage { get; set; }
-
-        // Rebotes
         public int OffensiveRebounds { get; set; }
         public int DefensiveRebounds { get; set; }
         public int TotalRebounds { get; set; }
-
-        // Outras estatísticas
         public int Assists { get; set; }
         public int Steals { get; set; }
         public int Blocks { get; set; }
         public int Turnovers { get; set; }
         public int PersonalFouls { get; set; }
-
-        // Médias (calculadas automaticamente via triggers)
         public decimal AvgPoints { get; set; }
         public decimal AvgRebounds { get; set; }
         public decimal AvgAssists { get; set; }
         public decimal AvgMinutes { get; set; }
-
-        // Navigation Properties
         public Player? Player { get; set; }
         public Team? Team { get; set; }
-
-        // Computed Properties
         public decimal PPG => GamesPlayed > 0 ? Math.Round((decimal)Points / GamesPlayed, 1) : 0;
         public decimal RPG => GamesPlayed > 0 ? Math.Round((decimal)TotalRebounds / GamesPlayed, 1) : 0;
         public decimal APG => GamesPlayed > 0 ? Math.Round((decimal)Assists / GamesPlayed, 1) : 0;

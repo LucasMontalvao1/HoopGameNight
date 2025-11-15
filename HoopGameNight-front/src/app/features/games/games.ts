@@ -1,8 +1,9 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 
 import { GamesService } from '../../core/services/games.service';
+import { TeamsService } from '../../core/services/teams.service';
 import { GameResponse } from '../../core/interfaces/api.interface';
 import { DatePicker } from '../../shared/components/date-picker/date-picker';
 
@@ -11,11 +12,16 @@ import { DatePicker } from '../../shared/components/date-picker/date-picker';
   standalone: true,
   imports: [CommonModule, RouterModule, DatePicker],
   templateUrl: './games.html',
-  styleUrls: ['./games.scss']
+  styleUrls: ['./games.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Games implements OnInit, OnDestroy {
-  
-  constructor(protected readonly gamesService: GamesService) {}
+
+  constructor(
+    protected readonly gamesService: GamesService,
+    protected readonly teamsService: TeamsService,
+    private readonly router: Router
+  ) {}
 
   async ngOnInit(): Promise<void> {
     console.log('Games component inicializado');
@@ -36,6 +42,42 @@ export class Games implements OnInit, OnDestroy {
 
   async goToToday(): Promise<void> {
     await this.gamesService.navigateToDate('today');
+  }
+
+  async goToYesterday(): Promise<void> {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    await this.gamesService.loadGamesByDate(yesterday);
+  }
+
+  async loadCompletedGames(): Promise<void> {
+    // Carregar jogos de 3 dias atrás (geralmente têm jogos finalizados)
+    const date = new Date();
+    date.setDate(date.getDate() - 3);
+
+    console.log(`🔄 Carregando jogos de ${date.toLocaleDateString('pt-BR')}...`);
+    await this.gamesService.loadGamesByDate(date);
+
+    // Forçar sincronização
+    await this.syncCurrentDate();
+
+    const games = this.gamesService.currentGames();
+    console.log(`📊 Total de jogos: ${games.length}`);
+
+    // Mostrar status de TODOS os jogos
+    games.forEach(game => {
+      console.log(`🏀 ${game.gameTitle}:`, {
+        status: game.status,
+        statusDisplay: game.statusDisplay,
+        isLive: game.isLive,
+        isCompleted: game.isCompleted,
+        score: `${game.visitorTeamScore ?? 0} x ${game.homeTeamScore ?? 0}`,
+        winningTeam: game.winningTeam
+      });
+    });
+
+    const completed = games.filter(g => g.isCompleted);
+    console.log(`✅ ${completed.length} jogos finalizados encontrados!`);
   }
 
   async onDateChange(date: Date): Promise<void> {
@@ -85,80 +127,77 @@ export class Games implements OnInit, OnDestroy {
     return game.id;
   }
 
-  
+  // Usar TeamsService para logos (centralizado)
   getTeamLogoUrl(abbreviation: string): string {
-  // Usando NBA CDN oficial
-  const teamId = this.getTeamIdByAbbreviation(abbreviation);
-  return `https://cdn.nba.com/logos/nba/${teamId}/primary/L/logo.svg`;
-}
-
-getTeamLogoUrlFallback(abbreviation: string): string {
-  // URL alternativa se a primeira não funcionar
-  return `https://www.nba.com/.element/img/1.0/teamsites/logos/teamlogos_500x500/${abbreviation.toLowerCase()}.png`;
-}
+    return this.teamsService.getTeamLogoUrl(abbreviation);
+  }
 
   getTeamColorPrimary(abbreviation: string): string {
-    const teamColors: Record<string, string> = {
-      'LAL': '#552583', 'GSW': '#1D428A', 'BOS': '#007A33',
-      'MIA': '#98002E', 'CHI': '#CE1141', 'NYK': '#006BB6',
-      'LAC': '#C8102E', 'BKN': '#000000', 'PHI': '#006BB6',
-      'MIL': '#00471B', 'PHX': '#E56020', 'UTA': '#002B5C',
-      'ATL': '#E03A3E', 'DEN': '#0E2240', 'IND': '#002D62',
-      'CLE': '#860038', 'MEM': '#5D76A9', 'DAL': '#00538C',
-      'TOR': '#CE1141', 'CHA': '#1D1160', 'SAS': '#C4CED4',
-      'MIN': '#0C2340', 'OKC': '#007AC1', 'NOP': '#0C2340',
-      'ORL': '#0077C0', 'WAS': '#002B5C', 'SAC': '#5A2D81',
-      'DET': '#C8102E', 'HOU': '#CE1141', 'POR': '#E03A3E'
-    };
-
-    return teamColors[abbreviation] || '#6B7280';
+    return this.teamsService.getTeamColorPrimary(abbreviation);
   }
 
-  private getTeamIdByAbbreviation(abbreviation: string): number {
-  const teamIds: Record<string, number> = {
-    'ATL': 1610612737, 'BOS': 1610612738, 'BKN': 1610612751,
-    'CHA': 1610612766, 'CHI': 1610612741, 'CLE': 1610612739,
-    'DAL': 1610612742, 'DEN': 1610612743, 'DET': 1610612765,
-    'GSW': 1610612744, 'HOU': 1610612745, 'IND': 1610612754,
-    'LAC': 1610612746, 'LAL': 1610612747, 'MEM': 1610612763,
-    'MIA': 1610612748, 'MIL': 1610612749, 'MIN': 1610612750,
-    'NOP': 1610612740, 'NYK': 1610612752, 'OKC': 1610612760,
-    'ORL': 1610612753, 'PHI': 1610612755, 'PHX': 1610612756,
-    'POR': 1610612757, 'SAC': 1610612758, 'SAS': 1610612759,
-    'TOR': 1610612761, 'UTA': 1610612762, 'WAS': 1610612764
-  };
+  handleLogoError(event: Event, abbreviation: string): void {
+    const img = event.target as HTMLImageElement;
 
-  return teamIds[abbreviation] || 1610612737; 
-}
+    if (img.src.includes('nba-logo-fallback.svg')) {
+      return;
+    }
 
-handleLogoError(event: any, abbreviation: string): void {
-  const img = event.target;
-  
-  // Primeira tentativa: URL alternativa
-  if (!img.src.includes('teamlogos_500x500')) {
-    img.src = this.getTeamLogoUrlFallback(abbreviation);
-    return;
+    console.warn(`Logo não encontrado para: ${abbreviation}`);
+    img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+CiAgPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHJ4PSIxMCIgZmlsbD0iI2YzZjRmNiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOWNhM2FmIj5OQkE8L3RleHQ+Cjwvc3ZnPg==';
+    img.classList.add('logo-fallback');
   }
-  
-  // Segunda tentativa: Logo local personalizado
-  if (!img.src.includes('assets')) {
-    img.src = `assets/images/teams/${abbreviation.toLowerCase()}.svg`;
-    return;
+
+  navigateToTeam(abbreviation: string): void {
+    if (abbreviation) {
+      this.router.navigate(['/teams', abbreviation]);
+    }
   }
-  
-  // Última tentativa: Fallback geral
-  img.src = 'assets/images/nba-logo-fallback.svg';
-}
 
   private async loadInitialData(): Promise<void> {
     try {
       await this.gamesService.loadTodayGames();
-      
+
       if (!this.gamesService.isToday()) {
         await this.gamesService.loadGamesByDate(this.gamesService.selectedDate());
       }
+
+      // Debug: verificar vencedores
+      const games = this.gamesService.currentGames();
+      const completedGames = games.filter(g => g.isCompleted);
+      console.log(`✅ Jogos finalizados: ${completedGames.length}`);
+      completedGames.forEach(game => {
+        console.log(`🏀 ${game.gameTitle}:`, {
+          completed: game.isCompleted,
+          score: `${game.visitorTeamScore} x ${game.homeTeamScore}`,
+          winningTeam: game.winningTeam,
+          visitorId: game.visitorTeam.id,
+          homeId: game.homeTeam.id
+        });
+      });
+
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);
     }
+  }
+
+  isFutureDate(): boolean {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const selected = new Date(this.gamesService.selectedDate());
+    selected.setHours(0, 0, 0, 0);
+
+    return selected > today;
+  }
+
+  getSyncButtonTooltip(): string {
+    if (this.isFutureDate()) {
+      return 'Sincronização disponível apenas para jogos já realizados';
+    }
+    if (this.gamesService.isLoading()) {
+      return 'Carregando...';
+    }
+    return 'Atualizar jogos com dados mais recentes da API externa';
   }
 }

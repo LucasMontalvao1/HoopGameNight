@@ -53,9 +53,9 @@ export class TeamsService {
   );
 
   private readonly NBA_TEAMS = new Set([
-    'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW',
-    'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NO', 'NOP', 'NYK',
-    'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'
+    'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GS',
+    'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NO', 'NY',
+    'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SA', 'TOR', 'UTAH', 'WSH'
   ]);
 
   constructor(
@@ -172,33 +172,66 @@ export class TeamsService {
 
   getTeamLogoUrl(abbreviation: string): string {
     if (!this.isNBATeam(abbreviation)) {
-      return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+CiAgPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHJ4PSIxMCIgZmlsbD0iI2YzZjRmNiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOWNhM2FmIj5OQkE8L3RleHQ+CiAgPHBhdGggZD0iTTM1IDMwIEwzNSA3MCBNNDAGIDI1IEw0MCA3NSBNNDUgMjAgTDQ1IDgwIE01MCAxNSBMNTAgODUgTTU1IDIwIEw1NSA4MCBNIDAGIDI1IEw2MCA3NSBNNjUgMzAgTDY1IDcwIiBzdHJva2U9IiNkMWQ1ZGIiIHN0cm9rZS13aWR0aD0iMiIgb3BhY2l0eT0iMC41Ii8+Cjwvc3ZnPg==';
+      return 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+CiAgPHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHJ4PSIxMCIgZmlsbD0iI2YzZjRmNiIvPgogIDx0ZXh0IHg9IjUwIiB5PSI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOWNhM2FmIj5OQkE8L3RleHQ+Cjwvc3ZnPg==';
     }
-    
-    let logoAbbr = abbreviation.toLowerCase();
-    
-    if (logoAbbr === 'nop') {
-      logoAbbr = 'no';
-    }
-    
-    if (logoAbbr === 'uta') {
-      logoAbbr = 'utah';
-    }
-    
+
+    // Mapeamento correto de abreviações para ESPN CDN
+    const logoMappings: Record<string, string> = {
+      'ATL': 'atl',   // Atlanta Hawks
+      'BOS': 'bos',   // Boston Celtics
+      'BKN': 'bkn',   // Brooklyn Nets
+      'CHA': 'cha',   // Charlotte Hornets
+      'CHI': 'chi',   // Chicago Bulls
+      'CLE': 'cle',   // Cleveland Cavaliers
+      'DAL': 'dal',   // Dallas Mavericks
+      'DEN': 'den',   // Denver Nuggets
+      'DET': 'det',   // Detroit Pistons
+      'GS': 'gs',     // Golden State Warriors (banco usa GS)
+      'GSW': 'gs',    // Golden State Warriors (fallback)
+      'HOU': 'hou',   // Houston Rockets
+      'IND': 'ind',   // Indiana Pacers
+      'LAC': 'lac',   // LA Clippers
+      'LAL': 'lal',   // LA Lakers
+      'MEM': 'mem',   // Memphis Grizzlies
+      'MIA': 'mia',   // Miami Heat
+      'MIL': 'mil',   // Milwaukee Bucks
+      'MIN': 'min',   // Minnesota Timberwolves
+      'NOP': 'no',    // New Orleans Pelicans
+      'NO': 'no',     // New Orleans Pelicans (banco usa NO)
+      'NY': 'ny',     // New York Knicks (banco usa NY)
+      'NYK': 'ny',    // New York Knicks (fallback)
+      'OKC': 'okc',   // Oklahoma City Thunder
+      'ORL': 'orl',   // Orlando Magic
+      'PHI': 'phi',   // Philadelphia 76ers
+      'PHX': 'phx',   // Phoenix Suns
+      'POR': 'por',   // Portland Trail Blazers
+      'SAC': 'sac',   // Sacramento Kings
+      'SA': 'sa',     // San Antonio Spurs (banco usa SA)
+      'SAS': 'sa',    // San Antonio Spurs (fallback)
+      'TOR': 'tor',   // Toronto Raptors
+      'UTAH': 'utah', // Utah Jazz (banco usa UTAH)
+      'UTA': 'utah',  // Utah Jazz (fallback)
+      'WSH': 'wsh',   // Washington Wizards (banco usa WSH)
+      'WAS': 'wsh'    // Washington Wizards (fallback)
+    };
+
+    const upperAbbr = abbreviation.toUpperCase();
+    const logoAbbr = logoMappings[upperAbbr] || abbreviation.toLowerCase();
+
     return `https://a.espncdn.com/i/teamlogos/nba/500/${logoAbbr}.png`;
   }
 
   getTeamColorPrimary(abbreviation: string): string {
     const teamColors: Record<string, string> = {
-      'LAL': '#552583', 'GSW': '#1D428A', 'BOS': '#007A33',
-      'MIA': '#98002E', 'CHI': '#CE1141', 'NYK': '#006BB6',
+      'LAL': '#552583', 'GS': '#1D428A', 'GSW': '#1D428A', 'BOS': '#007A33',
+      'MIA': '#98002E', 'CHI': '#CE1141', 'NY': '#006BB6', 'NYK': '#006BB6',
       'LAC': '#C8102E', 'BKN': '#000000', 'PHI': '#006BB6',
-      'MIL': '#00471B', 'PHX': '#E56020', 'UTA': '#002B5C',
+      'MIL': '#00471B', 'PHX': '#E56020', 'UTAH': '#002B5C', 'UTA': '#002B5C',
       'ATL': '#E03A3E', 'DEN': '#0E2240', 'IND': '#002D62',
       'CLE': '#860038', 'MEM': '#5D76A9', 'DAL': '#00538C',
-      'TOR': '#CE1141', 'CHA': '#1D1160', 'SAS': '#C4CED4',
-      'MIN': '#0C2340', 'OKC': '#007AC1', 'NOP': '#0C2340',
-      'ORL': '#0077C0', 'WAS': '#002B5C', 'SAC': '#5A2D81',
+      'TOR': '#CE1141', 'CHA': '#1D1160', 'SA': '#C4CED4', 'SAS': '#C4CED4',
+      'MIN': '#0C2340', 'OKC': '#007AC1', 'NOP': '#0C2340', 'NO': '#0C2340',
+      'ORL': '#0077C0', 'WSH': '#002B5C', 'WAS': '#002B5C', 'SAC': '#5A2D81',
       'DET': '#C8102E', 'HOU': '#CE1141', 'POR': '#E03A3E'
     };
 
@@ -207,15 +240,15 @@ export class TeamsService {
 
   getTeamColorSecondary(abbreviation: string): string {
     const teamColors: Record<string, string> = {
-      'LAL': '#FDB927', 'GSW': '#FFC72C', 'BOS': '#BA9653',
-      'MIA': '#F9A01B', 'CHI': '#000000', 'NYK': '#FF6900',
+      'LAL': '#FDB927', 'GS': '#FFC72C', 'GSW': '#FFC72C', 'BOS': '#BA9653',
+      'MIA': '#F9A01B', 'CHI': '#000000', 'NY': '#FF6900', 'NYK': '#FF6900',
       'LAC': '#1D428A', 'BKN': '#FFFFFF', 'PHI': '#ED174C',
-      'MIL': '#EEE1C6', 'PHX': '#1D1160', 'UTA': '#F9A01B',
+      'MIL': '#EEE1C6', 'PHX': '#1D1160', 'UTAH': '#F9A01B', 'UTA': '#F9A01B',
       'ATL': '#C1D32F', 'DEN': '#FEC524', 'IND': '#FDBB30',
       'CLE': '#FDBB30', 'MEM': '#12173F', 'DAL': '#00538C',
-      'TOR': '#000000', 'CHA': '#00788C', 'SAS': '#000000',
-      'MIN': '#78BE20', 'OKC': '#EF3B24', 'NOP': '#85714D',
-      'ORL': '#C4CED4', 'WAS': '#E31837', 'SAC': '#63727A',
+      'TOR': '#000000', 'CHA': '#00788C', 'SA': '#000000', 'SAS': '#000000',
+      'MIN': '#78BE20', 'OKC': '#EF3B24', 'NOP': '#85714D', 'NO': '#85714D',
+      'ORL': '#C4CED4', 'WSH': '#E31837', 'WAS': '#E31837', 'SAC': '#63727A',
       'DET': '#006BB6', 'HOU': '#000000', 'POR': '#000000'
     };
 

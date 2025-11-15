@@ -24,20 +24,20 @@ namespace HoopGameNight.Api.Controllers
         private readonly ILogger<HealthController> _logger;
         private readonly HealthCheckService _healthCheckService;
         private readonly IDatabaseConnection _databaseConnection;
-        private readonly IBallDontLieService _ballDontLieService;
+        private readonly IEspnApiService _espnApiService;
         private readonly IConfiguration _configuration;
 
         public HealthController(
             ILogger<HealthController> logger,
             HealthCheckService healthCheckService,
             IDatabaseConnection databaseConnection,
-            IBallDontLieService ballDontLieService,
+            IEspnApiService espnApiService,
             IConfiguration configuration)
         {
             _logger = logger;
             _healthCheckService = healthCheckService;
             _databaseConnection = databaseConnection;
-            _ballDontLieService = ballDontLieService;
+            _espnApiService = espnApiService;
             _configuration = configuration;
         }
 
@@ -77,7 +77,6 @@ namespace HoopGameNight.Api.Controllers
             // Check External API
             var apiCheck = await CheckExternalApiAsync();
             checks.Add(apiCheck);
-            // API externa não é crítica para readiness
 
             // Check Configuration
             var configCheck = CheckConfiguration();
@@ -211,7 +210,7 @@ namespace HoopGameNight.Api.Controllers
             try
             {
                 using var connection = _databaseConnection.CreateConnection();
-                connection.Open(); // Usar Open síncrono ao invés de OpenAsync
+                connection.Open(); 
 
                 stopwatch.Stop();
 
@@ -243,30 +242,30 @@ namespace HoopGameNight.Api.Controllers
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                var teams = await _ballDontLieService.GetAllTeamsAsync();
+                var games = await _espnApiService.GetGamesByDateAsync(DateTime.Today);
                 stopwatch.Stop();
 
-                var isHealthy = teams.Any();
+                var isHealthy = games != null;
 
                 return new DependencyCheck
                 {
-                    Name = "Ball Don't Lie API",
+                    Name = "ESPN API",
                     IsHealthy = isHealthy,
                     ResponseTime = stopwatch.ElapsedMilliseconds,
-                    Message = isHealthy ? $"API responding, {teams.Count()} teams found" : "API returned no data"
+                    Message = isHealthy ? $"ESPN API responding, {games?.Count() ?? 0} games found for today" : "ESPN API returned no data"
                 };
             }
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                _logger.LogWarning(ex, "External API health check failed");
+                _logger.LogWarning(ex, "ESPN API health check failed");
 
                 return new DependencyCheck
                 {
-                    Name = "Ball Don't Lie API",
+                    Name = "ESPN API",
                     IsHealthy = false,
                     ResponseTime = stopwatch.ElapsedMilliseconds,
-                    Message = $"API call failed: {ex.Message}"
+                    Message = $"ESPN API call failed: {ex.Message}"
                 };
             }
         }
@@ -278,9 +277,9 @@ namespace HoopGameNight.Api.Controllers
             if (string.IsNullOrEmpty(_configuration.GetConnectionString("MySqlConnection")))
                 errors.Add("Database connection string missing");
 
-            var apiKey = _configuration["ExternalApis:BallDontLie:ApiKey"];
-            if (string.IsNullOrEmpty(apiKey))
-                errors.Add("External API key missing");
+            var espnBaseUrl = _configuration["ExternalApis:ESPN:BaseUrl"];
+            if (string.IsNullOrEmpty(espnBaseUrl))
+                errors.Add("ESPN API base URL missing");
 
             return new DependencyCheck
             {
@@ -292,20 +291,29 @@ namespace HoopGameNight.Api.Controllers
 
         private HealthCheckResponse BuildHealthResponse(HealthReport report)
         {
+            var checks = report.Entries.Select(entry => new HealthCheckResult
+            {
+                Name = entry.Key,
+                Status = entry.Value.Status.ToString().ToLower(),
+                Description = entry.Value.Description,
+                Duration = entry.Value.Duration.TotalMilliseconds,
+                Tags = entry.Value.Tags.ToList(),
+                Error = entry.Value.Exception?.Message
+            }).ToList();
+
             var response = new HealthCheckResponse
             {
                 Status = report.Status.ToString().ToLower(),
                 Timestamp = DateTime.UtcNow,
                 Duration = report.TotalDuration.TotalMilliseconds,
-                Checks = report.Entries.Select(entry => new HealthCheckResult
+                Checks = checks,
+                Summary = new HealthCheckSummary
                 {
-                    Name = entry.Key,
-                    Status = entry.Value.Status.ToString().ToLower(),
-                    Description = entry.Value.Description,
-                    Duration = entry.Value.Duration.TotalMilliseconds,
-                    Tags = entry.Value.Tags.ToList(),
-                    Error = entry.Value.Exception?.Message
-                }).ToList()
+                    Healthy = checks.Count(c => c.Status == "healthy"),
+                    Degraded = checks.Count(c => c.Status == "degraded"),
+                    Unhealthy = checks.Count(c => c.Status == "unhealthy"),
+                    Total = checks.Count
+                }
             };
 
             return response;
@@ -380,9 +388,9 @@ namespace HoopGameNight.Api.Controllers
             // External API
             dependencies.Add(new DependencyDiagnostic
             {
-                Name = "Ball Don't Lie API",
+                Name = "ESPN API",
                 Type = "External API",
-                ConnectionString = _configuration["ExternalApis:BallDontLie:BaseUrl"] ?? "Not configured",
+                ConnectionString = _configuration["ExternalApis:ESPN:BaseUrl"] ?? "Not configured",
                 Status = (await CheckExternalApiAsync()).IsHealthy ? "Available" : "Unavailable"
             });
 
@@ -422,7 +430,6 @@ namespace HoopGameNight.Api.Controllers
             if (string.IsNullOrEmpty(connectionString))
                 return "Not configured";
 
-            // Mask password in connection string
             var pattern = @"(password|pwd)=([^;]+)";
             return System.Text.RegularExpressions.Regex.Replace(
                 connectionString,
@@ -479,6 +486,7 @@ namespace HoopGameNight.Api.Controllers
         public double Duration { get; set; }
         public string? Error { get; set; }
         public List<HealthCheckResult> Checks { get; set; } = new();
+        public HealthCheckSummary Summary { get; set; } = new();
     }
 
     public class HealthCheckResult
@@ -489,6 +497,14 @@ namespace HoopGameNight.Api.Controllers
         public double Duration { get; set; }
         public List<string> Tags { get; set; } = new();
         public string? Error { get; set; }
+    }
+
+    public class HealthCheckSummary
+    {
+        public int Healthy { get; set; }
+        public int Degraded { get; set; }
+        public int Unhealthy { get; set; }
+        public int Total { get; set; }
     }
 
     public class SystemInfo

@@ -1,5 +1,6 @@
 ﻿using HoopGameNight.Api.Constants;
 using HoopGameNight.Api.Middleware;
+using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Infrastructure.Data;
 using HoopGameNight.Infrastructure.Services;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -40,19 +41,11 @@ namespace HoopGameNight.Api.Extensions
 
         private static void ConfigureMiddleware(this WebApplication app)
         {
-            // 1. Error Handling (SEMPRE primeiro)
-            app.UseMiddleware<ErrorHandlingMiddleware>();
+            // 1. Exception Handler (ASP.NET Core 8+) 
+            app.UseExceptionHandler();
 
-            // 2. Request/Response Logging (se habilitado)
-            if (app.Configuration.GetValue<bool>("Logging:EnableRequestResponseLogging", false))
-            {
-                app.UseMiddleware<RequestResponseLoggingMiddleware>();
-            }
-            else
-            {
-                // Logging básico sempre ativo
-                app.UseMiddleware<LoggingMiddleware>();
-            }
+            // 2. Request Logging (sempre ativo)
+            app.UseMiddleware<RequestLoggingMiddleware>();
 
             // 3. Security Headers
             app.UseSecurityHeaders();
@@ -70,8 +63,10 @@ namespace HoopGameNight.Api.Extensions
                 app.UseSwagger();
                 app.UseSwaggerUI(c =>
                 {
-                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hoop Game Night API V1");
-                    c.RoutePrefix = string.Empty; 
+                    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Main API");
+                    c.SwaggerEndpoint("/swagger/admin/swagger.json", "Admin");
+                    c.SwaggerEndpoint("/swagger/monitoring/swagger.json", "Monitoring");
+                    c.RoutePrefix = string.Empty;
                     c.DisplayRequestDuration();
                     c.EnableTryItOutByDefault();
                     c.EnableDeepLinking();
@@ -164,7 +159,7 @@ namespace HoopGameNight.Api.Extensions
             var apiGroup = app.MapGroup("/api")
                 .WithTags("System")
                 .AllowAnonymous();
-                // .ExcludeFromDescription(); // Não mostrar no Swagger os endpoint de metrica e info
+                //.ExcludeFromDescription(); // Não mostrar no Swagger os endpoint de metrica e info
 
             // Info endpoint
             apiGroup.MapGet("/info", (IConfiguration config) =>
@@ -291,7 +286,6 @@ namespace HoopGameNight.Api.Extensions
 
                     if (attempt == maxRetries)
                     {
-                        // Verificar se o banco é obrigatório
                         var requireDb = config.GetValue<bool>("RequiredForStartup", true);
 
                         if (requireDb)
@@ -418,10 +412,10 @@ namespace HoopGameNight.Api.Extensions
             Log.Information("║ • Connection: {Connection,-43} ║", "Configured");
             Log.Information("╠══════════════════════════════════════════════════════════╣");
             Log.Information("║ EXTERNAL APIS:                                           ║");
-            Log.Information("║ • Ball Don't Lie: {BallDontLie,-38}  ║", string.IsNullOrEmpty(config["ExternalApis:BallDontLie:ApiKey"]) ? "No API Key" : "Configured");
-            Log.Information("║ • ESPN API: {ESPN,-45} ║", "Configured");
+            Log.Information("║ • ESPN API: {ESPN,-45} ║", "✅ Configured (Free)");
+            Log.Information("║ • NBA Stats API: {NBAStats,-38} ║", "✅ Ready for future");
             Log.Information("╠══════════════════════════════════════════════════════════╣");
-            Log.Information("║ ONLINEEEEEEEEEEEEEEEEEEEEEEEEEE                          ║");
+            Log.Information("║ STATUS: {Status,-48} ║", "ONLINEEEE");
             Log.Information("╚══════════════════════════════════════════════════════════╝");
 
             if (env.IsDevelopment())

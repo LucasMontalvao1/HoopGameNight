@@ -64,7 +64,6 @@ namespace HoopGameNight.Infrastructure.Repositories
 
         public async Task<IEnumerable<PlayerGameStats>> GetRecentGamesAsync(int playerId, int limit)
         {
-            // Fix para MySQL - não pode usar parâmetro no LIMIT
             var sql = (await LoadSqlAsync("GetRecentGames")).Replace("@Limit", limit.ToString());
             return await ExecuteQueryAsync<PlayerGameStats>(sql, new { PlayerId = playerId });
         }

@@ -30,7 +30,6 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
             _mockLogger = new Mock<ILogger<GameRepository>>();
             _mockDbConnection = new Mock<IDbConnection>();
 
-            // Configurar o mock para sempre retornar a mesma conexão mockada
             _mockDatabaseConnection
                 .Setup(x => x.CreateConnection())
                 .Returns(_mockDbConnection.Object);
@@ -288,7 +287,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
 
             // Assert
             jogos.Should().HaveCount(3);
-            jogos.Should().OnlyContain(g => g.ExternalId > 0);
+            jogos.Should().OnlyContain(g => !string.IsNullOrEmpty(g.ExternalId));
             jogos.Should().OnlyContain(g => g.HomeTeamId > 0);
             jogos.Should().OnlyContain(g => g.VisitorTeamId > 0);
         }
@@ -347,7 +346,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
         {
             // Arrange
             var gameValido = CriarJogo();
-            gameValido.ExternalId = 100;
+            gameValido.ExternalId = "100";
             gameValido.HomeTeamId = 1;
             gameValido.VisitorTeamId = 2;
             gameValido.Season = 2024;
@@ -370,7 +369,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
             return new Game
             {
                 Id = id,
-                ExternalId = externalId == 0 ? new Random().Next(1000, 9999) : externalId,
+                ExternalId = (externalId == 0 ? new Random().Next(1000, 9999) : externalId).ToString(),
                 Date = DateTime.Today,
                 DateTime = DateTime.Now,
                 HomeTeamId = 1,
@@ -394,7 +393,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
                 new Game
                 {
                     Id = 1,
-                    ExternalId = 100,
+                    ExternalId = "100",
                     Date = DateTime.Today,
                     DateTime = DateTime.Today.AddHours(19),
                     HomeTeamId = 1,
@@ -409,7 +408,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
                 new Game
                 {
                     Id = 2,
-                    ExternalId = 200,
+                    ExternalId = "200",
                     Date = DateTime.Today,
                     DateTime = DateTime.Today.AddHours(20),
                     HomeTeamId = 3,
@@ -425,7 +424,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
                 new Game
                 {
                     Id = 3,
-                    ExternalId = 300,
+                    ExternalId = "300",
                     Date = DateTime.Today.AddDays(-1),
                     DateTime = DateTime.Today.AddDays(-1).AddHours(22),
                     HomeTeamId = 5,

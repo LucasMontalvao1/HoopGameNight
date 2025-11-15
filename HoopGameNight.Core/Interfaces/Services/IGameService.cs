@@ -59,5 +59,10 @@ namespace HoopGameNight.Core.Interfaces.Services
         /// Sincroniza jogos do dia atual
         /// </summary>
         Task SyncTodayGamesAsync();
+
+        /// <summary>
+        /// Sincroniza jogos futuros da ESPN e salva no banco
+        /// </summary>
+        Task<int> SyncFutureGamesAsync(int days = 30);
     }
 }

@@ -1,5 +1,4 @@
 ﻿using AutoMapper;
-using HoopGameNight.Core.DTOs.External.BallDontLie;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
@@ -24,6 +23,12 @@ namespace HoopGameNight.Tests.Helpers
 
             mock.Setup(x => x.GetByIdAsync(It.IsAny<int>()))
                 .ReturnsAsync((Game?)null);
+
+            mock.Setup(x => x.GetByExternalIdAsync(It.IsAny<string>()))
+                .ReturnsAsync((Game?)null);
+
+            mock.Setup(x => x.ExistsByExternalIdAsync(It.IsAny<string>()))
+                .ReturnsAsync(false);
 
             mock.Setup(x => x.ExistsAsync(It.IsAny<int>()))
                 .ReturnsAsync(false);
@@ -63,22 +68,6 @@ namespace HoopGameNight.Tests.Helpers
         #endregion
 
         #region Service Mocks
-
-        public static Mock<IBallDontLieService> CreateBallDontLieServiceMock()
-        {
-            var mock = new Mock<IBallDontLieService>();
-
-            mock.Setup(x => x.GetTodaysGamesAsync())
-                .ReturnsAsync(new List<BallDontLieGameDto>());
-
-            mock.Setup(x => x.GetAllTeamsAsync())
-                .ReturnsAsync(new List<BallDontLieTeamDto>());
-
-            mock.Setup(x => x.SearchPlayersAsync(It.IsAny<string>(), It.IsAny<int>()))
-                .ReturnsAsync(new List<BallDontLiePlayerDto>());
-
-            return mock;
-        }
 
         public static Mock<IEspnApiService> CreateEspnApiServiceMock()
         {
@@ -121,6 +110,23 @@ namespace HoopGameNight.Tests.Helpers
         public static IMemoryCache CreateMemoryCache()
         {
             return new MemoryCache(new MemoryCacheOptions());
+        }
+
+        public static Mock<ICacheService> CreateCacheServiceMock()
+        {
+            var mock = new Mock<ICacheService>();
+
+            // Setup métodos básicos - sem setup genérico, deixar o comportamento padrão
+            mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan?>()))
+                .Returns(Task.CompletedTask);
+
+            mock.Setup(x => x.RemoveAsync(It.IsAny<string>()))
+                .Returns(Task.CompletedTask);
+
+            mock.Setup(x => x.GetStatistics())
+                .Returns(new CacheStatistics());
+
+            return mock;
         }
 
         public static Mock<ILogger<T>> CreateLoggerMock<T>()

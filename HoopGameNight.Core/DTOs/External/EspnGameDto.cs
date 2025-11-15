@@ -16,5 +16,9 @@
         public string Status { get; set; } = string.Empty;
         public int? HomeTeamScore { get; set; }
         public int? AwayTeamScore { get; set; }
+        public int? Period { get; set; } 
+        public string? TimeRemaining { get; set; } 
+        public bool? IsPostseason { get; set; } 
+        public int? Season { get; set; } 
     }
 }

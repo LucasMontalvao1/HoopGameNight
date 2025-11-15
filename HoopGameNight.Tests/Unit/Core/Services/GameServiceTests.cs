@@ -1,6 +1,5 @@
 ﻿using AutoMapper;
 using FluentAssertions;
-using HoopGameNight.Core.DTOs.External.BallDontLie;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Enums;
@@ -196,182 +195,8 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         #endregion
 
         #region Testes de Sincronização de Jogos
-
-        /// <summary>
-        /// Testa se sincroniza novos jogos quando há jogos externos
-        /// </summary>
-        [Fact(DisplayName = "Deve sincronizar novos jogos quando há jogos externos")]
-        public async Task DeveSincronizarNovosJogos_QuandoHaJogosExternos()
-        {
-            // Arrange: Configura cenário de sincronização
-            var data = DateTime.Today;
-            var jogosExternos = CriarJogosExternosAmostra(2);
-            var timeCasa = CriarTimeAmostra(1, "Lakers");
-            var timeVisitante = CriarTimeAmostra(2, "Warriors");
-
-            _fixture.MockBallDontLieService
-                .Setup(x => x.GetGamesByDateAsync(data))
-                .ReturnsAsync(jogosExternos);
-
-            // Setup: Jogos não existem ainda
-            _fixture.MockGameRepository
-                .Setup(x => x.GetByExternalIdAsync(It.IsAny<int>()))
-                .ReturnsAsync((Game?)null);
-
-            // Setup: Times existem
-            _fixture.MockTeamRepository
-                .Setup(x => x.GetByExternalIdAsync(1))
-                .ReturnsAsync(timeCasa);
-
-            _fixture.MockTeamRepository
-                .Setup(x => x.GetByExternalIdAsync(2))
-                .ReturnsAsync(timeVisitante);
-
-            _fixture.MockGameRepository
-                .Setup(x => x.InsertAsync(It.IsAny<Game>()))
-                .ReturnsAsync(100);
-
-            // Act: Executa sincronização
-            var resultado = await _fixture.GameService.SyncGamesByDateAsync(data);
-
-            // Assert: Verifica se sincronizou corretamente
-            resultado.Should().Be(2, "porque sincronizamos 2 jogos novos");
-
-            _fixture.MockGameRepository.Verify(x => x.InsertAsync(It.IsAny<Game>()), Times.Exactly(2));
-            _fixture.MockBallDontLieService.Verify(x => x.GetGamesByDateAsync(data), Times.Once);
-        }
-
-        /// <summary>
-        /// Testa se atualiza jogos existentes em vez de criar novos
-        /// </summary>
-        [Fact(DisplayName = "Deve atualizar jogos existentes em vez de criar novos")]
-        public async Task DeveAtualizarJogosExistentes_EmVezDeCriarNovos()
-        {
-            // Arrange: Configura jogo já existente
-            var data = DateTime.Today;
-            var jogosExternos = CriarJogosExternosAmostra(1);
-            var jogoExistente = CriarJogoAmostra(1);
-
-            _fixture.MockBallDontLieService
-                .Setup(x => x.GetGamesByDateAsync(data))
-                .ReturnsAsync(jogosExternos);
-
-            _fixture.MockGameRepository
-                .Setup(x => x.GetByExternalIdAsync(It.IsAny<int>()))
-                .ReturnsAsync(jogoExistente);
-
-            _fixture.MockGameRepository
-                .Setup(x => x.UpdateAsync(It.IsAny<Game>()))
-                .ReturnsAsync(true);
-
-            // Act: Executa sincronização
-            var resultado = await _fixture.GameService.SyncGamesByDateAsync(data);
-
-            // Assert: Deve atualizar, não inserir
-            resultado.Should().Be(0, "porque são atualizações, não inserções");
-
-            _fixture.MockGameRepository.Verify(x => x.UpdateAsync(It.IsAny<Game>()), Times.Once);
-            _fixture.MockGameRepository.Verify(x => x.InsertAsync(It.IsAny<Game>()), Times.Never);
-        }
-
-        /// <summary>
-        /// Testa se pula jogos quando times não são encontrados
-        /// </summary>
-        [Fact(DisplayName = "Deve pular jogos quando times não são encontrados")]
-        public async Task DevePularJogos_QuandoTimesNaoSaoEncontrados()
-        {
-            // Arrange: Configura times inexistentes
-            var data = DateTime.Today;
-            var jogosExternos = CriarJogosExternosAmostra(1);
-
-            _fixture.MockBallDontLieService
-                .Setup(x => x.GetGamesByDateAsync(data))
-                .ReturnsAsync(jogosExternos);
-
-            _fixture.MockGameRepository
-                .Setup(x => x.GetByExternalIdAsync(It.IsAny<int>()))
-                .ReturnsAsync((Game?)null);
-
-            // Setup: Times não existem
-            _fixture.MockTeamRepository
-                .Setup(x => x.GetByExternalIdAsync(It.IsAny<int>()))
-                .ReturnsAsync((Team?)null);
-
-            // Act: Executa sincronização
-            var resultado = await _fixture.GameService.SyncGamesByDateAsync(data);
-
-            // Assert: Não deve sincronizar nenhum jogo
-            resultado.Should().Be(0, "porque times não existem");
-            _fixture.MockGameRepository.Verify(x => x.InsertAsync(It.IsAny<Game>()), Times.Never);
-        }
-
-        /// <summary>
-        /// Testa se lança ExternalApiException quando serviço externo falha
-        /// </summary>
-        [Fact(DisplayName = "Deve lançar ExternalApiException quando serviço externo falha")]
-        public async Task DeveLancarExternalApiException_QuandoServicoExternoFalha()
-        {
-            // Arrange: Configura falha na API externa
-            var data = DateTime.Today;
-
-            _fixture.MockBallDontLieService
-                .Setup(x => x.GetGamesByDateAsync(data))
-                .ThrowsAsync(new HttpRequestException("API está fora do ar"));
-
-            // Act & Assert: Verifica exceção
-            var exception = await Assert.ThrowsAsync<ExternalApiException>(
-                () => _fixture.GameService.SyncGamesByDateAsync(data));
-
-            exception.ApiName.Should().Be("Ball Don't Lie");
-            exception.Message.Should().Contain("Failed to sync games");
-        }
-
-        #endregion
-
-        #region Testes de Sincronização por Período
-
-        /// <summary>
-        /// Testa se sincroniza múltiplas datas com sucesso
-        /// </summary>
-        [Fact(DisplayName = "Deve sincronizar múltiplas datas com sucesso")]
-        public async Task DeveSincronizarMultiplasDatas_ComSucesso()
-        {
-            // Arrange: Configura período de 3 dias
-            var dataInicio = new DateTime(2024, 1, 1);
-            var dataFim = new DateTime(2024, 1, 3); // 3 dias
-            var jogosExternos = CriarJogosExternosAmostra(1);
-
-            _fixture.MockBallDontLieService
-                .Setup(x => x.GetGamesByDateAsync(It.IsAny<DateTime>()))
-                .ReturnsAsync(jogosExternos);
-
-            _fixture.MockGameRepository
-                .Setup(x => x.GetByExternalIdAsync(It.IsAny<int>()))
-                .ReturnsAsync((Game?)null);
-
-            var timeCasa = CriarTimeAmostra(1, "Lakers");
-            var timeVisitante = CriarTimeAmostra(2, "Warriors");
-
-            _fixture.MockTeamRepository
-                .Setup(x => x.GetByExternalIdAsync(1))
-                .ReturnsAsync(timeCasa);
-
-            _fixture.MockTeamRepository
-                .Setup(x => x.GetByExternalIdAsync(2))
-                .ReturnsAsync(timeVisitante);
-
-            _fixture.MockGameRepository
-                .Setup(x => x.InsertAsync(It.IsAny<Game>()))
-                .ReturnsAsync(100);
-
-            // Act: Sincroniza período
-            var resultado = await _fixture.GameService.SyncGamesForPeriodAsync(dataInicio, dataFim);
-
-            // Assert: Deve sincronizar 3 jogos (1 por dia x 3 dias)
-            resultado.Should().Be(3, "porque são 3 dias com 1 jogo cada");
-            _fixture.MockBallDontLieService.Verify(x => x.GetGamesByDateAsync(It.IsAny<DateTime>()), Times.Exactly(3));
-        }
-
+        // NOTA: Testes de sincronização BallDontLie removidos - agora usando ESPN API
+        // A sincronização de jogos agora é feita via GameService.SyncGamesFromEspnAsync()
         #endregion
 
         #region Testes de Busca por ID
@@ -510,7 +335,7 @@ namespace HoopGameNight.Tests.Unit.Core.Services
             return new Game
             {
                 Id = id,
-                ExternalId = id + 1000,
+                ExternalId = (id + 1000).ToString(),
                 Date = DateTime.Today,
                 DateTime = DateTime.Today.AddHours(20),
                 HomeTeamId = 1,
@@ -604,48 +429,48 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         }
 
         /// <summary>
-        /// Cria lista de jogos externos (Ball Don't Lie) para testes
+        /// REMOVIDO: BallDontLie DTOs deletados - usando apenas ESPN API
         /// </summary>
-        private static List<BallDontLieGameDto> CriarJogosExternosAmostra(int quantidade)
-        {
-            var jogos = new List<BallDontLieGameDto>();
-            for (int i = 1; i <= quantidade; i++)
-            {
-                jogos.Add(new BallDontLieGameDto
-                {
-                    Id = i + 1000,
-                    Date = DateTime.Today.ToString("yyyy-MM-dd"),
-                    HomeTeam = new BallDontLieTeamDto
-                    {
-                        Id = 1,
-                        Name = "Lakers",
-                        FullName = "Los Angeles Lakers",
-                        Abbreviation = "LAL",
-                        City = "Los Angeles",
-                        Conference = "West",
-                        Division = "Pacific"
-                    },
-                    VisitorTeam = new BallDontLieTeamDto
-                    {
-                        Id = 2,
-                        Name = "Warriors",
-                        FullName = "Golden State Warriors",
-                        Abbreviation = "GSW",
-                        City = "Golden State",
-                        Conference = "West",
-                        Division = "Pacific"
-                    },
-                    HomeTeamScore = 110,
-                    VisitorTeamScore = 105,
-                    Status = "Final",
-                    Period = 4,
-                    Time = "Final",
-                    Postseason = false,
-                    Season = 2024
-                });
-            }
-            return jogos;
-        }
+        // private static List<BallDontLieGameDto> CriarJogosExternosAmostra(int quantidade)
+        // {
+        //     var jogos = new List<BallDontLieGameDto>();
+        //     for (int i = 1; i <= quantidade; i++)
+        //     {
+        //         jogos.Add(new BallDontLieGameDto
+        //         {
+        //             Id = i + 1000,
+        //             Date = DateTime.Today.ToString("yyyy-MM-dd"),
+        //             HomeTeam = new BallDontLieTeamDto
+        //             {
+        //                 Id = 1,
+        //                 Name = "Lakers",
+        //                 FullName = "Los Angeles Lakers",
+        //                 Abbreviation = "LAL",
+        //                 City = "Los Angeles",
+        //                 Conference = "West",
+        //                 Division = "Pacific"
+        //             },
+        //             VisitorTeam = new BallDontLieTeamDto
+        //             {
+        //                 Id = 2,
+        //                 Name = "Warriors",
+        //                 FullName = "Golden State Warriors",
+        //                 Abbreviation = "GSW",
+        //                 City = "Golden State",
+        //                 Conference = "West",
+        //                 Division = "Pacific"
+        //             },
+        //             HomeTeamScore = 110,
+        //             VisitorTeamScore = 105,
+        //             Status = "Final",
+        //             Period = 4,
+        //             Time = "Final",
+        //             Postseason = false,
+        //             Season = 2024
+        //         });
+        //     }
+        //     return jogos;
+        // }
 
         #endregion
     }

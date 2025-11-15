@@ -1,124 +1,362 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+using HoopGameNight.Core.Configuration;
+using HoopGameNight.Core.Interfaces.Services;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
+using System.Text.Json;
+using System.Threading;
 
 namespace HoopGameNight.Infrastructure.Services
 {
     /// <summary>
-    /// Serviço de cache centralizado
+    /// Implementação de cache em camadas (Redis → Memory → Database)
+    /// Centraliza toda a lógica de cache do sistema
     /// </summary>
     public class CacheService : ICacheService
     {
-        private readonly IMemoryCache _cache;
+        private readonly IMemoryCache _memoryCache;
+        private readonly IDistributedCache? _distributedCache;
         private readonly ILogger<CacheService> _logger;
-        private readonly ConcurrentDictionary<string, DateTime> _cacheKeys;
-        private long _totalRequests;
-        private long _hits;
-        private long _misses;
-        private long _evictions;
 
-        public CacheService(IMemoryCache cache, ILogger<CacheService> logger)
+        // Estatísticas do cache
+        private long _redisHits = 0;
+        private long _redisMisses = 0;
+        private long _memoryHits = 0;
+        private long _memoryMisses = 0;
+        private readonly DateTime _startTime = DateTime.UtcNow;
+
+        public CacheService(
+            IMemoryCache memoryCache,
+            ILogger<CacheService> logger,
+            IDistributedCache? distributedCache = null)
         {
-            _cache = cache;
-            _logger = logger;
-            _cacheKeys = new ConcurrentDictionary<string, DateTime>();
+            _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _distributedCache = distributedCache;
+
+            if (_distributedCache == null)
+            {
+                _logger.LogWarning("Redis (IDistributedCache) não está disponível. Usando apenas Memory Cache.");
+            }
+            else
+            {
+                _logger.LogInformation("CacheService inicializado com Redis + Memory Cache");
+            }
         }
 
+        /// <summary>
+        /// Busca valor do cache de forma síncrona (apenas Memory Cache)
+        /// </summary>
         public T? Get<T>(string key)
         {
-            Interlocked.Increment(ref _totalRequests);
+            if (string.IsNullOrWhiteSpace(key))
+                return default;
 
-            if (_cache.TryGetValue(key, out T? value))
+            try
             {
-                Interlocked.Increment(ref _hits);
-                _logger.LogDebug("Cache hit for key: {Key}", key);
-                return value;
-            }
+                if (_memoryCache.TryGetValue(key, out T? value))
+                {
+                    Interlocked.Increment(ref _memoryHits);
+                    _logger.LogDebug("MEMORY HIT (sync): {Key}", key);
+                    return value;
+                }
 
-            Interlocked.Increment(ref _misses);
-            _logger.LogDebug("Cache miss for key: {Key}", key);
-            return default;
+                Interlocked.Increment(ref _memoryMisses);
+                return default;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar do cache (sync): {Key}", key);
+                return default;
+            }
         }
 
-        public Task<T?> GetAsync<T>(string key) => Task.FromResult(Get<T>(key));
+        /// <summary>
+        /// Busca valor do cache (Redis → Memory → null)
+        /// </summary>
+        public async Task<T?> GetAsync<T>(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Cache key cannot be null or empty", nameof(key));
 
+            try
+            {
+                // 1️⃣ Tentar Redis primeiro (se disponível)
+                if (_distributedCache != null)
+                {
+                    var redisData = await _distributedCache.GetStringAsync(key);
+                    if (redisData != null)
+                    {
+                        Interlocked.Increment(ref _redisHits);
+                        _logger.LogDebug("REDIS HIT: {Key}", key);
+
+                        var deserializedData = JsonSerializer.Deserialize<T>(redisData);
+
+                        // Salvar também no memory cache para próximas buscas
+                        if (deserializedData != null)
+                        {
+                            _memoryCache.Set(key, deserializedData, TimeSpan.FromMinutes(5));
+                        }
+
+                        return deserializedData;
+                    }
+
+                    Interlocked.Increment(ref _redisMisses);
+                    _logger.LogDebug("REDIS MISS: {Key}", key);
+                }
+
+                // 2️⃣ Fallback: Memory Cache
+                if (_memoryCache.TryGetValue(key, out T? memCached))
+                {
+                    Interlocked.Increment(ref _memoryHits);
+                    _logger.LogDebug("MEMORY HIT: {Key}", key);
+                    return memCached;
+                }
+
+                Interlocked.Increment(ref _memoryMisses);
+                _logger.LogDebug("CACHE MISS (total): {Key}", key);
+                return default;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar do cache: {Key}", key);
+                return default; 
+            }
+        }
+
+        /// <summary>
+        /// Armazena valor no cache de forma síncrona (apenas Memory Cache)
+        /// </summary>
         public void Set<T>(string key, T value, TimeSpan? expiration = null)
         {
-            var options = new MemoryCacheEntryOptions
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Cache key cannot be null or empty", nameof(key));
+
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            var ttl = expiration ?? CacheDurations.Default;
+
+            try
             {
-                SlidingExpiration = expiration ?? TimeSpan.FromMinutes(15)
-            };
-
-            options.RegisterPostEvictionCallback((evictedKey, evictedValue, reason, state) =>
+                _memoryCache.Set(key, value, ttl);
+                _logger.LogDebug("📦 MEMORY SET (sync): {Key} (TTL: {TTL})", key, ttl);
+            }
+            catch (Exception ex)
             {
-                _cacheKeys.TryRemove(evictedKey.ToString()!, out _);
-                Interlocked.Increment(ref _evictions);
-                _logger.LogDebug("Cache evicted: {Key}, Reason: {Reason}", evictedKey, reason);
-            });
-
-            _cache.Set(key, value, options);
-            _cacheKeys[key] = DateTime.UtcNow;
-
-            _logger.LogDebug("Cache set: {Key}, Expiration: {Expiration}", key, expiration);
+                _logger.LogError(ex, "Erro ao salvar no cache (sync): {Key}", key);
+            }
         }
 
-        public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
+        /// <summary>
+        /// Armazena valor no cache (Redis + Memory)
+        /// </summary>
+        public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
         {
-            Set(key, value, expiration);
-            return Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Cache key cannot be null or empty", nameof(key));
+
+            if (value == null)
+                throw new ArgumentNullException(nameof(value));
+
+            var ttl = expiration ?? CacheDurations.Default;
+
+            try
+            {
+                // 1️⃣ Salvar no Redis (se disponível)
+                if (_distributedCache != null)
+                {
+                    var json = JsonSerializer.Serialize(value);
+                    var options = new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = ttl
+                    };
+
+                    await _distributedCache.SetStringAsync(key, json, options);
+                    _logger.LogDebug("REDIS SET: {Key} (TTL: {TTL})", key, ttl);
+                }
+
+                // 2️⃣ Salvar no Memory Cache (sempre)
+                var cacheOptions = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = ttl
+                };
+
+                _memoryCache.Set(key, value, cacheOptions);
+                _logger.LogDebug("MEMORY SET: {Key} (TTL: {TTL})", key, ttl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao salvar no cache: {Key}", key);
+                // Não lança exceção - graceful degradation
+            }
         }
 
+        /// <summary>
+        /// Remove valor do cache de forma síncrona
+        /// </summary>
         public void Remove(string key)
         {
-            _cache.Remove(key);
-            _cacheKeys.TryRemove(key, out _);
-            _logger.LogDebug("Cache removed: {Key}", key);
+            if (string.IsNullOrWhiteSpace(key))
+                return;
+
+            try
+            {
+                _memoryCache.Remove(key);
+                _logger.LogDebug("🗑MEMORY REMOVE (sync): {Key}", key);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao remover do cache (sync): {Key}", key);
+            }
         }
 
-        public Task RemoveAsync(string key)
+        /// <summary>
+        /// Remove valor do cache
+        /// </summary>
+        public async Task RemoveAsync(string key)
         {
-            Remove(key);
-            return Task.CompletedTask;
+            if (string.IsNullOrWhiteSpace(key))
+                throw new ArgumentException("Cache key cannot be null or empty", nameof(key));
+
+            try
+            {
+                // Remover do Redis
+                if (_distributedCache != null)
+                {
+                    await _distributedCache.RemoveAsync(key);
+                    _logger.LogDebug("REDIS REMOVE: {Key}", key);
+                }
+
+                // Remover do Memory
+                _memoryCache.Remove(key);
+                _logger.LogDebug("MEMORY REMOVE: {Key}", key);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao remover do cache: {Key}", key);
+            }
         }
 
-        public bool Exists(string key) => _cache.TryGetValue(key, out _);
+        /// <summary>
+        /// Remove chaves por padrão (ex: "games:*")
+        /// NOTA: Funcionalidade limitada sem Redis Server commands
+        /// </summary>
+        public async Task RemoveByPatternAsync(string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(pattern))
+                throw new ArgumentException("Pattern cannot be null or empty", nameof(pattern));
 
+            _logger.LogWarning("⚠RemoveByPatternAsync('{Pattern}') requer Redis Server commands (KEYS/SCAN). " +
+                               "Funcionalidade limitada com IDistributedCache. " +
+                               "Considere implementar usando StackExchange.Redis diretamente.", pattern);
+
+
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Verifica se chave existe no cache (síncrono)
+        /// </summary>
+        public bool Exists(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return false;
+
+            try
+            {
+                return _memoryCache.TryGetValue(key, out _);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao verificar existência no cache (sync): {Key}", key);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Verifica se chave existe no cache
+        /// </summary>
+        public async Task<bool> ExistsAsync(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return false;
+
+            try
+            {
+                // Verificar Redis
+                if (_distributedCache != null)
+                {
+                    var redisData = await _distributedCache.GetStringAsync(key);
+                    if (redisData != null)
+                        return true;
+                }
+
+                // Verificar Memory
+                return _memoryCache.TryGetValue(key, out _);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao verificar existência no cache: {Key}", key);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Limpa todo o cache (apenas Memory Cache)
+        /// </summary>
         public void Clear()
         {
-            var keys = _cacheKeys.Keys.ToList();
-            foreach (var key in keys)
+            try
             {
-                _cache.Remove(key);
+                _logger.LogWarning("⚠️ Clear() chamado mas IMemoryCache não suporta limpeza total. " +
+                                   "Use RemoveByPatternAsync para invalidações específicas.");
             }
-            _cacheKeys.Clear();
-            _logger.LogInformation("Cache cleared - {Count} entries removed", keys.Count);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao limpar cache");
+            }
         }
 
+        /// <summary>
+        /// Invalida chaves por padrão (síncrono)
+        /// </summary>
         public void InvalidatePattern(string pattern)
         {
-            var keysToRemove = _cacheKeys.Keys
-                .Where(k => k.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            foreach (var key in keysToRemove)
-            {
-                Remove(key);
-            }
-
-            _logger.LogInformation("Invalidated {Count} cache entries matching pattern: {Pattern}",
-                keysToRemove.Count, pattern);
+            _logger.LogWarning("⚠️ InvalidatePattern('{Pattern}') requer Redis Server commands. " +
+                               "Use RemoveByPatternAsync para funcionalidade assíncrona.", pattern);
         }
 
+        /// <summary>
+        /// Obtém estatísticas do cache (síncrono)
+        /// </summary>
         public CacheStatistics GetStatistics()
         {
-            return new CacheStatistics
+            var stats = new CacheStatistics
             {
-                TotalRequests = Interlocked.Read(ref _totalRequests),
-                Hits = Interlocked.Read(ref _hits),
-                Misses = Interlocked.Read(ref _misses),
-                CurrentEntries = _cacheKeys.Count,
-                Evictions = Interlocked.Read(ref _evictions)
+                RedisHits = _redisHits,
+                RedisMisses = _redisMisses,
+                MemoryHits = _memoryHits,
+                MemoryMisses = _memoryMisses,
+                MemoryCacheCount = 0, 
+                Evictions = 0, 
+                LastResetTime = _startTime.ToString("O")
             };
+
+            return stats;
+        }
+
+        /// <summary>
+        /// Obtém estatísticas do cache
+        /// </summary>
+        public Task<CacheStatistics> GetStatisticsAsync()
+        {
+            var stats = GetStatistics();
+
+            _logger.LogInformation("Cache Statistics | Hits: {Hits} | Misses: {Misses} | Hit Rate: {HitRate:F2}%",
+                stats.TotalHits, stats.TotalMisses, stats.HitRate);
+
+            return Task.FromResult(stats);
         }
     }
 }

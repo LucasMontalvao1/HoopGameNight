@@ -1,17 +1,9 @@
 ﻿namespace HoopGameNight.Api.Configurations
 {
+    // REMOVIDO: BallDontLie configuration - API deprecated
     public class ExternalApiConfiguration
     {
-        public BallDontLieConfiguration BallDontLie { get; set; } = new();
-    }
-
-    public class BallDontLieConfiguration
-    {
-        public string BaseUrl { get; set; } = string.Empty;
-        public string ApiKey { get; set; } = string.Empty;
-        public int Timeout { get; set; } = 30;
-        public int RateLimit { get; set; } = 60;
-        public RetryPolicyConfiguration RetryPolicy { get; set; } = new();
+        // Configuration for external APIs can be added here if needed
     }
 
     public class RetryPolicyConfiguration

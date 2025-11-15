@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { TeamsService } from '../../core/services/teams.service';
@@ -26,7 +26,10 @@ export class Teams implements OnInit {
   readonly viewMode = this._viewMode.asReadonly();
   readonly sortBy = this._sortBy.asReadonly();
 
-  constructor(protected readonly teamsService: TeamsService) {}
+  constructor(
+    protected readonly teamsService: TeamsService,
+    private readonly router: Router
+  ) {}
 
   async ngOnInit(): Promise<void> {
     console.log('Teams component inicializado');
@@ -179,10 +182,10 @@ export class Teams implements OnInit {
   }
 
   async selectTeam(team: TeamResponse): Promise<void> {
-    await this.teamsService.loadTeamById(team.id);
     const teamName = team.displayName || `${team.city} ${team.name}`;
     console.log('Team selected:', teamName);
-    // abrir um modal
+    // Navegar para a página de detalhes do time
+    this.router.navigate(['/teams', team.abbreviation]);
   }
 
   getTeamLogoUrl(abbreviation: string): string {

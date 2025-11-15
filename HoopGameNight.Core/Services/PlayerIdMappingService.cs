@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace HoopGameNight.Core.Services
 {
     /// <summary>
-    /// Serviço para mapear IDs de jogadores entre Ball Don't Lie e ESPN APIs
+    /// Serviço para mapear IDs de jogadores ESPN APIs
     /// </summary>
     public class PlayerIdMappingService : IPlayerIdMappingService
     {
@@ -26,7 +26,6 @@ namespace HoopGameNight.Core.Services
 
         public async Task<string?> GetEspnPlayerIdAsync(int ballDontLiePlayerId)
         {
-            // Verificar cache
             if (_cachedMappings.TryGetValue(ballDontLiePlayerId, out var cachedId))
             {
                 return cachedId;
@@ -34,7 +33,6 @@ namespace HoopGameNight.Core.Services
 
             try
             {
-                // Buscar jogador no banco local
                 var player = await _playerRepository.GetByExternalIdAsync(ballDontLiePlayerId);
                 if (player == null)
                 {
@@ -42,18 +40,15 @@ namespace HoopGameNight.Core.Services
                     return null;
                 }
 
-                // Se já temos o ESPN ID armazenado, usar
                 if (!string.IsNullOrEmpty(player.EspnId))
                 {
                     _cachedMappings[ballDontLiePlayerId] = player.EspnId;
                     return player.EspnId;
                 }
 
-                // Tentar encontrar pelo nome na ESPN API
                 var espnPlayerId = await FindEspnPlayerByNameAsync(player.FirstName, player.LastName);
                 if (!string.IsNullOrEmpty(espnPlayerId))
                 {
-                    // Atualizar no banco
                     player.EspnId = espnPlayerId;
                     await _playerRepository.UpdateAsync(player);
 
@@ -77,8 +72,6 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                // Por enquanto, retorna null porque não temos um endpoint de busca por nome na ESPN
-                // Em produção, isso seria implementado com busca fuzzy ou banco de dados de mapeamento
                 _logger.LogDebug("ESPN player search by name not implemented yet: {FirstName} {LastName}", firstName, lastName);
                 return null;
             }

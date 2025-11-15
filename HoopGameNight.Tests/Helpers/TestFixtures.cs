@@ -14,37 +14,34 @@ namespace HoopGameNight.Tests.Helpers
     {
         public Mock<IGameRepository> MockGameRepository { get; }
         public Mock<ITeamRepository> MockTeamRepository { get; }
-        public Mock<IBallDontLieService> MockBallDontLieService { get; }
         public Mock<IEspnApiService> MockEspnApiService { get; }
         public Mock<IMapper> MockMapper { get; }
         public Mock<ILogger<GameService>> MockLogger { get; }
-        public IMemoryCache MemoryCache { get; }
+        public Mock<ICacheService> MockCacheService { get; }
         public GameService GameService { get; }
 
         public GameServiceTestFixture()
         {
             MockGameRepository = MockSetupHelper.CreateGameRepositoryMock();
             MockTeamRepository = MockSetupHelper.CreateTeamRepositoryMock();
-            MockBallDontLieService = MockSetupHelper.CreateBallDontLieServiceMock();
             MockEspnApiService = MockSetupHelper.CreateEspnApiServiceMock();
             MockMapper = MockSetupHelper.CreateMapperMock();
             MockLogger = MockSetupHelper.CreateLoggerMock<GameService>();
-            MemoryCache = MockSetupHelper.CreateMemoryCache();
+            MockCacheService = MockSetupHelper.CreateCacheServiceMock();
 
             GameService = new GameService(
                 MockGameRepository.Object,
                 MockTeamRepository.Object,
-                MockBallDontLieService.Object,
                 MockEspnApiService.Object,
                 MockMapper.Object,
-                MemoryCache,
+                MockCacheService.Object,
                 MockLogger.Object
             );
         }
 
         public void Dispose()
         {
-            MemoryCache?.Dispose();
+            // Não é mais necessário dispor do MemoryCache
         }
 
         #region Métodos Adicionados para os Testes
@@ -56,7 +53,6 @@ namespace HoopGameNight.Tests.Helpers
         {
             MockGameRepository.Reset();
             MockTeamRepository.Reset();
-            MockBallDontLieService.Reset();
             MockEspnApiService.Reset();
             MockMapper.Reset();
             MockLogger.Reset();
@@ -70,10 +66,8 @@ namespace HoopGameNight.Tests.Helpers
         /// </summary>
         public void LimparCache()
         {
-            if (MemoryCache is MemoryCache memoryCache)
-            {
-                memoryCache.Compact(1.0); // Remove todos os itens do cache
-            }
+            // Com mocks, resetamos o comportamento
+            MockCacheService.Reset();
         }
 
         /// <summary>
@@ -96,9 +90,10 @@ namespace HoopGameNight.Tests.Helpers
                 .ReturnsAsync((Team?)null);
 
             // BallDontLieService - comportamento padrão
-            MockBallDontLieService
-                .Setup(x => x.GetTodaysGamesAsync())
-                .ReturnsAsync(new List<Core.DTOs.External.BallDontLie.BallDontLieGameDto>());
+            // REMOVIDO: BallDontLie DTOs deletados - método comentado em IBallDontLieService
+            // MockBallDontLieService
+            //     .Setup(x => x.GetTodaysGamesAsync())
+            //     .ReturnsAsync(new List<Core.DTOs.External.BallDontLie.BallDontLieGameDto>());
 
             // Mapper - comportamento padrão
             MockMapper

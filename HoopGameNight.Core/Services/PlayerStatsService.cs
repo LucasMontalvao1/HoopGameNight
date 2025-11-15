@@ -14,7 +14,6 @@ namespace HoopGameNight.Core.Services
         private readonly IPlayerStatsRepository _statsRepository;
         private readonly IPlayerRepository _playerRepository;
         private readonly ITeamRepository _teamRepository;
-        private readonly IPlayerStatsSyncService _syncService;
         private readonly IMapper _mapper;
         private readonly IMemoryCache _cache;
         private readonly ILogger<PlayerStatsService> _logger;
@@ -23,7 +22,6 @@ namespace HoopGameNight.Core.Services
             IPlayerStatsRepository statsRepository,
             IPlayerRepository playerRepository,
             ITeamRepository teamRepository,
-            IPlayerStatsSyncService syncService,
             IMapper mapper,
             IMemoryCache cache,
             ILogger<PlayerStatsService> logger)
@@ -31,7 +29,6 @@ namespace HoopGameNight.Core.Services
             _statsRepository = statsRepository;
             _playerRepository = playerRepository;
             _teamRepository = teamRepository;
-            _syncService = syncService;
             _mapper = mapper;
             _cache = cache;
             _logger = logger;
@@ -65,7 +62,6 @@ namespace HoopGameNight.Core.Services
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error getting current season stats for player {PlayerId}", request.PlayerId);
-                        // Continua mesmo com erro
                     }
                 }
 
@@ -78,7 +74,6 @@ namespace HoopGameNight.Core.Services
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error getting career stats for player {PlayerId}", request.PlayerId);
-                        // Continua mesmo com erro
                     }
                 }
 
@@ -91,7 +86,6 @@ namespace HoopGameNight.Core.Services
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Error getting recent games for player {PlayerId}", request.PlayerId);
-                        // Continua mesmo com erro
                     }
                 }
 
@@ -109,11 +103,18 @@ namespace HoopGameNight.Core.Services
         {
             var stats = await _statsRepository.GetSeasonStatsAsync(playerId, season);
 
-            // AUTO-SYNC: Se não encontrar dados, tenta sincronizar da API externa
+            // TODO: AUTO-SYNC desabilitado temporariamente - PlayerStatsSyncService será reimplementado
+            // Estatísticas de jogadores devem ser sincronizadas via job em background no futuro
+            if (stats == null)
+            {
+                _logger.LogWarning("Season stats not found for player {PlayerId}, season {Season}. Auto-sync not available yet.", playerId, season);
+                return null;
+            }
+
+            /* CÓDIGO COMENTADO - Será reativado quando PlayerStatsSyncService for reimplementado
             if (stats == null)
             {
                 _logger.LogInformation("Season stats not found for player {PlayerId}, season {Season}. Attempting auto-sync...", playerId, season);
-
                 var syncSuccess = await _syncService.SyncPlayerSeasonStatsAsync(playerId, season);
                 if (syncSuccess)
                 {
@@ -125,6 +126,7 @@ namespace HoopGameNight.Core.Services
                     _logger.LogWarning("Auto-sync failed for player {PlayerId}, season {Season}", playerId, season);
                 }
             }
+            */
 
             if (stats == null)
                 return null;
@@ -170,8 +172,11 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("Career stats not found for player {PlayerId}. Attempting to sync recent seasons...", playerId);
 
                 var currentYear = DateTime.Now.Year;
-                var seasonsToSync = new List<int> { currentYear, currentYear - 1, currentYear - 2 }; // Últimas 3 temporadas
+                // TODO: AUTO-SYNC desabilitado - PlayerStatsSyncService será reimplementado
+                _logger.LogWarning("Career stats for player {PlayerId} incomplete. Auto-sync not available yet.", playerId);
 
+                /* CÓDIGO COMENTADO - Será reativado quando PlayerStatsSyncService for reimplementado
+                var seasonsToSync = new List<int> { currentYear, currentYear - 1, currentYear - 2 }; // Últimas 3 temporadas
                 var syncedAny = false;
                 foreach (var season in seasonsToSync)
                 {
@@ -186,14 +191,13 @@ namespace HoopGameNight.Core.Services
                         }
                     }
                 }
-
-                // Se sincronizou alguma temporada, atualiza as estatísticas de carreira
                 if (syncedAny)
                 {
                     _logger.LogInformation("Updating career stats for player {PlayerId} after auto-sync", playerId);
                     await UpdatePlayerCareerStatsAsync(playerId);
                     stats = await _statsRepository.GetCareerStatsAsync(playerId);
                 }
+                */
             }
 
             return stats != null ? _mapper.Map<PlayerCareerStatsResponse>(stats) : null;
@@ -209,11 +213,17 @@ namespace HoopGameNight.Core.Services
         {
             var stats = await _statsRepository.GetGameStatsAsync(playerId, gameId);
 
-            // AUTO-SYNC: Se não encontrar dados, tenta sincronizar da API externa
+            // TODO: AUTO-SYNC desabilitado - PlayerStatsSyncService será reimplementado
+            if (stats == null)
+            {
+                _logger.LogWarning("Game stats not found for player {PlayerId}, game {GameId}. Auto-sync not available yet.", playerId, gameId);
+                return null;
+            }
+
+            /* CÓDIGO COMENTADO - Será reativado quando PlayerStatsSyncService for reimplementado
             if (stats == null)
             {
                 _logger.LogInformation("Game stats not found for player {PlayerId}, game {GameId}. Attempting auto-sync...", playerId, gameId);
-
                 var syncSuccess = await _syncService.SyncPlayerGameStatsAsync(playerId, gameId);
                 if (syncSuccess)
                 {
@@ -225,6 +235,7 @@ namespace HoopGameNight.Core.Services
                     _logger.LogWarning("Auto-sync failed for player {PlayerId}, game {GameId}", playerId, gameId);
                 }
             }
+            */
 
             return stats != null ? _mapper.Map<PlayerRecentGameResponse>(stats) : null;
         }

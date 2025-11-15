@@ -108,7 +108,6 @@ namespace HoopGameNight.Api.Controllers.V1
                 var teams = await _teamService.GetAllTeamsAsync();
                 var todayGames = await _gameService.GetTodayGamesAsync();
 
-                // Buscar jogos da última semana para estatísticas
                 var weekGames = new List<GameResponse>();
                 for (int i = -7; i <= 0; i++)
                 {
@@ -153,7 +152,7 @@ namespace HoopGameNight.Api.Controllers.V1
                         GamesWithScores = weekGames.Count > 0
                             ? weekGames.Count(g => g.HomeTeamScore.HasValue) * 100.0 / weekGames.Count
                             : 0,
-                        LastDataUpdate = DateTime.UtcNow, // Você pode melhorar isso
+                        LastDataUpdate = DateTime.UtcNow, 
                         DataSources = new[] { "Database", "Ball Don't Lie API", "ESPN API" }
                     }
                 };
@@ -210,11 +209,11 @@ namespace HoopGameNight.Api.Controllers.V1
                         FailedSyncs = syncMetrics.FailedSyncs,
                         SuccessRate = syncMetrics.SuccessRate,
                         LastSyncTime = syncMetrics.LastSyncTime,
-                        LastSuccessTime = syncMetrics.LastSyncTime, // Usar LastSyncTime se LastSuccessTime não existir
-                        LastFailureTime = null, // Deixar null se não existir
-                        LastError = null // Deixar null se não existir
+                        LastSuccessTime = syncMetrics.LastSyncTime, 
+                        LastFailureTime = null, 
+                        LastError = null 
                     },
-                    ByType = new List<SyncTypeMetric>(), // Lista vazia se SyncTypeCount não existir
+                    ByType = new List<SyncTypeMetric>(), 
                     Performance = new SyncPerformanceMetrics
                     {
                         UptimeHours = syncMetrics.Uptime.TotalHours,
@@ -240,12 +239,11 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             return await ExecuteAsync(async () =>
             {
-                // Você pode implementar tracking de requests se necessário
                 var metrics = new ApiMetrics
                 {
                     Endpoints = new EndpointMetrics
                     {
-                        TotalEndpoints = 25, // Contar dinamicamente se possível
+                        TotalEndpoints = 25, 
                         ActiveEndpoints = 25,
                         MostUsedEndpoints = new[]
                         {

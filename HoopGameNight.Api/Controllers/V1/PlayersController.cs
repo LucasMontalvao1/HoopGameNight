@@ -12,17 +12,14 @@ namespace HoopGameNight.Api.Controllers.V1
     public class PlayersController : BaseApiController
     {
         private readonly IPlayerService _playerService;
-        private readonly IBallDontLieService _ballDontLieService;
         private readonly IMemoryCache _cache;
 
         public PlayersController(
             IPlayerService playerService,
-            IBallDontLieService ballDontLieService,
             IMemoryCache cache,
             ILogger<PlayersController> logger) : base(logger)
         {
             _playerService = playerService;
-            _ballDontLieService = ballDontLieService;
             _cache = cache;
         }
 
@@ -167,90 +164,6 @@ namespace HoopGameNight.Api.Controllers.V1
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Erro durante a sincronização manual dos jogadores");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Buscar jogadores diretamente da API externa
-        /// </summary>
-        /// <param name="search">Termo de busca</param>
-        /// <returns>Jogadores direto da Ball Don't Lie API</returns>
-        [HttpGet("external/search")]
-        [ProducesResponseType(typeof(ApiResponse<List<object>>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<ApiResponse<List<object>>>> SearchPlayersFromExternal([FromQuery] string search)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(search) || search.Length < 2)
-                {
-                    return BadRequest<List<object>>("O termo de pesquisa deve ter pelo menos 2 caracteres");
-                }
-
-                Logger.LogInformation("Pesquisando jogadores diretamente da API externa: {Pesquisar}", search);
-
-                var externalPlayers = await _ballDontLieService.SearchPlayersAsync(search);
-                var playersList = externalPlayers.Select(p => new
-                {
-                    id = p.Id,
-                    firstName = p.FirstName,
-                    lastName = p.LastName,
-                    position = p.Position,
-                    height = p.HeightFeet.HasValue && p.HeightInches.HasValue ?
-                        $"{p.HeightFeet}'{p.HeightInches}\"" : "N/A",
-                    weight = p.WeightPounds.HasValue ? $"{p.WeightPounds} lbs" : "N/A",
-                    team = p.Team?.FullName ?? "Free Agent"
-                }).ToList<object>();
-
-                Logger.LogInformation("Foram encontrados {PlayerCount} jogadores na API externa", playersList.Count);
-                return Ok(playersList, $"Jogadores que correspondem a '{search}' da API externa");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao pesquisar jogadores na API externa");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Verificar status da sincronização de jogadores
-        /// </summary>
-        /// <param name="search">Termo para verificar</param>
-        /// <returns>Status da sincronização</returns>
-        [HttpGet("sync/status")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<object>>> GetSyncStatus([FromQuery] string? search = "lebron")
-        {
-            try
-            {
-                var searchRequest = new SearchPlayerRequest
-                {
-                    Search = search,
-                    Page = 1,
-                    PageSize = 10
-                };
-
-                var (localPlayers, localTotal) = await _playerService.SearchPlayersAsync(searchRequest);
-                var externalPlayers = await _ballDontLieService.SearchPlayersAsync(search ?? "lebron");
-
-                var status = (object)new
-                {
-                    searchTerm = search ?? "lebron",
-                    localPlayers = localTotal,
-                    externalPlayers = externalPlayers.Count(),
-                    sampleLocalPlayers = localPlayers.Take(3).Select(p => p.FullName),
-                    lastCheck = DateTime.UtcNow,
-                    recommendation = localTotal == 0 ?
-                        "Sincronização inicial de jogadores recomendada" :
-                        "Dados de alguns jogadores disponíveis"
-                };
-
-                return Ok(status, "Status de sincronização do jogador recuperado");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao verificar o status de sincronização do player");
                 throw;
             }
         }

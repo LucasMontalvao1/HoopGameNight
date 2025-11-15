@@ -22,13 +22,18 @@ export const routes: Routes = [
     title: 'API Status - HoopGameNight'
   },
 
-  { 
-    path: 'teams', 
+  {
+    path: 'teams',
     loadComponent: () => import('./features/teams/teams').then(m => m.Teams),
     title: 'Teams - HoopGameNight'
   },
-  // { 
-  //   path: 'players', 
+  {
+    path: 'teams/:abbreviation',
+    loadComponent: () => import('./features/teams/team-details/team-details').then(m => m.TeamDetails),
+    title: 'Team Details - HoopGameNight'
+  },
+  // {
+  //   path: 'players',
   //   loadComponent: () => import('./features/players/players').then(m => m.Players),
   //   title: 'Players - HoopGameNight'
   // },

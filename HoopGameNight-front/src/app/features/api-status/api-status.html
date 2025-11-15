@@ -4,7 +4,7 @@
     <div class="api-status__header">
       <div>
         <h1 class="api-status__title">API Status Monitor</h1>
-        <p class="api-status__subtitle">Real-time monitoring of all system endpoints</p>
+        <p class="api-status__subtitle">Confira em tempo real o status de cada api</p>
       </div>
       
       <button 
@@ -52,45 +52,97 @@
       <div class="api-status__details">
         <div class="detail-card">
           <h3 class="detail-card__title">System Information</h3>
-          
+
           <div class="detail-grid">
             <div class="detail-item">
               <span class="detail-item__label">Status</span>
               <span class="detail-item__value detail-item__value--success">{{ data.status }}</span>
             </div>
-            
+
             <div class="detail-item">
-              <span class="detail-item__label">Uptime</span>
-              <span class="detail-item__value">{{ getUptimeFormatted() }}</span>
+              <span class="detail-item__label">Health Checks</span>
+              <span class="detail-item__value">{{ getHealthCheckCount() }}</span>
             </div>
-            
-            @if (data.version) {
-              <div class="detail-item">
-                <span class="detail-item__label">Version</span>
-                <span class="detail-item__value">{{ data.version }}</span>
-              </div>
-            }
-            
-            @if (data.environment) {
-              <div class="detail-item">
-                <span class="detail-item__label">Environment</span>
-                <span class="detail-item__value">{{ data.environment }}</span>
-              </div>
-            }
-            
+
+            <div class="detail-item">
+              <span class="detail-item__label">Check Duration</span>
+              <span class="detail-item__value">{{ getHealthDuration() }}</span>
+            </div>
+
             <div class="detail-item">
               <span class="detail-item__label">Last Response</span>
               <span class="detail-item__value">{{ data.timestamp | date:'dd/MM/yyyy HH:mm:ss' }}</span>
             </div>
-            
-            @if (data.server) {
+
+            @if (data.summary) {
               <div class="detail-item">
-                <span class="detail-item__label">Server</span>
-                <span class="detail-item__value">{{ data.server }}</span>
+                <span class="detail-item__label">Healthy</span>
+                <span class="detail-item__value detail-item__value--success">{{ data.summary.healthy }}</span>
               </div>
+
+              @if (data.summary.degraded > 0) {
+                <div class="detail-item">
+                  <span class="detail-item__label">Degraded</span>
+                  <span class="detail-item__value detail-item__value--warning">{{ data.summary.degraded }}</span>
+                </div>
+              }
+
+              @if (data.summary.unhealthy > 0) {
+                <div class="detail-item">
+                  <span class="detail-item__label">Unhealthy</span>
+                  <span class="detail-item__value detail-item__value--error">{{ data.summary.unhealthy }}</span>
+                </div>
+              }
             }
           </div>
         </div>
+
+        <!-- Health Checks Details -->
+        @if (data.checks && data.checks.length > 0) {
+          <div class="detail-card">
+            <h3 class="detail-card__title">Health Checks</h3>
+
+            <div class="checks-list">
+              @for (check of data.checks; track check.name) {
+                <div class="check-item" [class.check-item--healthy]="check.status.toLowerCase() === 'healthy'"
+                     [class.check-item--degraded]="check.status.toLowerCase() === 'degraded'"
+                     [class.check-item--unhealthy]="check.status.toLowerCase() === 'unhealthy'">
+                  <div class="check-item__header">
+                    <div class="check-item__name">
+                      <span class="check-status-dot"></span>
+                      {{ check.name }}
+                    </div>
+                    <div class="check-item__status">{{ check.status }}</div>
+                  </div>
+
+                  @if (check.description) {
+                    <div class="check-item__description">{{ check.description }}</div>
+                  }
+
+                  <div class="check-item__meta">
+                    <span class="check-meta-item">
+                      <span class="material-icons">timer</span>
+                      {{ check.duration.toFixed(2) }}ms
+                    </span>
+                    @if (check.tags.length > 0) {
+                      <span class="check-meta-item">
+                        <span class="material-icons">label</span>
+                        {{ check.tags.join(', ') }}
+                      </span>
+                    }
+                  </div>
+
+                  @if (check.error) {
+                    <div class="check-item__error">
+                      <span class="material-icons">error</span>
+                      {{ check.error }}
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
       </div>
     }
 
@@ -121,7 +173,7 @@
           </div>
           <div class="info-item">
             <span class="material-icons">timer</span>
-            <span>60-second timeout per request</span>
+            <span>2-minute timeout per request</span>
           </div>
           <div class="info-item">
             <span class="material-icons">sync</span>

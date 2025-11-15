@@ -27,7 +27,6 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             _mockSqlLoader = new Mock<ISqlLoader>();
             _mockLogger = new Mock<ILogger<DatabaseInitializer>>();
 
-            // CORREÇÃO: Inicializar a configuração com uma connection string válida
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string>
                 {
@@ -80,7 +79,6 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             // Assert
             resultado.Should().BeFalse("falha na query indica banco não saudável");
 
-            // CORREÇÃO: Ajustar a verificação do log para ser mais flexível
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Error,
@@ -125,10 +123,9 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
                 .Setup(x => x.ExecuteAsync(It.IsAny<string>(), It.IsAny<object>()))
                 .ReturnsAsync(1);
 
-            // IMPORTANTE: Configurar o mock para o LoadSqlAsync que é chamado no EnsureSchemaExistsAsync
             _mockSqlLoader
                 .Setup(x => x.LoadSqlAsync("Database", "InitDatabase"))
-                .ReturnsAsync((string)null); // Retorna null para simular que não existe
+                .ReturnsAsync((string)null); 
 
             // Act
             try
@@ -144,22 +141,15 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
                 // Ignora qualquer erro - estamos testando apenas se tentou carregar
             }
 
-            // Assert - Como o código falha na conexão antes de carregar tabelas,
-            // vamos verificar se o mock foi configurado corretamente
-            // e aceitar que o teste passou se não houve outras exceções
-
-            // Verificar se os mocks foram configurados (não necessariamente chamados)
+           
             _mockSqlLoader.Invocations.Clear(); // Limpar invocações para não confundir
 
-            // Se quiser testar a lógica de carregamento sem a conexão real,
-            // simule diretamente o que o método faria:
             var tableOrder = new[] { "Teams", "Players", "Games" };
             foreach (var table in tableOrder)
             {
                 await _mockSqlLoader.Object.LoadSqlAsync(table, "CreateTable");
             }
 
-            // Agora verifica se os mocks funcionam quando chamados diretamente
             _mockSqlLoader.Verify(
                 x => x.LoadSqlAsync("Teams", "CreateTable"),
                 Times.Once,
@@ -201,7 +191,6 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             // Arrange
             ConfigurarMocksParaInicializacaoCompleta();
 
-            // IMPORTANTE: Mockar também o ExecuteAsync para evitar conexão real
             _mockQueryExecutor
                 .Setup(x => x.ExecuteAsync(It.IsAny<string>(), It.IsAny<object>()))
                 .ReturnsAsync(1);
@@ -213,15 +202,15 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             }
             catch
             {
-                // Ignora erros de conexão - estamos testando apenas os logs
+                // Ignora erros de conexão 
             }
 
-            // Assert - Simplificado para aceitar qualquer log de informação
+            // Assert 
             _mockLogger.Verify(
                 x => x.Log(
                     LogLevel.Information,
                     It.IsAny<EventId>(),
-                    It.IsAny<It.IsAnyType>(),  // Aceita qualquer mensagem
+                    It.IsAny<It.IsAnyType>(), 
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.AtLeastOnce,
@@ -248,7 +237,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             // Act
             var acao = async () => await _databaseInitializer.InitializeAsync();
 
-            // Assert - Ajustado para o erro real que pode ocorrer
+            // Assert 
             await acao.Should().ThrowAsync<Exception>(
                 "deve lançar exceção quando falha ao carregar SQL");
         }
@@ -301,7 +290,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             }
             catch
             {
-                // Ignora erro de conexão - estamos testando apenas os logs
+                // Ignora erro de conexão 
             }
 
             // Assert - Verifica se logou ALGO (qualquer nível de log)
@@ -309,7 +298,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
                 x => x.Log(
                     It.IsAny<LogLevel>(),
                     It.IsAny<EventId>(),
-                    It.IsAny<It.IsAnyType>(),  // Aceita qualquer mensagem
+                    It.IsAny<It.IsAnyType>(), 
                     It.IsAny<Exception>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.AtLeastOnce,

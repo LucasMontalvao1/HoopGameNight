@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 
 import { HealthCheck } from '../../core/services/health-check';
 import { GamesService } from '../../core/services/games.service';
+import { TeamsService } from '../../core/services/teams.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
 import { ApiStatus } from '../../core/interfaces/api.interface';
 
@@ -16,6 +17,7 @@ import { ApiStatus } from '../../core/interfaces/api.interface';
 })
 export class Dashboard implements OnInit {
   readonly ApiStatusEnum = ApiStatus;
+  protected selectedDateOption: string = 'today';
 
   protected readonly myTeams = [
     { code: 'LAL', name: 'Lakers', city: 'Los Angeles', nextGame: 'vs Warriors hoje', color: '#552583' },
@@ -37,7 +39,9 @@ export class Dashboard implements OnInit {
 
   constructor(
     protected readonly healthCheck: HealthCheck,
-    protected readonly gamesService: GamesService
+    protected readonly gamesService: GamesService,
+    protected readonly teamsService: TeamsService,
+    private readonly router: Router
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -52,7 +56,7 @@ export class Dashboard implements OnInit {
   }
 
   getTodayGamesCount(): number {
-    return this.gamesService.todayGames().length;
+    return this.getCurrentGames().length;
   }
 
   getLiveGamesCount(): number {
@@ -94,5 +98,61 @@ export class Dashboard implements OnInit {
 
   trackByGameId(index: number, game: any): number {
     return game.id;
+  }
+
+  getTeamLogoUrl(abbreviation: string): string {
+    return this.teamsService.getTeamLogoUrl(abbreviation);
+  }
+
+  handleLogoError(event: Event, abbreviation: string): void {
+    const img = event.target as HTMLImageElement;
+    if (img.src.includes('fallback')) return;
+    console.warn(`Logo não encontrado para: ${abbreviation}`);
+    img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOWNhM2FmIj5OQkE8L3RleHQ+PC9zdmc+';
+  }
+
+  async onDateChange(event: Event): Promise<void> {
+    const select = event.target as HTMLSelectElement;
+    const value = select.value;
+    this.selectedDateOption = value;
+
+    const today = new Date();
+    let targetDate: Date;
+
+    switch (value) {
+      case 'yesterday':
+        targetDate = new Date(today);
+        targetDate.setDate(today.getDate() - 1);
+        break;
+      case 'tomorrow':
+        targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + 1);
+        break;
+      case 'today':
+      default:
+        targetDate = today;
+        break;
+    }
+
+    console.log(`📅 Dashboard: Carregando jogos para ${targetDate.toLocaleDateString('pt-BR')}`);
+
+    if (value === 'today') {
+      await this.gamesService.loadTodayGames(true);
+    } else {
+      await this.gamesService.loadGamesByDate(targetDate, true);
+    }
+  }
+
+  navigateToTeam(abbreviation: string): void {
+    if (abbreviation) {
+      console.log(`🏀 Navegando para detalhes do time: ${abbreviation}`);
+      this.router.navigate(['/teams', abbreviation]);
+    }
+  }
+
+  getCurrentGames() {
+    return this.selectedDateOption === 'today'
+      ? this.gamesService.todayGames()
+      : this.gamesService.currentGames();
   }
 }

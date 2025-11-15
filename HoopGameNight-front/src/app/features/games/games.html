@@ -36,6 +36,10 @@
           <button class="btn btn--ghost btn--sm" (click)="goToToday()">
             Voltar para Hoje
           </button>
+        } @else {
+          <button class="btn btn--ghost btn--sm" (click)="loadCompletedGames()">
+            Carregar Jogos Finalizados (testar)
+          </button>
         }
 
         <!-- Date Picker Integration -->
@@ -82,13 +86,21 @@
           Atualizar
         </button>
         
-        <button 
+        <button
           class="btn btn--primary"
           (click)="syncCurrentDate()"
-          [disabled]="gamesService.isLoading()">
+          [disabled]="gamesService.isLoading() || isFutureDate()"
+          [title]="getSyncButtonTooltip()">
           <span class="material-icons">sync</span>
           Sincronizar
         </button>
+
+        @if (isFutureDate()) {
+          <span class="sync-warning">
+            <span class="material-icons">info</span>
+            Sincronização disponível apenas para jogos já realizados
+          </span>
+        }
       </div>
     </div>
 
@@ -143,9 +155,9 @@
                   <!-- Teams Section -->
                   <div class="game-card__teams">
                     <!-- Visitor Team -->
-                    <div class="team">
+                    <div class="team team--clickable" (click)="navigateToTeam(game.visitorTeam.abbreviation)">
                       <div class="team__logo">
-                        <img 
+                        <img
                           [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
                           [alt]="game.visitorTeam.name + ' logo'"
                           (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
@@ -154,20 +166,20 @@
                       </div>
                       <div class="team__info">
                         <span class="team__abbreviation">{{ game.visitorTeam.abbreviation }}</span>
-                        <span class="team__name">{{ game.visitorTeam.city }}</span>
+                        <span class="team__name">{{ game.visitorTeam.displayName }}</span>
                       </div>
                       <div class="team__score">{{ game.visitorTeamScore || 0 }}</div>
                     </div>
-                    
+
                     <!-- VS Separator -->
                     <div class="game-separator">
-                      <span class="separator-text">@</span>
+                      <span class="separator-text">vs</span>
                     </div>
-                    
+
                     <!-- Home Team -->
-                    <div class="team">
+                    <div class="team team--clickable" (click)="navigateToTeam(game.homeTeam.abbreviation)">
                       <div class="team__logo">
-                        <img 
+                        <img
                           [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
                           [alt]="game.homeTeam.name + ' logo'"
                           (error)="handleLogoError($event, game.homeTeam.abbreviation)"
@@ -176,23 +188,11 @@
                       </div>
                       <div class="team__info">
                         <span class="team__abbreviation">{{ game.homeTeam.abbreviation }}</span>
-                        <span class="team__name">{{ game.homeTeam.city }}</span>
+                        <span class="team__name">{{ game.homeTeam.displayName }}</span>
                       </div>
                       <div class="team__score">{{ game.homeTeamScore || 0 }}</div>
                     </div>
                   </div>
-                  
-                  <!-- Game Details -->
-                  @if (game.period || game.timeRemaining) {
-                    <div class="game-card__details">
-                      @if (game.period) {
-                        <span class="detail-item">{{ game.period }}º período</span>
-                      }
-                      @if (game.timeRemaining) {
-                        <span class="detail-item">{{ game.timeRemaining }}</span>
-                      }
-                    </div>
-                  }
                 </div>
               }
             </div>
@@ -202,10 +202,10 @@
         <!-- All Games Section -->
         <div class="games-section">
           <h2 class="games-section__title">
-            Todos os Jogos ({{ gamesService.getCurrentGames().length }})
+            Todos os Jogos ({{ gamesService.currentGames().length }})
           </h2>
-          
-          @if (gamesService.getCurrentGames().length === 0) {
+
+          @if (gamesService.currentGames().length === 0) {
             <div class="empty-state">
               <span class="material-icons">event_busy</span>
               <h3>Nenhum jogo encontrado</h3>
@@ -217,7 +217,7 @@
             </div>
           } @else {
             <div class="games-list">
-              @for (game of gamesService.getCurrentGames(); track trackByGameId($index, game)) {
+              @for (game of gamesService.currentGames(); track trackByGameId($index, game)) {
                 <div class="game-card" 
                      [class.game-card--live]="game.isLive"
                      [class.game-card--completed]="game.isCompleted"
@@ -226,75 +226,76 @@
                   <!-- Card Header com Status e Horário -->
                   <div class="game-card__header">
                     <div class="game-header__left">
-                      <span class="game-time">{{ formatGameTime(game.dateTime) }}</span>
                       @if (game.postSeason) {
                         <span class="playoff-badge">PLAYOFFS</span>
                       }
                     </div>
-                    <div class="game-status" 
+                    <div class="game-status"
                          [class.game-status--live]="game.isLive"
                          [class.game-status--completed]="game.isCompleted"
                          [class.game-status--scheduled]="!game.isLive && !game.isCompleted">
                       @if (game.isLive) {
                         <span class="status-dot"></span>
-                        {{ game.statusDisplay }}
+                        AO VIVO
+                      } @else if (game.isCompleted) {
+                        FINAL
                       } @else {
-                        {{ game.statusDisplay }}
+                        {{ formatGameTime(game.dateTime) }}
                       }
                     </div>
                   </div>
                   
                   <!-- Teams Section -->
-                  <div class="game-card__teams">
-                    <!-- Visitor Team -->
-                    <div class="team" [class.team--winner]="game.isCompleted && game.winningTeam?.id === game.visitorTeam.id">
-                      <div class="team__logo">
-                        <img 
-                          [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
-                          [alt]="game.visitorTeam.name + ' logo'"
-                          (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
-                          class="team-logo"
-                          loading="lazy">
+                  @if (game.visitorTeam && game.homeTeam) {
+                    <div class="game-card__teams">
+                      <!-- Visitor Team -->
+                      <div class="team team--clickable"
+                           [class.team--winner]="game.isCompleted && game.winningTeam && game.winningTeam.id === game.visitorTeam.id"
+                           (click)="navigateToTeam(game.visitorTeam.abbreviation)">
+                        <div class="team__logo">
+                          <img
+                            [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
+                            [alt]="game.visitorTeam.name + ' logo'"
+                            (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
+                            class="team-logo"
+                            loading="lazy">
+                        </div>
+                        <div class="team__info">
+                          <span class="team__abbreviation">{{ game.visitorTeam.abbreviation }}</span>
+                          <span class="team__name">{{ game.visitorTeam.displayName }}</span>
+                        </div>
+                        <div class="team__score">{{ game.visitorTeamScore ?? 0 }}</div>
                       </div>
-                      <div class="team__info">
-                        <span class="team__abbreviation">{{ game.visitorTeam.abbreviation }}</span>
-                        <span class="team__name">{{ game.visitorTeam.city }}</span>
+
+                      <!-- VS Separator -->
+                      <div class="game-separator">
+                        <span class="separator-text">vs</span>
                       </div>
-                      <div class="team__score">{{ game.visitorTeamScore || 0 }}</div>
+
+                      <!-- Home Team -->
+                      <div class="team team--clickable"
+                           [class.team--winner]="game.isCompleted && game.winningTeam && game.winningTeam.id === game.homeTeam.id"
+                           (click)="navigateToTeam(game.homeTeam.abbreviation)">
+                        <div class="team__logo">
+                          <img
+                            [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
+                            [alt]="game.homeTeam.name + ' logo'"
+                            (error)="handleLogoError($event, game.homeTeam.abbreviation)"
+                            class="team-logo"
+                            loading="lazy">
+                        </div>
+                        <div class="team__info">
+                          <span class="team__abbreviation">{{ game.homeTeam.abbreviation }}</span>
+                          <span class="team__name">{{ game.homeTeam.displayName }}</span>
+                        </div>
+                        <div class="team__score">{{ game.homeTeamScore ?? 0 }}</div>
+                      </div>
                     </div>
-                    
-                    <!-- VS Separator -->
-                    <div class="game-separator">
-                      <span class="separator-text">@</span>
-                    </div>
-                    
-                    <!-- Home Team -->
-                    <div class="team" [class.team--winner]="game.isCompleted && game.winningTeam?.id === game.homeTeam.id">
-                      <div class="team__logo">
-                        <img 
-                          [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
-                          [alt]="game.homeTeam.name + ' logo'"
-                          (error)="handleLogoError($event, game.homeTeam.abbreviation)"
-                          class="team-logo"
-                          loading="lazy">
+                  } @else {
+                    <div class="game-card__teams">
+                      <div class="team team--error">
+                        <span>Dados dos times não disponíveis</span>
                       </div>
-                      <div class="team__info">
-                        <span class="team__abbreviation">{{ game.homeTeam.abbreviation }}</span>
-                        <span class="team__name">{{ game.homeTeam.city }}</span>
-                      </div>
-                      <div class="team__score">{{ game.homeTeamScore || 0 }}</div>
-                    </div>
-                  </div>
-                  
-                  <!-- Game Details -->
-                  @if (game.period || game.timeRemaining) {
-                    <div class="game-card__details">
-                      @if (game.period) {
-                        <span class="detail-item">{{ game.period }}º período</span>
-                      }
-                      @if (game.timeRemaining) {
-                        <span class="detail-item">{{ game.timeRemaining }}</span>
-                      }
                     </div>
                   }
                 </div>

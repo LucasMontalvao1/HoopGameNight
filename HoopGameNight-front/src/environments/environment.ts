@@ -1,6 +1,6 @@
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:5000',
-  healthCheckEndpoint: '/api/health',
+  apiUrl: 'https://localhost:7039',
+  healthCheckEndpoint: '/health',
   appName: 'HoopGameNight'
 };

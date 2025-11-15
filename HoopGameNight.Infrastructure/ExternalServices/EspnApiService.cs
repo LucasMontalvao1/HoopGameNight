@@ -16,41 +16,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         private const string BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba";
         private const string CORE_API_BASE_URL = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba";
 
-        // Mapeamento de IDs do sistema para IDs da ESPN
-        private readonly Dictionary<int, string> _teamIdMapping = new()
-        {
-            { 1, "1" },   // Hawks
-            { 2, "2" },   // Celtics
-            { 3, "17" },  // Nets
-            { 4, "3" },   // Hornets
-            { 5, "5" },   // Bulls
-            { 6, "6" },   // Cavaliers
-            { 7, "7" },   // Mavericks
-            { 8, "8" },   // Nuggets
-            { 9, "9" },   // Pistons
-            { 10, "10" }, // Warriors
-            { 11, "11" }, // Rockets
-            { 12, "12" }, // Pacers
-            { 13, "13" }, // Clippers
-            { 14, "14" }, // Lakers
-            { 15, "15" }, // Grizzlies
-            { 16, "16" }, // Heat
-            { 17, "18" }, // Bucks
-            { 18, "19" }, // Timberwolves
-            { 19, "20" }, // Pelicans
-            { 20, "21" }, // Knicks
-            { 21, "22" }, // Thunder
-            { 22, "23" }, // Magic
-            { 23, "24" }, // 76ers
-            { 24, "25" }, // Suns
-            { 25, "26" }, // Trail Blazers
-            { 26, "27" }, // Kings
-            { 27, "28" }, // Spurs
-            { 28, "29" }, // Raptors
-            { 29, "30" }, // Jazz
-            { 30, "4" }   // Wizards
-        };
-
         public EspnApiService(HttpClient httpClient, ILogger<EspnApiService> logger)
         {
             _httpClient = httpClient;
@@ -118,55 +83,31 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             return games;
         }
 
+        /// <summary>
+        /// DEPRECATED: Use GetGamesByDateAsync instead (more efficient)
+        /// Busca jogos de um time específico por período
+        /// </summary>
         public async Task<List<EspnGameDto>> GetTeamScheduleAsync(int teamId, DateTime startDate, DateTime endDate)
         {
             try
             {
-                if (!_teamIdMapping.TryGetValue(teamId, out var espnTeamId))
+                _logger.LogWarning(
+                    "GetTeamScheduleAsync is DEPRECATED and inefficient. Consider using GetGamesByDateAsync for date ranges.");
+
+                var allGames = new List<EspnGameDto>();
+
+                var currentDate = startDate;
+                while (currentDate <= endDate)
                 {
-                    _logger.LogWarning("Team ID {TeamId} not found in ESPN mapping", teamId);
-                    return new List<EspnGameDto>();
+                    var dailyGames = await GetGamesByDateAsync(currentDate);
+                    allGames.AddRange(dailyGames);
+                    currentDate = currentDate.AddDays(1);
                 }
 
-                // Validar se estamos buscando dados muito no futuro
-                var currentDate = DateTime.Today;
-                var currentMonth = currentDate.Month;
-                var currentYear = currentDate.Year;
+                _logger.LogInformation("Found {Count} total games between {Start} and {End}",
+                    allGames.Count, startDate.ToShortDateString(), endDate.ToShortDateString());
 
-                // Se estamos no offseason (julho-setembro) e buscando datas futuras
-                if (currentMonth >= 7 && currentMonth <= 9 && startDate > currentDate)
-                {
-                    _logger.LogWarning(
-                        "Requesting future games during offseason. Team {TeamId}, dates {Start} to {End}. Next season starts in October.",
-                        teamId, startDate, endDate
-                    );
-
-                    // Se a data é para a próxima temporada que ainda não começou
-                    if (startDate.Year > currentYear || (startDate.Year == currentYear && startDate.Month > 9))
-                    {
-                        _logger.LogInformation("Schedule for next season not available yet");
-                        return new List<EspnGameDto>();
-                    }
-                }
-
-                var url = $"{BASE_URL}/teams/{espnTeamId}/schedule";
-
-                _logger.LogInformation("Fetching ESPN schedule for team {TeamId} (ESPN: {EspnId})", teamId, espnTeamId);
-
-                var response = await _httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
-                var json = await response.Content.ReadAsStringAsync();
-                var allGames = ParseTeamScheduleResponse(json);
-
-                var filteredGames = allGames
-                    .Where(g => g.Date >= startDate && g.Date <= endDate)
-                    .ToList();
-
-                _logger.LogInformation("Found {Count} games for team {TeamId} between {Start} and {End}",
-                    filteredGames.Count, teamId, startDate.ToShortDateString(), endDate.ToShortDateString());
-
-                return filteredGames;
+                return allGames;
             }
             catch (Exception ex)
             {
@@ -186,6 +127,91 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             catch
             {
                 return false;
+            }
+        }
+
+        public async Task<List<EspnTeamDto>> GetAllTeamsAsync()
+        {
+            try
+            {
+                var url = $"{BASE_URL}/teams?limit=100";
+                _logger.LogInformation("Fetching all NBA teams from ESPN: {Url}", url);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                var teams = new List<EspnTeamDto>();
+
+                if (root.TryGetProperty("sports", out var sports))
+                {
+                    foreach (var sport in sports.EnumerateArray())
+                    {
+                        if (sport.TryGetProperty("leagues", out var leagues))
+                        {
+                            foreach (var league in leagues.EnumerateArray())
+                            {
+                                if (league.TryGetProperty("teams", out var teamsArray))
+                                {
+                                    foreach (var teamWrapper in teamsArray.EnumerateArray())
+                                    {
+                                        if (teamWrapper.TryGetProperty("team", out var teamElement))
+                                        {
+                                            var team = new EspnTeamDto
+                                            {
+                                                Id = teamElement.GetPropertySafe("id"),
+                                                Uid = teamElement.GetPropertySafe("uid"),
+                                                Slug = teamElement.GetPropertySafe("slug"),
+                                                Location = teamElement.GetPropertySafe("location"),
+                                                Name = teamElement.GetPropertySafe("name"),
+                                                Abbreviation = teamElement.GetPropertySafe("abbreviation"),
+                                                DisplayName = teamElement.GetPropertySafe("displayName"),
+                                                ShortDisplayName = teamElement.GetPropertySafe("shortDisplayName"),
+                                                Color = teamElement.GetPropertySafe("color"),
+                                                AlternateColor = teamElement.GetPropertySafe("alternateColor"),
+                                                IsActive = teamElement.TryGetProperty("isActive", out var isActive) && isActive.GetBoolean(),
+                                                IsAllStar = teamElement.TryGetProperty("isAllStar", out var isAllStar) && isAllStar.GetBoolean()
+                                            };
+
+                                            if (teamElement.TryGetProperty("logos", out var logos))
+                                            {
+                                                foreach (var logo in logos.EnumerateArray())
+                                                {
+                                                    team.Logos.Add(new EspnLogoDto
+                                                    {
+                                                        Href = logo.GetPropertySafe("href"),
+                                                        Width = logo.TryGetProperty("width", out var width) ? width.GetInt32() : 0,
+                                                        Height = logo.TryGetProperty("height", out var height) ? height.GetInt32() : 0,
+                                                        Alt = logo.GetPropertySafe("alt"),
+                                                        Rel = logo.TryGetProperty("rel", out var rel)
+                                                            ? rel.EnumerateArray().Select(r => r.GetString() ?? "").ToList()
+                                                            : new List<string>()
+                                                    });
+                                                }
+                                            }
+
+                                            if (team.IsActive && !team.IsAllStar)
+                                            {
+                                                teams.Add(team);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Found {Count} active NBA teams from ESPN", teams.Count);
+                return teams;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching teams from ESPN");
+                return new List<EspnTeamDto>();
             }
         }
 
@@ -233,8 +259,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             try
             {
-                // ESPN API não tem busca direta por nome, então retornamos null
-                // Futuramente poderia buscar todos e filtrar, mas seria muito custoso
                 _logger.LogDebug("ESPN API does not support search by name directly. Player: {FirstName} {LastName}", firstName, lastName);
                 return null;
             }
@@ -381,7 +405,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    // Try away team if home team request fails
                     url = $"{CORE_API_BASE_URL}/events/{gameId}/competitions/{gameId}/competitors/away/roster/{playerId}/statistics?lang=en&region=us";
                     response = await _httpClient.GetAsync(url);
                 }
@@ -509,24 +532,45 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                     Id = eventElement.GetProperty("id").GetString() ?? ""
                 };
 
-                // Parse date - pode vir como string ou objeto
+                _logger.LogDebug("🔍 Parsing ESPN Game ID: {GameId}", game.Id);
+
                 if (eventElement.TryGetProperty("date", out var dateElement))
                 {
                     if (dateElement.ValueKind == JsonValueKind.String)
                     {
-                        game.Date = DateTime.Parse(dateElement.GetString() ?? "");
+                        var dateString = dateElement.GetString() ?? "";
+                        if (DateTime.TryParse(dateString, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedDate))
+                        {
+                            game.Date = parsedDate.Kind == DateTimeKind.Utc
+                                ? parsedDate.ToLocalTime()
+                                : parsedDate;
+                        }
+                        else
+                        {
+                            game.Date = DateTime.Parse(dateString);
+                        }
                     }
                     else if (dateElement.ValueKind == JsonValueKind.Object)
                     {
-                        // ESPN às vezes retorna date como objeto com propriedades
                         if (dateElement.TryGetProperty("date", out var innerDate))
                         {
-                            game.Date = DateTime.Parse(innerDate.GetString() ?? "");
+                            var dateString = innerDate.GetString() ?? "";
+                            if (DateTime.TryParse(dateString, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedDate))
+                            {
+                                game.Date = parsedDate.Kind == DateTimeKind.Utc
+                                    ? parsedDate.ToLocalTime()
+                                    : parsedDate;
+                            }
+                            else
+                            {
+                                game.Date = DateTime.Parse(dateString);
+                            }
                         }
                     }
                 }
 
-                // Parse status
+                _logger.LogDebug("Game Date: {Date} (UTC: {IsUtc})", game.Date, game.Date.Kind == DateTimeKind.Utc);
+
                 if (eventElement.TryGetProperty("status", out var status))
                 {
                     if (status.TryGetProperty("type", out var statusType))
@@ -535,20 +579,38 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                             ? statusName.GetString() ?? "Scheduled"
                             : "Scheduled";
                     }
+
+                    if (status.TryGetProperty("period", out var periodElement))
+                    {
+                        game.Period = periodElement.GetInt32();
+                    }
+
+                    if (status.TryGetProperty("displayClock", out var clockElement))
+                    {
+                        game.TimeRemaining = clockElement.GetString();
+                    }
                 }
 
-                // Parse competitions
                 if (eventElement.TryGetProperty("competitions", out var competitions))
                 {
                     var competition = competitions.EnumerateArray().FirstOrDefault();
                     if (competition.ValueKind != JsonValueKind.Undefined)
                     {
-                        // Parse date from competition if not found above
                         if (game.Date == default && competition.TryGetProperty("date", out var compDate))
                         {
                             if (compDate.ValueKind == JsonValueKind.String)
                             {
-                                game.Date = DateTime.Parse(compDate.GetString() ?? "");
+                                var dateString = compDate.GetString() ?? "";
+                                if (DateTime.TryParse(dateString, null, System.Globalization.DateTimeStyles.RoundtripKind, out var parsedDate))
+                                {
+                                    game.Date = parsedDate.Kind == DateTimeKind.Utc
+                                        ? parsedDate.ToLocalTime()
+                                        : parsedDate;
+                                }
+                                else
+                                {
+                                    game.Date = DateTime.Parse(dateString);
+                                }
                             }
                         }
 
@@ -583,16 +645,21 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                                         game.HomeTeamId = teamId;
                                         game.HomeTeamName = teamName;
                                         game.HomeTeamAbbreviation = teamAbbr;
+                                        _logger.LogDebug(
+                                            "HOME: {Abbr} (ESPN ID: {EspnId})",
+                                            teamAbbr, teamId);
                                     }
                                     else
                                     {
                                         game.AwayTeamId = teamId;
                                         game.AwayTeamName = teamName;
                                         game.AwayTeamAbbreviation = teamAbbr;
+                                        _logger.LogDebug(
+                                            "AWAY: {Abbr} (ESPN ID: {EspnId})",
+                                            teamAbbr, teamId);
                                     }
                                 }
 
-                                // Parse score
                                 if (competitor.TryGetProperty("score", out var scoreElement))
                                 {
                                     if (scoreElement.ValueKind == JsonValueKind.String)
@@ -619,7 +686,23 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                     }
                 }
 
-                // Validar se temos dados mínimos
+                if (eventElement.TryGetProperty("season", out var seasonElement))
+                {
+                    if (seasonElement.TryGetProperty("year", out var yearElement))
+                    {
+                        game.Season = yearElement.GetInt32();
+                    }
+                }
+
+                if (eventElement.TryGetProperty("season", out var seasonInfo))
+                {
+                    if (seasonInfo.TryGetProperty("type", out var seasonType))
+                    {
+                        var typeValue = seasonType.GetInt32();
+                        game.IsPostseason = typeValue == 3;
+                    }
+                }
+
                 if (string.IsNullOrEmpty(game.HomeTeamId) || string.IsNullOrEmpty(game.AwayTeamId))
                 {
                     _logger.LogDebug("Game event missing team data, skipping");
@@ -636,5 +719,18 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// Extension methods para JsonElement
+    /// </summary>
+    internal static class JsonElementExtensions
+    {
+        public static string GetPropertySafe(this JsonElement element, string propertyName)
+        {
+            return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+                ? property.GetString() ?? ""
+                : "";
+        }
     }
 }

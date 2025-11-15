@@ -37,7 +37,6 @@ namespace HoopGameNight.Api.Controllers
                 Logger.LogDebug("Completed {Operation} in {ElapsedMs}ms - RequestId: {RequestId}",
                     operationName, _stopwatch.ElapsedMilliseconds, requestId);
 
-                // Adicionar headers de resposta úteis
                 if (!Response.Headers.ContainsKey("X-Request-ID"))
                 {
                     Response.Headers.Add("X-Request-ID", requestId);
@@ -51,8 +50,6 @@ namespace HoopGameNight.Api.Controllers
                 Logger.LogError(ex,
                     "Error in {Operation} after {ElapsedMs}ms - RequestId: {RequestId}",
                     operationName, _stopwatch.ElapsedMilliseconds, requestId);
-
-                // Re-throw para deixar o middleware de erro global tratar
                 throw;
             }
             finally
@@ -104,7 +101,6 @@ namespace HoopGameNight.Api.Controllers
             var response = PaginatedResponse<T>.Create(data.ToList(), page, pageSize, totalRecords, message);
             response.RequestId = HttpContext.TraceIdentifier;
 
-            // Headers úteis para paginação
             Response.Headers.Add("X-Total-Count", totalRecords.ToString());
             Response.Headers.Add("X-Page", page.ToString());
             Response.Headers.Add("X-Page-Size", pageSize.ToString());

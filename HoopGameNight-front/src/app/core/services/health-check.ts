@@ -60,32 +60,53 @@ export class HealthCheck {
 
   private performHealthCheck() {
     console.log('Fazendo requisição para:', this.healthUrl);
-    
+
     this._status.set(ApiStatus.LOADING);
     this._lastCheck.set(new Date());
 
     return this.http.get<HealthCheckResponse>(this.healthUrl)
       .pipe(
-        timeout(10000), 
+        timeout(120000), // 2 minutos para dar tempo das APIs externas responderem
         map((response: HealthCheckResponse) => {
           console.log('✅ Resposta da API recebida:', response);
-          this._status.set(ApiStatus.ONLINE);
+
+          // Mapear status do health check para ApiStatus
+          const apiStatus = this.mapHealthStatus(response.status);
+          this._status.set(apiStatus);
           this._healthData.set(response);
-          this._errorMessage.set(null); 
+          this._errorMessage.set(null);
+
+          // Log detalhado
+          console.log(`Status: ${response.status} (${response.summary.healthy}/${response.summary.total} checks healthy)`);
+
           return response;
         }),
         catchError((error: HttpErrorResponse) => {
           console.error('Erro na requisição:', error);
-          
+
           this._status.set(ApiStatus.OFFLINE);
           this._healthData.set(null);
-          
+
           const errorMessage = this.getErrorMessage(error);
           this._errorMessage.set(errorMessage);
-          
+
           return EMPTY;
         })
       );
+  }
+
+  private mapHealthStatus(status: string): ApiStatus {
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'healthy':
+        return ApiStatus.ONLINE;
+      case 'degraded':
+        return ApiStatus.ERROR;
+      case 'unhealthy':
+        return ApiStatus.OFFLINE;
+      default:
+        return ApiStatus.ERROR;
+    }
   }
 
   private getErrorMessage(error: any): string {
@@ -159,5 +180,32 @@ export class HealthCheck {
     }
 
     return lastCheck.toLocaleTimeString('pt-BR');
+  }
+
+  // Métodos auxiliares para acessar dados do health check
+  getHealthSummary() {
+    return this._healthData()?.summary;
+  }
+
+  getHealthChecks() {
+    return this._healthData()?.checks || [];
+  }
+
+  getHealthDuration() {
+    return this._healthData()?.duration;
+  }
+
+  isDatabaseHealthy(): boolean {
+    const dbCheck = this.getHealthChecks().find(check =>
+      check.tags.includes('database')
+    );
+    return dbCheck?.status.toLowerCase() === 'healthy';
+  }
+
+  areExternalApisHealthy(): boolean {
+    const apiChecks = this.getHealthChecks().filter(check =>
+      check.tags.includes('external')
+    );
+    return apiChecks.every(check => check.status.toLowerCase() === 'healthy');
   }
 }

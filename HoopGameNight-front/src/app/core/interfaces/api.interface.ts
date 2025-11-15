@@ -1,10 +1,26 @@
 export interface HealthCheckResponse {
-  status: 'healthy' | 'unhealthy';
-  uptime: number;
+  status: string; 
   timestamp: string;
-  version?: string;
-  environment?: string;
-  server?: string;
+  duration: number;
+  checks: HealthCheckItem[];
+  summary: HealthCheckSummary;
+}
+
+export interface HealthCheckItem {
+  name: string;
+  status: string; 
+  description: string | null;
+  duration: number;
+  tags: string[];
+  data?: Record<string, any>;
+  error?: string | null;
+}
+
+export interface HealthCheckSummary {
+  healthy: number;
+  degraded: number;
+  unhealthy: number;
+  total: number;
 }
 
 export enum ApiStatus {
@@ -60,6 +76,7 @@ export interface TeamSummaryResponse {
   name: string;
   abbreviation: string;
   city: string;
+  displayName: string;
   logoUrl?: string;
 }
 

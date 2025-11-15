@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 
 import { HealthCheck } from '../../core/services/health-check';
@@ -9,7 +9,8 @@ import { StatusIndicator } from '../../shared/components/status-indicator/status
   standalone: true,
   imports: [CommonModule, DatePipe, StatusIndicator],
   templateUrl: './api-status.html',
-  styleUrls: ['./api-status.scss']
+  styleUrls: ['./api-status.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ApiStatus implements OnInit, OnDestroy {
   constructor(protected readonly healthCheck: HealthCheck) {}
@@ -26,17 +27,27 @@ export class ApiStatus implements OnInit, OnDestroy {
     this.healthCheck.checkHealth();
   }
 
-  getUptimeFormatted(): string {
-    const data = this.healthCheck.healthData();
-    if (!data?.uptime) return '0s';
-    
-    const uptime = data.uptime;
-    const days = Math.floor(uptime / 86400);
-    const hours = Math.floor((uptime % 86400) / 3600);
-    const minutes = Math.floor((uptime % 3600) / 60);
-    
-    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+  getHealthDuration(): string {
+    const duration = this.healthCheck.getHealthDuration();
+    if (!duration) return 'N/A';
+
+    // A duração está em milissegundos
+    if (duration < 1000) {
+      return `${Math.round(duration)}ms`;
+    }
+
+    const seconds = duration / 1000;
+    if (seconds < 60) {
+      return `${seconds.toFixed(2)}s`;
+    }
+
+    return `${(seconds / 60).toFixed(2)}min`;
+  }
+
+  getHealthCheckCount(): string {
+    const summary = this.healthCheck.getHealthSummary();
+    if (!summary) return 'N/A';
+
+    return `${summary.healthy}/${summary.total}`;
   }
 }

@@ -22,15 +22,12 @@ namespace HoopGameNight.Api.Middleware
             var clientId = GetClientId(context);
             var now = DateTime.UtcNow;
 
-            // Get or create request list for this client
             var requestTimes = _requests.GetOrAdd(clientId, _ => new List<DateTime>());
 
             lock (requestTimes)
             {
-                // Remove old requests outside the time window
                 requestTimes.RemoveAll(time => now - time > _timeWindow);
 
-                // Check if limit exceeded
                 if (requestTimes.Count >= _requestLimit)
                 {
                     _logger.LogWarning("Rate limit exceeded for client {ClientId}", clientId);
@@ -39,11 +36,9 @@ namespace HoopGameNight.Api.Middleware
                     return;
                 }
 
-                // Add current request
                 requestTimes.Add(now);
             }
 
-            // Add rate limit headers
             context.Response.Headers.Add("X-RateLimit-Limit", _requestLimit.ToString());
             context.Response.Headers.Add("X-RateLimit-Remaining", (_requestLimit - requestTimes.Count).ToString());
             context.Response.Headers.Add("X-RateLimit-Reset", DateTimeOffset.UtcNow.Add(_timeWindow).ToUnixTimeSeconds().ToString());
@@ -53,7 +48,6 @@ namespace HoopGameNight.Api.Middleware
 
         private string GetClientId(HttpContext context)
         {
-            // Try to get real IP from headers (for load balancers)
             var realIp = context.Request.Headers["X-Real-IP"].FirstOrDefault() ??
                         context.Request.Headers["X-Forwarded-For"].FirstOrDefault() ??
                         context.Connection.RemoteIpAddress?.ToString() ??

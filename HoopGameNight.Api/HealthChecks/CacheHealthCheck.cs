@@ -1,4 +1,4 @@
-﻿using HoopGameNight.Infrastructure.Services;
+﻿using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace HoopGameNight.Api.HealthChecks

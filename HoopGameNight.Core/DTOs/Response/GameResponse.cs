@@ -21,7 +21,7 @@
         public bool IsCompleted { get; set; }
         public TeamSummaryResponse? WinningTeam { get; set; }
         public bool IsFutureGame { get; set; }
-        public string DataSource { get; set; } = "Database";
+        public string DataSource { get; set; } = "ESPN"; 
         public FutureGameInfo? FutureGameInfo { get; set; }
     }
 

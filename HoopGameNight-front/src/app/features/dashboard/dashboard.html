@@ -28,7 +28,15 @@
     <!-- Today's Games Section -->
     <section class="games-section">
       <div class="section-header">
-        <h2 class="section-title">Jogos de Hoje</h2>
+        <h2 class="section-title">
+          @if (selectedDateOption === 'today') {
+            Jogos de Hoje
+          } @else if (selectedDateOption === 'yesterday') {
+            Jogos de Ontem
+          } @else {
+            Jogos de Amanhã
+          }
+        </h2>
         <div class="section-actions">
           @if (hasLiveGames()) {
             <span class="live-games-badge">
@@ -36,10 +44,10 @@
               {{ getLiveGamesCount() }} ao vivo
             </span>
           }
-          <select class="date-selector">
-            <option>Hoje</option>
-            <option>Ontem</option>
-            <option>Amanhã</option>
+          <select class="date-selector" (change)="onDateChange($event)" [value]="selectedDateOption">
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="tomorrow">Amanhã</option>
           </select>
         </div>
       </div>
@@ -48,7 +56,15 @@
         @if (gamesService.isLoading()) {
           <div class="games-loading">
             <div class="loading-spinner"></div>
-            <p>Carregando jogos de hoje...</p>
+            <p>
+              @if (selectedDateOption === 'today') {
+                Carregando jogos de hoje...
+              } @else if (selectedDateOption === 'yesterday') {
+                Carregando jogos de ontem...
+              } @else {
+                Carregando jogos de amanhã...
+              }
+            </p>
           </div>
         } @else if (gamesService.error()) {
           <div class="games-error">
@@ -63,43 +79,83 @@
         } @else if (getTodayGamesCount() === 0) {
           <div class="games-placeholder">
             <div class="games-placeholder__icon">🏀</div>
-            <h3>Nenhum jogo hoje</h3>
-            <p>Não há jogos da NBA agendados para hoje</p>
+            <h3>
+              @if (selectedDateOption === 'today') {
+                Nenhum jogo hoje
+              } @else if (selectedDateOption === 'yesterday') {
+                Nenhum jogo ontem
+              } @else {
+                Nenhum jogo amanhã
+              }
+            </h3>
+            <p>Não há jogos da NBA agendados para esta data</p>
             <button class="btn btn--primary" routerLink="/games">
               <span class="material-icons">calendar_today</span>
               Ver Outros Dias
             </button>
           </div>
         } @else {
-          <!-- ✅ MINI PREVIEW DOS JOGOS (CORRIGIDO) -->
+          <!-- ✅ TODOS OS JOGOS DO DIA (IGUAL GAMES PAGE) -->
           <div class="games-mini-list">
-            @for (game of gamesService.todayGames().slice(0, 3); track trackByGameId($index, game)) {
-              <div class="game-mini-card" [class.game-mini-card--live]="game.isLive">
-                <div class="game-mini-card__teams">
-                  <span class="team-abbr">{{ game.visitorTeam.abbreviation }}</span>
-                  <span class="vs">@</span>
-                  <span class="team-abbr">{{ game.homeTeam.abbreviation }}</span>
-                </div>
-                <div class="game-mini-card__info">
-                  @if (game.isLive) {
-                    <span class="score">{{ game.score }}</span>
-                    <span class="status live">AO VIVO</span>
-                  } @else if (game.isCompleted) {
-                    <span class="score">{{ game.score }}</span>
-                    <span class="status completed">Final</span>
-                  } @else {
-                    <span class="time">{{ formatGameTime(game.dateTime) }}</span>
-                    <span class="status scheduled">Agendado</span>
+            @for (game of getCurrentGames(); track trackByGameId($index, game)) {
+              <div class="game-mini-card"
+                   [class.game-mini-card--live]="game.isLive"
+                   [class.game-mini-card--completed]="game.isCompleted">
+
+                <!-- Time Visitante (Coluna 1) -->
+                <div class="game-mini-card__team team--clickable" (click)="navigateToTeam(game.visitorTeam.abbreviation)">
+                  <img
+                    [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
+                    [alt]="game.visitorTeam.name"
+                    class="team-logo"
+                    (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
+                    loading="lazy">
+                  <div class="team-info">
+                    <span class="team-abbr">{{ game.visitorTeam.abbreviation }}</span>
+                    <span class="team-name">{{ game.visitorTeam.displayName }}</span>
+                  </div>
+                  @if (game.isCompleted || game.isLive) {
+                    <span class="team-score" [class.winner]="game.winningTeam?.id === game.visitorTeam.id">
+                      {{ game.visitorTeamScore ?? 0 }}
+                    </span>
                   }
                 </div>
-              </div>
-            }
-            
-            @if (getTodayGamesCount() > 3) {
-              <div class="games-more">
-                <button class="btn btn--ghost" routerLink="/games">
-                  +{{ getTodayGamesCount() - 3 }} jogos
-                </button>
+
+                <!-- Separador VS (Coluna 2) -->
+                <div class="game-mini-card__vs">vs</div>
+
+                <!-- Time da Casa (Coluna 3) -->
+                <div class="game-mini-card__team team--clickable" (click)="navigateToTeam(game.homeTeam.abbreviation)">
+                  <img
+                    [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
+                    [alt]="game.homeTeam.name"
+                    class="team-logo"
+                    (error)="handleLogoError($event, game.homeTeam.abbreviation)"
+                    loading="lazy">
+                  <div class="team-info">
+                    <span class="team-abbr">{{ game.homeTeam.abbreviation }}</span>
+                    <span class="team-name">{{ game.homeTeam.displayName }}</span>
+                  </div>
+                  @if (game.isCompleted || game.isLive) {
+                    <span class="team-score" [class.winner]="game.winningTeam?.id === game.homeTeam.id">
+                      {{ game.homeTeamScore ?? 0 }}
+                    </span>
+                  }
+                </div>
+
+                <!-- Info do Jogo (Coluna 4) -->
+                <div class="game-mini-card__info">
+                  @if (game.isLive) {
+                    <span class="status status--live">
+                      <span class="live-dot"></span>
+                      LIVE
+                    </span>
+                  } @else if (game.isCompleted) {
+                    <span class="status status--completed">Final</span>
+                  } @else {
+                    <span class="time">{{ formatGameTime(game.dateTime) }}</span>
+                  }
+                </div>
               </div>
             }
           </div>

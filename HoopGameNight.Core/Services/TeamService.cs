@@ -1,10 +1,11 @@
 ﻿using AutoMapper;
+using HoopGameNight.Core.Configuration;
 using HoopGameNight.Core.Constants;
 using HoopGameNight.Core.DTOs.Response;
+using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Exceptions;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Core.Services
@@ -12,22 +13,22 @@ namespace HoopGameNight.Core.Services
     public class TeamService : ITeamService
     {
         private readonly ITeamRepository _teamRepository;
-        private readonly IBallDontLieService _ballDontLieService;
+        private readonly IEspnApiService _espnService;
         private readonly IMapper _mapper;
-        private readonly IMemoryCache _cache;
+        private readonly ICacheService _cacheService;
         private readonly ILogger<TeamService> _logger;
 
         public TeamService(
             ITeamRepository teamRepository,
-            IBallDontLieService ballDontLieService,
+            IEspnApiService espnService,
             IMapper mapper,
-            IMemoryCache cache,
+            ICacheService cacheService,
             ILogger<TeamService> logger)
         {
             _teamRepository = teamRepository;
-            _ballDontLieService = ballDontLieService;
+            _espnService = espnService;
             _mapper = mapper;
-            _cache = cache;
+            _cacheService = cacheService;
             _logger = logger;
         }
 
@@ -37,23 +38,34 @@ namespace HoopGameNight.Core.Services
             {
                 _logger.LogInformation("Buscando todos os times");
 
-                // Verifica se existe no cache
-                if (_cache.TryGetValue(CacheKeys.ALL_TEAMS, out List<TeamResponse> cachedTeams))
+                var cachedTeams = await _cacheService.GetAsync<List<TeamResponse>>(CacheKeys.ALL_TEAMS);
+                if (cachedTeams != null && cachedTeams.Count >= 30)
                 {
                     _logger.LogInformation("Retornando {TeamCount} times do cache", cachedTeams.Count);
                     return cachedTeams;
                 }
 
-                // Se não está no cache, busca do repositório
                 var teams = await _teamRepository.GetAllAsync();
+
+                if (!teams.Any() || teams.Count() < 30)
+                {
+                    _logger.LogWarning("Banco com {Count} times (esperado: 30). Sincronizando automaticamente...", teams.Count());
+
+                    try
+                    {
+                        await SyncAllTeamsAsync();
+                        teams = await _teamRepository.GetAllAsync();
+                        _logger.LogInformation("Auto-sync concluído. {Count} times agora no banco", teams.Count());
+                    }
+                    catch (Exception syncEx)
+                    {
+                        _logger.LogError(syncEx, "Falha no auto-sync de times");
+                    }
+                }
+
                 var response = _mapper.Map<List<TeamResponse>>(teams);
 
-                // Armazena no cache com expiração
-                var cacheOptions = new MemoryCacheEntryOptions()
-                    .SetSlidingExpiration(TimeSpan.FromMinutes(30)) // Expira após 30 minutos sem uso
-                    .SetAbsoluteExpiration(TimeSpan.FromHours(2));  // Expira após 2 horas independentemente
-
-                _cache.Set(CacheKeys.ALL_TEAMS, response, cacheOptions);
+                await _cacheService.SetAsync(CacheKeys.ALL_TEAMS, response, CacheDurations.AllTeams);
 
                 _logger.LogInformation("Recuperados {TeamCount} times do banco de dados e armazenados em cache", response.Count);
                 return response;
@@ -71,17 +83,15 @@ namespace HoopGameNight.Core.Services
             {
                 _logger.LogInformation("Buscando time por ID: {TeamId}", id);
 
-                // Cache key específico para cada time
-                var cacheKey = CacheKeys.GetTeamById(id);
+                var cacheKey = CacheKeys.TeamById(id);
 
-                // Verifica se existe no cache
-                if (_cache.TryGetValue(cacheKey, out TeamResponse cachedTeam))
+                var cachedTeam = await _cacheService.GetAsync<TeamResponse>(cacheKey);
+                if (cachedTeam != null)
                 {
                     _logger.LogInformation("Retornando time {TeamId} do cache", id);
                     return cachedTeam;
                 }
 
-                // Se não está no cache, busca do repositório
                 var team = await _teamRepository.GetByIdAsync(id);
                 if (team == null)
                 {
@@ -91,11 +101,7 @@ namespace HoopGameNight.Core.Services
 
                 var response = _mapper.Map<TeamResponse>(team);
 
-                // Armazena no cache
-                var cacheOptions = new MemoryCacheEntryOptions()
-                    .SetSlidingExpiration(TimeSpan.FromMinutes(30));
-
-                _cache.Set(cacheKey, response, cacheOptions);
+                await _cacheService.SetAsync(cacheKey, response, CacheDurations.SingleTeam);
 
                 _logger.LogInformation("Time recuperado: {TeamName} e armazenado em cache", response.DisplayName);
                 return response;
@@ -135,39 +141,121 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                _logger.LogInformation("Iniciando sincronização de todos os times");
+                _logger.LogInformation("Iniciando sincronização de todos os times via ESPN API");
 
-                var externalTeams = await _ballDontLieService.GetAllTeamsAsync();
-                var entities = _mapper.Map<List<Models.Entities.Team>>(externalTeams);
+                var espnTeams = await _espnService.GetAllTeamsAsync();
+
+                if (espnTeams == null || !espnTeams.Any())
+                {
+                    _logger.LogWarning("Nenhum time retornado pela ESPN API");
+                    return;
+                }
+
+                _logger.LogInformation("ESPN retornou {Count} times", espnTeams.Count);
 
                 var syncCount = 0;
-                foreach (var team in entities)
-                {
-                    // Verificar por external_id E por abbreviation para evitar duplicatas
-                    var existsByExternalId = await _teamRepository.ExistsAsync(team.ExternalId);
-                    var existsByAbbreviation = await _teamRepository.GetByAbbreviationAsync(team.Abbreviation);
+                var updateCount = 0;
 
-                    if (!existsByExternalId && existsByAbbreviation == null)
+                foreach (var espnTeam in espnTeams)
+                {
+                    try
                     {
-                        await _teamRepository.InsertAsync(team);
-                        syncCount++;
+                        if (string.IsNullOrEmpty(espnTeam.Id) ||
+                            string.IsNullOrEmpty(espnTeam.Abbreviation) ||
+                            string.IsNullOrEmpty(espnTeam.Name))
+                        {
+                            _logger.LogWarning("Time da ESPN com dados incompletos, ignorando: {DisplayName}", espnTeam.DisplayName);
+                            continue;
+                        }
+
+                        var existingTeam = await _teamRepository.GetByAbbreviationAsync(espnTeam.Abbreviation);
+
+                        if (existingTeam == null)
+                        {
+                            var newTeam = MapEspnTeamToEntity(espnTeam);
+                            await _teamRepository.InsertAsync(newTeam);
+                            syncCount++;
+                            _logger.LogInformation("✅ Time inserido: {Abbreviation} - {DisplayName}", espnTeam.Abbreviation, espnTeam.DisplayName);
+                        }
+                        else
+                        {
+                            existingTeam.Name = espnTeam.Name;
+                            existingTeam.FullName = espnTeam.DisplayName;
+                            existingTeam.City = espnTeam.Location;
+                            existingTeam.EspnId = espnTeam.Id;
+                            existingTeam.Conference = DetermineConference(espnTeam);
+                            existingTeam.Division = DetermineDivision(espnTeam);
+
+                            await _teamRepository.UpdateAsync(existingTeam);
+                            updateCount++;
+                            _logger.LogDebug("🔄 Time atualizado: {Abbreviation}", espnTeam.Abbreviation);
+                        }
                     }
-                    else if (existsByAbbreviation != null)
+                    catch (Exception ex)
                     {
-                        _logger.LogDebug("Time já existe com abreviação {Abbreviation}, pulando inserção", team.Abbreviation);
+                        _logger.LogError(ex, "Erro ao processar time: {DisplayName}", espnTeam.DisplayName);
                     }
                 }
 
-                // Clear all team-related cache entries
-                _cache.Remove(CacheKeys.ALL_TEAMS);
+                await _cacheService.RemoveAsync(CacheKeys.ALL_TEAMS);
 
-                _logger.LogInformation("Sincronizados {SyncCount} novos times e cache limpo", syncCount);
+                _logger.LogInformation("✅ Sincronização concluída: {New} novos, {Updated} atualizados", syncCount, updateCount);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao sincronizar times");
-                throw new ExternalApiException("Ball Don't Lie", "Falha ao sincronizar times da API externa", null);
+                _logger.LogError(ex, "Erro ao sincronizar times da ESPN");
+                throw new ExternalApiException("ESPN API", "Falha ao sincronizar times da API externa", null);
             }
+        }
+
+        private Models.Entities.Team MapEspnTeamToEntity(DTOs.External.ESPN.EspnTeamDto espnTeam)
+        {
+            var externalId = int.TryParse(espnTeam.Id, out var id) ? id : 0;
+
+            return new Models.Entities.Team
+            {
+                ExternalId = externalId,
+                EspnId = espnTeam.Id,
+                Name = espnTeam.Name,
+                FullName = espnTeam.DisplayName,
+                Abbreviation = espnTeam.Abbreviation,
+                City = espnTeam.Location,
+                Conference = DetermineConference(espnTeam),
+                Division = DetermineDivision(espnTeam),
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+        }
+
+        private Conference DetermineConference(DTOs.External.ESPN.EspnTeamDto espnTeam)
+        {
+            // Mapear baseado no nome ou slug do time
+            // Times do Leste
+            var eastTeams = new[] { "BOS", "BKN", "NY", "PHI", "TOR", "CHI", "CLE", "DET", "IND", "MIL", "ATL", "CHA", "MIA", "ORL", "WSH" };
+
+            return eastTeams.Contains(espnTeam.Abbreviation) ? Conference.East : Conference.West;
+        }
+
+        private string DetermineDivision(DTOs.External.ESPN.EspnTeamDto espnTeam)
+        {
+            // Mapear divisões baseado no time
+            var divisions = new Dictionary<string, string>
+            {
+                // Atlantic
+                { "BOS", "Atlantic" }, { "BKN", "Atlantic" }, { "NY", "Atlantic" }, { "PHI", "Atlantic" }, { "TOR", "Atlantic" },
+                // Central
+                { "CHI", "Central" }, { "CLE", "Central" }, { "DET", "Central" }, { "IND", "Central" }, { "MIL", "Central" },
+                // Southeast
+                { "ATL", "Southeast" }, { "CHA", "Southeast" }, { "MIA", "Southeast" }, { "ORL", "Southeast" }, { "WSH", "Southeast" },
+                // Northwest
+                { "DEN", "Northwest" }, { "MIN", "Northwest" }, { "OKC", "Northwest" }, { "POR", "Northwest" }, { "UTAH", "Northwest" },
+                // Pacific
+                { "GS", "Pacific" }, { "LAC", "Pacific" }, { "LAL", "Pacific" }, { "PHX", "Pacific" }, { "SAC", "Pacific" },
+                // Southwest
+                { "DAL", "Southwest" }, { "HOU", "Southwest" }, { "MEM", "Southwest" }, { "NO", "Southwest" }, { "SA", "Southwest" }
+            };
+
+            return divisions.TryGetValue(espnTeam.Abbreviation, out var division) ? division : "Unknown";
         }
     }
 }

@@ -1,4 +1,3 @@
-﻿using HoopGameNight.Core.DTOs.External.BallDontLie;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Models.Entities;
@@ -14,7 +13,7 @@ namespace HoopGameNight.Tests.Helpers
             return new Game
             {
                 Id = id,
-                ExternalId = id + 1000,
+                ExternalId = $"test-game-{id}",
                 Date = DateTime.Today,
                 DateTime = DateTime.Today.AddHours(20),
                 HomeTeamId = homeTeamId,
@@ -163,64 +162,6 @@ namespace HoopGameNight.Tests.Helpers
                 Weight = "200 lbs",
                 Team = CreateTeamSummary(1, "Lakers"),
                 DisplayName = $"Player{id} Test (PG)"
-            };
-        }
-
-        #endregion
-
-        #region External API DTOs
-
-        public static BallDontLieGameDto CreateBallDontLieGame(int id = 1)
-        {
-            return new BallDontLieGameDto
-            {
-                Id = id + 1000,
-                Date = DateTime.Today.ToString("yyyy-MM-dd"),
-                HomeTeam = CreateBallDontLieTeam(1, "Lakers"),
-                VisitorTeam = CreateBallDontLieTeam(2, "Warriors"),
-                HomeTeamScore = 110,
-                VisitorTeamScore = 105,
-                Status = "Final",
-                Period = 4,
-                Time = "Final",
-                Postseason = false,
-                Season = 2024
-            };
-        }
-
-        public static List<BallDontLieGameDto> CreateBallDontLieGames(int count)
-        {
-            return Enumerable.Range(1, count)
-                .Select(CreateBallDontLieGame)
-                .ToList();
-        }
-
-        public static BallDontLieTeamDto CreateBallDontLieTeam(int id = 1, string name = "Lakers")
-        {
-            return new BallDontLieTeamDto
-            {
-                Id = id + 100,
-                Name = name,
-                FullName = $"Sample {name}",
-                Abbreviation = name[..Math.Min(3, name.Length)].ToUpper(),
-                City = "Sample City",
-                Conference = "West",
-                Division = "Pacific"
-            };
-        }
-
-        public static BallDontLiePlayerDto CreateBallDontLiePlayer(int id = 1)
-        {
-            return new BallDontLiePlayerDto
-            {
-                Id = id + 1000,
-                FirstName = $"Player{id}",
-                LastName = "Test",
-                Position = "PG",
-                HeightFeet = 6,
-                HeightInches = 6,
-                WeightPounds = 200,
-                Team = CreateBallDontLieTeam(1, "Lakers")
             };
         }
 

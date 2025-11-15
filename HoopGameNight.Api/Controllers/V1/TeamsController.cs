@@ -11,17 +11,14 @@ namespace HoopGameNight.Api.Controllers.V1
     public class TeamsController : BaseApiController
     {
         private readonly ITeamService _teamService;
-        private readonly IBallDontLieService _ballDontLieService;
         private readonly IMemoryCache _cache;
 
         public TeamsController(
             ITeamService teamService,
-            IBallDontLieService ballDontLieService,
             IMemoryCache cache,
             ILogger<TeamsController> logger) : base(logger)
         {
             _teamService = teamService;
-            _ballDontLieService = ballDontLieService;
             _cache = cache;
         }
 
@@ -167,7 +164,6 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 Logger.LogInformation("Sincronização manual concluída - {TeamCount} equipes", teams.Count);
 
-                // Usa 201 Created porque está criando/atualizando recursos
                 return StatusCode(StatusCodes.Status201Created, ApiResponse<object>.SuccessResult(result, "Equipes sincronizadas com sucesso"));
             }
             catch (Exception ex)
@@ -191,24 +187,24 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 Logger.LogInformation("Buscando equipes diretamente da API externa");
 
-                var externalTeams = await _ballDontLieService.GetAllTeamsAsync();
-                var teamsList = externalTeams.Select(t => new
+                var teams = await _teamService.GetAllTeamsAsync();
+                var teamsList = teams.Select(t => new
                 {
                     id = t.Id,
                     name = t.Name,
-                    fullName = t.FullName,
+                    fullName = t.DisplayName,
                     abbreviation = t.Abbreviation,
                     city = t.City,
                     conference = t.Conference,
                     division = t.Division
                 }).ToList<object>();
 
-                Logger.LogInformation("{TeamCount} equipes recuperadas da API externa", teamsList.Count);
-                return Ok(teamsList, "Equipes de API externa");
+                Logger.LogInformation("{TeamCount} equipes recuperadas", teamsList.Count);
+                return Ok(teamsList, "Equipes recuperadas do banco de dados");
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Erro ao buscar equipes da API externa");
+                Logger.LogError(ex, "Erro ao buscar equipes");
                 throw;
             }
         }
@@ -224,13 +220,14 @@ namespace HoopGameNight.Api.Controllers.V1
             try
             {
                 var localTeamsCount = (await _teamService.GetAllTeamsAsync()).Count;
-                var externalTeamsCount = (await _ballDontLieService.GetAllTeamsAsync()).Count();
+
+                var expectedTeamsCount = 30; 
 
                 var status = (object)new
                 {
                     localTeams = localTeamsCount,
-                    externalTeams = externalTeamsCount,
-                    needsSync = localTeamsCount != externalTeamsCount,
+                    expectedTeams = expectedTeamsCount,
+                    needsSync = localTeamsCount != expectedTeamsCount,
                     lastCheck = DateTime.UtcNow,
                     recommendation = localTeamsCount < 30 ?
                         "Sincronização inicial necessária - menos de 30 equipes encontradas" :

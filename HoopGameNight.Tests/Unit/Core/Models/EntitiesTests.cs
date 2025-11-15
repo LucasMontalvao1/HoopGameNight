@@ -239,14 +239,14 @@ namespace HoopGameNight.Tests.Unit.Core.Models
         }
 
         [Theory(DisplayName = "IsValid deve validar corretamente as propriedades do jogo")]
-        [InlineData(1, 1, 2, 2020, true, "jogo válido")]
-        [InlineData(1, 1, 1, 2020, false, "times iguais")]
-        [InlineData(0, 1, 2, 2020, false, "ID externo inválido")]
-        [InlineData(1, 0, 2, 2020, false, "ID time casa inválido")]
-        [InlineData(1, 1, 0, 2020, false, "ID time visitante inválido")]
-        [InlineData(1, 1, 2, 1999, false, "temporada inválida")]
+        [InlineData("valid-id", 1, 2, 2020, true, "jogo válido")]
+        [InlineData("valid-id", 1, 1, 2020, false, "times iguais")]
+        [InlineData("", 1, 2, 2020, false, "ID externo inválido")]
+        [InlineData("valid-id", 0, 2, 2020, false, "ID time casa inválido")]
+        [InlineData("valid-id", 1, 0, 2020, false, "ID time visitante inválido")]
+        [InlineData("valid-id", 1, 2, 1999, false, "temporada inválida")]
         public void DeveValidarCorretamente_PropriedadesDoJogo(
-            int idExterno, int idCasa, int idVisitante, int temporada, bool esperadoValido, string cenario)
+            string idExterno, int idCasa, int idVisitante, int temporada, bool esperadoValido, string cenario)
         {
             // Arrange
             var jogo = TestDataBuilder.CreateGame();

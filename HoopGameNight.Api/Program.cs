@@ -34,11 +34,6 @@ try
     var connectionString = $"Server={dbServer};Port={dbPort};Database={dbName};Uid={dbUser};Pwd={dbPassword};CharSet=utf8mb4;AllowUserVariables=true;";
     builder.Configuration.GetSection("ConnectionStrings")["MySqlConnection"] = connectionString;
 
-    // Configurar API Key do Ball Don't Lie
-    var ballDontLieApiKey = Environment.GetEnvironmentVariable("BALLDONTLIE_API_KEY");
-    builder.Configuration.GetSection("ExternalApis:BallDontLie")["ApiKey"] = ballDontLieApiKey;
-    builder.Configuration.GetSection("Sync")["ApiKey"] = ballDontLieApiKey;
-
     // Configurar Serilog do appsettings.json
     builder.Host.UseSerilog((context, configuration) =>
         configuration.ReadFrom.Configuration(context.Configuration));
@@ -54,7 +49,7 @@ try
     await app.ConfigureHoopGameNightPipeline();
 
     // ===== EXECUTAR =====
-    Log.Information("🚀 Hoop Game Night API rodando em: {Urls}", string.Join(", ", app.Urls));
+    Log.Information("Hoop Game Night API rodando em: {Urls}", string.Join(", ", app.Urls));
     await app.RunAsync();
 
     return 0;

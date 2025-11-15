@@ -9,7 +9,10 @@ namespace HoopGameNight.Api.Services
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<DataSyncBackgroundService> _logger;
-        private readonly TimeSpan _syncInterval = TimeSpan.FromHours(1); 
+        private readonly TimeSpan _liveGamesSyncInterval = TimeSpan.FromMinutes(2);   // Com jogos ao vivo
+        private readonly TimeSpan _normalSyncInterval = TimeSpan.FromMinutes(15);     // Normal 
+        private readonly TimeSpan _offseasonSyncInterval = TimeSpan.FromHours(1);     // Off-season
+        private int _syncCounter = 0;
 
         public DataSyncBackgroundService(
             IServiceProvider serviceProvider,
@@ -23,18 +26,24 @@ namespace HoopGameNight.Api.Services
         {
             _logger.LogInformation("Data Sync Background Service started");
 
-            // Wait 30 seconds after startup before first sync
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
-            // Perform initial sync
-            await PerformSyncAsync("Initial");
+            var hasLiveGames = await PerformSyncAsync("Initial");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(_syncInterval, stoppingToken);
-                    await PerformSyncAsync("Scheduled");
+                    _syncCounter++;
+
+                    var interval = hasLiveGames ? _liveGamesSyncInterval : _normalSyncInterval;
+
+                    _logger.LogDebug(
+                        "Next sync in {Interval} | Live games: {HasLive} | Counter: {Counter}",
+                        interval, hasLiveGames, _syncCounter);
+
+                    await Task.Delay(interval, stoppingToken);
+                    hasLiveGames = await PerformSyncAsync("Scheduled");
                 }
                 catch (OperationCanceledException)
                 {
@@ -44,11 +53,13 @@ namespace HoopGameNight.Api.Services
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error in Data Sync Background Service");
+                    // Aguardar 5 minutos antes de tentar novamente após erro
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
                 }
             }
         }
 
-        private async Task PerformSyncAsync(string syncType)
+        private async Task<bool> PerformSyncAsync(string syncType)
         {
             try
             {
@@ -57,25 +68,44 @@ namespace HoopGameNight.Api.Services
                 var teamService = scope.ServiceProvider.GetRequiredService<ITeamService>();
                 var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
 
-                _logger.LogInformation("Starting {SyncType} data synchronization", syncType);
+                _logger.LogInformation("Starting {SyncType} data synchronization (#{Counter})",
+                    syncType, _syncCounter);
 
-                // Check if teams need sync (only if less than 30 teams)
                 var teams = await teamService.GetAllTeamsAsync();
                 if (teams.Count < 30)
                 {
-                    _logger.LogInformation("Syncing teams ({Count} found, expected 30)", teams.Count);
+                    _logger.LogWarning("Syncing teams ({Count} found, expected 30)", teams.Count);
                     await teamService.SyncAllTeamsAsync();
                 }
 
-                // Always sync today's games
+                if (_syncCounter == 1 || _syncCounter % 12 == 0) 
+                {
+                    _logger.LogInformation("Syncing yesterday's games");
+                    await gameService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
+                }
+
                 _logger.LogInformation("Syncing today's games");
                 await gameService.SyncTodayGamesAsync();
+                if (_syncCounter == 1 || _syncCounter % 4 == 0) 
+                {
+                    _logger.LogInformation("Syncing future games (next 7 days)");
+                    await gameService.SyncFutureGamesAsync(days: 7);
+                }
 
-                _logger.LogInformation("{SyncType} data synchronization completed successfully", syncType);
+                var todayGames = await gameService.GetTodayGamesAsync();
+                var liveGames = todayGames.Count(g => g.IsLive);
+                var hasLiveGames = liveGames > 0;
+
+                _logger.LogInformation(
+                    "{SyncType} sync completed | Today: {TotalGames} jogos, Live: {LiveGames}",
+                    syncType, todayGames.Count, liveGames);
+
+                return hasLiveGames;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during {SyncType} data synchronization", syncType);
+                return false;
             }
         }
 

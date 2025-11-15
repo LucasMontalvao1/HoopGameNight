@@ -15,7 +15,6 @@ namespace HoopGameNight.Infrastructure.Data
         {
             _logger = logger;
 
-            // Tentar múltiplos caminhos para encontrar a pasta Sql
             _sqlBasePath = FindSqlBasePath();
 
             _logger.LogInformation("SqlLoader initialized with base path: {BasePath}", _sqlBasePath);
@@ -109,7 +108,6 @@ namespace HoopGameNight.Infrastructure.Data
                     _logger.LogError("SQL file not found in any of these locations: {Paths}",
                         string.Join(", ", possiblePaths));
 
-                    // Retornar SQL inline básico como fallback
                     return GetFallbackSql(category, fileName);
                 }
 
@@ -131,7 +129,6 @@ namespace HoopGameNight.Infrastructure.Data
             {
                 _logger.LogError(ex, "Error loading SQL file: {Category}/{FileName}", category, fileName);
 
-                // Retornar SQL básico como fallback
                 return GetFallbackSql(category, fileName);
             }
         }
@@ -175,7 +172,6 @@ namespace HoopGameNight.Infrastructure.Data
                     var sql = await File.ReadAllTextAsync(filePath);
                     result[fileName] = sql;
 
-                    // Cache individual files
                     var cacheKey = $"{category}:{fileName}";
                     _sqlCache[cacheKey] = sql;
                 }

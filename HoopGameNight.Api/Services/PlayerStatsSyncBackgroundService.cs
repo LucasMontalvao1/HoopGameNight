@@ -181,37 +181,9 @@ namespace HoopGameNight.Api.Services
 
         private async Task SyncPlayerStatsAsync(CancellationToken cancellationToken)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var syncService = scope.ServiceProvider.GetRequiredService<IPlayerStatsSyncService>();
-            var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
-            var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
-
-            _logger.LogInformation("Starting scheduled player stats sync");
-
-            try
-            {
-                if (_syncOptions.SyncTodayGames)
-                {
-                    await SyncTodayGamesStatsAsync(syncService, gameService, cancellationToken);
-                }
-
-                if (_syncOptions.SyncRecentGames)
-                {
-                    await SyncRecentPlayerStatsAsync(syncService, playerService, cancellationToken);
-                }
-
-                if (_syncOptions.UpdateCareerStats)
-                {
-                    await UpdateCareerStatsAsync(scope.ServiceProvider, cancellationToken);
-                }
-
-                _logger.LogInformation("Scheduled player stats sync completed successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during scheduled player stats sync");
-                throw;
-            }
+            _logger.LogWarning("Player stats sync is currently disabled - service not implemented");
+            await Task.CompletedTask;
+            return;
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken)

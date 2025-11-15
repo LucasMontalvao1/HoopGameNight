@@ -1,0 +1,176 @@
+<div class="team-details-page">
+  <div class="team-details-container">
+    <!-- Loading State -->
+    <div *ngIf="loading()" class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>Carregando informações do time...</p>
+    </div>
+
+  <!-- Error State -->
+  <div *ngIf="error() && !loading()" class="error-container">
+    <div class="error-icon">⚠️</div>
+    <h2>{{ error() }}</h2>
+    <button class="btn-back" (click)="goBack()">
+      Voltar para Times
+    </button>
+  </div>
+
+  <!-- Team Details -->
+  <div *ngIf="team() && !loading() && !error()" class="team-details-content">
+    <!-- Header -->
+    <div class="team-header">
+      <button class="btn-back-header" (click)="goBack()">
+        <span class="material-icons">arrow_back</span>
+        Voltar
+      </button>
+
+      <div class="team-hero" [style.background]="'linear-gradient(135deg, ' + getTeamColorPrimary(team()!.abbreviation) + ' 0%, ' + getTeamColorSecondary(team()!.abbreviation) + ' 100%)'">
+        <div class="team-hero-content">
+          <img
+            [src]="getTeamLogoUrl(team()!.abbreviation)"
+            [alt]="teamDisplayName() + ' logo'"
+            class="team-logo-large"
+            (error)="handleLogoError($event, team()!.abbreviation)"
+          />
+          <div class="team-hero-info">
+            <h1 class="team-name">{{ teamDisplayName() }}</h1>
+            <div class="team-meta">
+              <span class="team-conference">
+                <span class="material-icons">stars</span>
+                {{ team()!.conference === 'East' ? 'Conferência Leste' : 'Conferência Oeste' }}
+              </span>
+              <span class="team-division">
+                <span class="material-icons">group_work</span>
+                {{ team()!.division }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Team Information Cards -->
+    <div class="team-info-section">
+      <div class="info-cards">
+        <div class="info-card">
+          <span class="material-icons info-icon">location_city</span>
+          <div class="info-content">
+            <label>Cidade</label>
+            <span>{{ team()!.city }}</span>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <span class="material-icons info-icon">badge</span>
+          <div class="info-content">
+            <label>Abreviação</label>
+            <span>{{ team()!.abbreviation }}</span>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <span class="material-icons info-icon">sports_basketball</span>
+          <div class="info-content">
+            <label>Nome Completo</label>
+            <span>{{ team()!.name }}</span>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <span class="material-icons info-icon">analytics</span>
+          <div class="info-content">
+            <label>Últimos 5 Jogos</label>
+            <span class="record">{{ wins() }}V - {{ losses() }}D</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Games Section -->
+    <div class="recent-games-section">
+      <div class="section-header">
+        <h2>
+          <span class="material-icons">history</span>
+          Últimos Jogos
+        </h2>
+        <button class="btn-view-all" (click)="navigateToGames()">
+          Ver todos os jogos
+          <span class="material-icons">arrow_forward</span>
+        </button>
+      </div>
+
+      <div *ngIf="recentGames().length === 0" class="no-games">
+        <span class="material-icons">event_busy</span>
+        <p>Nenhum jogo encontrado nos últimos 30 dias</p>
+      </div>
+
+      <div *ngIf="recentGames().length > 0" class="games-list">
+        <div
+          *ngFor="let game of recentGames(); trackBy: trackByGameId"
+          class="game-card"
+          [class.game-win]="getGameResult(game) === 'win'"
+          [class.game-loss]="getGameResult(game) === 'loss'"
+          [class.game-scheduled]="getGameResult(game) === 'scheduled'"
+        >
+          <div class="game-date">
+            {{ formatDate(game.date) }}
+          </div>
+
+          <div class="game-matchup">
+            <div class="game-teams">
+              <!-- Visitor Team -->
+              <div class="team-info" [class.current-team]="game.visitorTeam.id === team()!.id">
+                <img
+                  *ngIf="game.visitorTeam"
+                  [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
+                  [alt]="game.visitorTeam.name"
+                  class="team-logo-small"
+                  (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
+                />
+                <span class="team-abbr">{{ game.visitorTeam.abbreviation || 'TBD' }}</span>
+                <span class="team-score" *ngIf="game.isCompleted || game.isLive">
+                  {{ game.visitorTeamScore ?? 0 }}
+                </span>
+              </div>
+
+              <div class="game-vs">
+                <span class="material-icons">{{ getGameLocation(game) === 'home' ? 'home' : 'flight_takeoff' }}</span>
+              </div>
+
+              <!-- Home Team -->
+              <div class="team-info" [class.current-team]="game.homeTeam.id === team()!.id">
+                <span class="team-score" *ngIf="game.isCompleted || game.isLive">
+                  {{ game.homeTeamScore ?? 0 }}
+                </span>
+                <span class="team-abbr">{{ game.homeTeam.abbreviation || 'TBD' }}</span>
+                <img
+                  *ngIf="game.homeTeam"
+                  [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
+                  [alt]="game.homeTeam.name"
+                  class="team-logo-small"
+                  (error)="handleLogoError($event, game.homeTeam.abbreviation)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="game-result">
+            <span
+              class="result-badge"
+              [class.win]="getGameResult(game) === 'win'"
+              [class.loss]="getGameResult(game) === 'loss'"
+              [class.scheduled]="getGameResult(game) === 'scheduled'"
+            >
+              {{
+                getGameResult(game) === 'win' ? 'V' :
+                getGameResult(game) === 'loss' ? 'D' :
+                'Agendado'
+              }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>

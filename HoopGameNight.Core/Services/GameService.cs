@@ -1,13 +1,14 @@
 ﻿using AutoMapper;
+using HoopGameNight.Core.Configuration;
+using HoopGameNight.Core.Constants;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
-using HoopGameNight.Core.DTOs.External; // Adicionar esta using
+using HoopGameNight.Core.DTOs.External;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Exceptions;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Core.Models.Entities;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Core.Services
@@ -16,122 +17,108 @@ namespace HoopGameNight.Core.Services
     {
         private readonly IGameRepository _gameRepository;
         private readonly ITeamRepository _teamRepository;
-        private readonly IBallDontLieService _ballDontLieService;
         private readonly IEspnApiService _espnService;
         private readonly IMapper _mapper;
-        private readonly IMemoryCache _cache;
+        private readonly ICacheService _cacheService;
         private readonly ILogger<GameService> _logger;
-
-        // Mapeamento de IDs de times (Sistema -> ESPN)
-        private readonly Dictionary<int, string> _systemToEspnTeamMapping = new()
-        {
-            { 1, "1" },   // Hawks
-            { 2, "2" },   // Celtics
-            { 3, "17" },  // Nets
-            { 4, "3" },   // Hornets
-            { 5, "5" },   // Bulls
-            { 6, "6" },   // Cavaliers
-            { 7, "7" },   // Mavericks
-            { 8, "8" },   // Nuggets
-            { 9, "9" },   // Pistons
-            { 10, "10" }, // Warriors
-            { 11, "11" }, // Rockets
-            { 12, "12" }, // Pacers
-            { 13, "13" }, // Clippers
-            { 14, "14" }, // Lakers
-            { 15, "15" }, // Grizzlies
-            { 16, "16" }, // Heat
-            { 17, "18" }, // Bucks
-            { 18, "19" }, // Timberwolves
-            { 19, "20" }, // Pelicans
-            { 20, "21" }, // Knicks
-            { 21, "22" }, // Thunder
-            { 22, "23" }, // Magic
-            { 23, "24" }, // 76ers
-            { 24, "25" }, // Suns
-            { 25, "26" }, // Trail Blazers
-            { 26, "27" }, // Kings
-            { 27, "28" }, // Spurs
-            { 28, "29" }, // Raptors
-            { 29, "30" }, // Jazz
-            { 30, "4" }   // Wizards
-        };
-
-        // Mapeamento reverso (ESPN -> Sistema)
-        private readonly Dictionary<string, int> _espnToSystemTeamMapping;
 
         public GameService(
             IGameRepository gameRepository,
             ITeamRepository teamRepository,
-            IBallDontLieService ballDontLieService,
             IEspnApiService espnService,
             IMapper mapper,
-            IMemoryCache cache,
+            ICacheService cacheService,
             ILogger<GameService> logger)
         {
             _gameRepository = gameRepository;
             _teamRepository = teamRepository;
-            _ballDontLieService = ballDontLieService;
             _espnService = espnService;
             _mapper = mapper;
-            _cache = cache;
+            _cacheService = cacheService;
             _logger = logger;
-
-            // Criar mapeamento reverso
-            _espnToSystemTeamMapping = _systemToEspnTeamMapping.ToDictionary(kvp => kvp.Value, kvp => kvp.Key);
         }
 
         #region Métodos Principais
 
         /// <summary>
-        /// Busca jogos de hoje com cache
+        /// Busca jogos de hoje com cache (Redis → Memory → Banco)
         /// </summary>
         public async Task<List<GameResponse>> GetTodayGamesAsync()
         {
-            var cacheKey = $"games_today_{DateTime.Today:yyyy-MM-dd}";
+            var cacheKey = CacheKeys.TodayGames();
 
-            if (_cache.TryGetValue<List<GameResponse>>(cacheKey, out var cachedGames))
+            // 1. Tentar cache (Redis → Memory)
+            var cachedData = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
+            if (cachedData != null)
             {
-                return cachedGames!;
+                _logger.LogInformation("CACHE HIT: Jogos de hoje ({Count} jogos)", cachedData.Count);
+                return cachedData;
             }
 
+            // 2. Buscar do banco
+            _logger.LogInformation("Buscando jogos de hoje no BANCO...");
             var games = await _gameRepository.GetTodayGamesAsync();
             var response = _mapper.Map<List<GameResponse>>(games);
 
-            _cache.Set(cacheKey, response, TimeSpan.FromMinutes(5));
+            // 3. Salvar em cache
+            await _cacheService.SetAsync(cacheKey, response, CacheDurations.TodayGames);
+            _logger.LogInformation("Retrieved {Count} games for today from DATABASE", response.Count);
 
-            _logger.LogInformation("Retrieved {Count} games for today", response.Count);
             return response;
         }
 
         /// <summary>
-        /// Busca jogos por data específica
+        /// Busca jogos por data específica (Redis → Banco → ESPN)
         /// </summary>
         public async Task<List<GameResponse>> GetGamesByDateAsync(DateTime date)
         {
-            var cacheKey = $"games_date_{date:yyyy-MM-dd}";
+            var cacheKey = CacheKeys.GamesByDate(date);
+            _logger.LogInformation("GET GAMES: Buscando jogos para {Date}", date.ToString("yyyy-MM-dd"));
 
-            if (_cache.TryGetValue<List<GameResponse>>(cacheKey, out var cachedGames))
+            // 1. Tentar cache (Redis → Memory)
+            var cachedData = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
+            if (cachedData != null)
             {
-                return cachedGames!;
+                _logger.LogInformation("CACHE HIT: {Date} ({Count} jogos)", date.ToString("yyyy-MM-dd"), cachedData.Count);
+                return cachedData;
             }
 
             List<GameResponse> response;
 
-            if (date > DateTime.Today)
+            // 2. SEMPRE tentar buscar do banco primeiro
+            _logger.LogInformation("Consultando BANCO para {Date}...", date.ToString("yyyy-MM-dd"));
+            var gamesFromDb = await _gameRepository.GetGamesByDateAsync(date);
+
+            if (gamesFromDb.Any())
             {
-                // Data futura - buscar da ESPN
+                // Encontrou no banco - usar esses dados
+                response = _mapper.Map<List<GameResponse>>(gamesFromDb);
+                _logger.LogInformation("BANCO: Encontrou {Count} jogos para {Date}",
+                    response.Count, date.ToString("yyyy-MM-dd"));
+
+                // Salvar em cache (TTL dinâmico baseado na data)
+                await _cacheService.SetAsync(cacheKey, response, CacheDurations.GetGameCacheDuration(date));
+            }
+            else if (date > DateTime.Today)
+            {
+                // Data futura sem dados no banco - buscar da ESPN
+                _logger.LogInformation("Buscando jogos futuros da ESPN para {Date}",
+                    date.ToString("yyyy-MM-dd"));
+
                 var espnGames = await _espnService.GetGamesByDateAsync(date);
-                response = ConvertEspnGamesToResponse(espnGames);
+                response = await ConvertEspnGamesToResponseAsync(espnGames);
+                _logger.LogInformation("ESPN: {Count} jogos futuros", response.Count);
+
+                // Salvar em cache
+                await _cacheService.SetAsync(cacheKey, response, CacheDurations.FutureGames);
             }
             else
             {
-                // Data passada ou hoje - buscar do banco
-                var games = await _gameRepository.GetGamesByDateAsync(date);
-                response = _mapper.Map<List<GameResponse>>(games);
+                // Data passada sem dados (vazio)
+                response = new List<GameResponse>();
+                _logger.LogWarning("Nenhum jogo encontrado para {Date}", date.ToString("yyyy-MM-dd"));
+                await _cacheService.SetAsync(cacheKey, response, CacheDurations.Default);
             }
-
-            _cache.Set(cacheKey, response, TimeSpan.FromMinutes(15));
 
             return response;
         }
@@ -223,7 +210,6 @@ namespace HoopGameNight.Core.Services
 
                 _logger.LogInformation("Found {Count} future games from ESPN", futureGames.Count);
 
-                // Atualizar informações da API
                 response.ApiLimitations = new ApiLimitationInfo
                 {
                     HasLimitations = false,
@@ -278,10 +264,22 @@ namespace HoopGameNight.Core.Services
         #region Métodos de Conveniência
 
         /// <summary>
-        /// Busca próximos jogos de um time
+        /// Busca próximos jogos de um time (com cache Redis)
         /// </summary>
         public async Task<List<GameResponse>> GetUpcomingGamesForTeamAsync(int teamId, int days = 7)
         {
+            var cacheKey = CacheKeys.UpcomingGamesByTeam(teamId, days);
+
+            // 1. Tentar buscar do cache Redis
+            var cachedData = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
+            if (cachedData != null)
+            {
+                _logger.LogInformation("REDIS CACHE HIT: Próximos jogos do time {TeamId} ({Count} jogos)", teamId, cachedData.Count);
+                return cachedData;
+            }
+
+            // 2. Buscar do banco/ESPN
+            _logger.LogInformation("CACHE MISS: Buscando próximos jogos do time {TeamId}", teamId);
             var request = new GetMultipleTeamsGamesRequest
             {
                 TeamIds = new List<int> { teamId },
@@ -292,14 +290,32 @@ namespace HoopGameNight.Core.Services
             };
 
             var result = await GetGamesForMultipleTeamsAsync(request);
-            return result.AllGames.OrderBy(g => g.Date).ToList();
+            var games = result.AllGames.OrderBy(g => g.Date).ToList();
+
+            // 3. Salvar em cache (10 minutos para jogos futuros)
+            await _cacheService.SetAsync(cacheKey, games, TimeSpan.FromMinutes(10));
+            _logger.LogInformation("Salvos {Count} próximos jogos do time {TeamId} no Redis", games.Count, teamId);
+
+            return games;
         }
 
         /// <summary>
-        /// Busca jogos recentes de um time
+        /// Busca jogos recentes de um time (com cache Redis)
         /// </summary>
         public async Task<List<GameResponse>> GetRecentGamesForTeamAsync(int teamId, int days = 7)
         {
+            var cacheKey = CacheKeys.RecentGamesByTeam(teamId, days);
+
+            // 1. Tentar buscar do cache Redis
+            var cachedData = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
+            if (cachedData != null)
+            {
+                _logger.LogInformation("REDIS CACHE HIT: Jogos recentes do time {TeamId} ({Count} jogos)", teamId, cachedData.Count);
+                return cachedData;
+            }
+
+            // 2. Buscar do banco
+            _logger.LogInformation("CACHE MISS: Buscando jogos recentes do time {TeamId}", teamId);
             var request = new GetMultipleTeamsGamesRequest
             {
                 TeamIds = new List<int> { teamId },
@@ -310,7 +326,13 @@ namespace HoopGameNight.Core.Services
             };
 
             var result = await GetGamesForMultipleTeamsAsync(request);
-            return result.AllGames.OrderByDescending(g => g.Date).ToList();
+            var games = result.AllGames.OrderByDescending(g => g.Date).ToList();
+
+            // 3. Salvar em cache (5 minutos para jogos passados)
+            await _cacheService.SetAsync(cacheKey, games, TimeSpan.FromMinutes(5));
+            _logger.LogInformation("Salvos {Count} jogos recentes do time {TeamId} no Redis", games.Count, teamId);
+
+            return games;
         }
 
         #endregion
@@ -326,87 +348,226 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Sincroniza jogos por data específica (apenas datas passadas/hoje)
+        /// Sincroniza jogos por data específica (SIMPLIFICADO - sem duplicatas)
         /// </summary>
         public async Task<int> SyncGamesByDateAsync(DateTime date)
         {
-            if (date > DateTime.Today)
-            {
-                _logger.LogWarning("Cannot sync future games. Date: {Date}", date);
-                return 0;
-            }
+            var syncCount = 0;
+            var updateCount = 0;
 
             try
             {
-                var externalGames = await _ballDontLieService.GetGamesByDateAsync(date);
-                var syncCount = 0;
+                _logger.LogInformation("Sincronizando jogos para {Date}", date.ToString("yyyy-MM-dd"));
 
-                foreach (var externalGame in externalGames)
+                // 1. Buscar jogos da API apropriada
+                List<EspnGameDto>? espnGames = null;
+
+                // USAR APENAS ESPN (fonte única confiável)
+                try
                 {
-                    var existingGame = await _gameRepository.GetByExternalIdAsync(externalGame.Id);
+                    espnGames = await _espnService.GetGamesByDateAsync(date);
+                    _logger.LogInformation("ESPN retornou {Count} jogos para {Date}", espnGames.Count, date.ToString("yyyy-MM-dd"));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao buscar da ESPN para {Date}", date);
+                    return 0;
+                }
 
-                    if (existingGame == null)
+                // 2. Se não há jogos, retornar
+                if (espnGames == null || !espnGames.Any())
+                {
+                    _logger.LogInformation("Nenhum jogo encontrado para {Date}", date.ToString("yyyy-MM-dd"));
+                    return 0;
+                }
+
+                // 3. Validar times e processar jogos (INSERT ou UPDATE)
+                foreach (var espnGame in espnGames)
+                {
+                    try
                     {
-                        var homeTeam = await _teamRepository.GetByExternalIdAsync(externalGame.HomeTeam.Id);
-                        var visitorTeam = await _teamRepository.GetByExternalIdAsync(externalGame.VisitorTeam.Id);
+                        var homeTeamId = await MapEspnTeamToSystemIdAsync(espnGame.HomeTeamId, espnGame.HomeTeamAbbreviation);
+                        var visitorTeamId = await MapEspnTeamToSystemIdAsync(espnGame.AwayTeamId, espnGame.AwayTeamAbbreviation);
 
-                        if (homeTeam == null || visitorTeam == null)
+                        if (homeTeamId == 0 || visitorTeamId == 0)
                         {
                             _logger.LogWarning(
-                                "Skipping game {GameId} - teams not found",
-                                externalGame.Id
-                            );
+                                "Jogo ignorado - mapeamento falhou | ESPN: {Away}({AwayId}) @ {Home}({HomeId})",
+                                espnGame.AwayTeamAbbreviation, espnGame.AwayTeamId,
+                                espnGame.HomeTeamAbbreviation, espnGame.HomeTeamId);
                             continue;
                         }
 
-                        var game = new Game
+                        // Validar se times existem no banco
+                        var homeTeam = await _teamRepository.GetByIdAsync(homeTeamId);
+                        var visitorTeam = await _teamRepository.GetByIdAsync(visitorTeamId);
+
+                        if (homeTeam == null || visitorTeam == null)
                         {
-                            ExternalId = externalGame.Id,
-                            Date = DateTime.Parse(externalGame.Date),
-                            DateTime = DateTime.Parse(externalGame.Date),
-                            HomeTeamId = homeTeam.Id,
-                            VisitorTeamId = visitorTeam.Id,
-                            HomeTeamScore = externalGame.HomeTeamScore,
-                            VisitorTeamScore = externalGame.VisitorTeamScore,
-                            Status = MapGameStatus(externalGame.Status),
-                            Period = externalGame.Period,
-                            TimeRemaining = externalGame.Time,
-                            PostSeason = externalGame.Postseason,
-                            Season = externalGame.Season,
-                            CreatedAt = DateTime.UtcNow,
-                            UpdatedAt = DateTime.UtcNow
-                        };
+                            _logger.LogError(
+                                "CRÍTICO: Mapeamento retornou IDs inexistentes | System IDs: Home={HomeId}, Away={VisitorId}",
+                                homeTeamId, visitorTeamId);
+                            continue;
+                        }
 
-                        await _gameRepository.InsertAsync(game);
-                        syncCount++;
+                        // Log detalhado do mapeamento bem-sucedido
+                        _logger.LogDebug(
+                            "Mapeamento OK | ESPN: {AwayAbbr}({AwayEspnId})→{AwayId} @ {HomeAbbr}({HomeEspnId})→{HomeId} | Score: {AwayScore}-{HomeScore}",
+                            espnGame.AwayTeamAbbreviation, espnGame.AwayTeamId, visitorTeamId,
+                            espnGame.HomeTeamAbbreviation, espnGame.HomeTeamId, homeTeamId,
+                            espnGame.AwayTeamScore ?? 0, espnGame.HomeTeamScore ?? 0);
+
+                        var gameDate = espnGame.Date.Date;
+                        var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate);
+                        var existingGame = existingGames.FirstOrDefault(g =>
+                            g.HomeTeamId == homeTeamId &&
+                            g.VisitorTeamId == visitorTeamId &&
+                            g.Date.Date == gameDate);
+
+                        if (existingGame == null)
+                        {
+                            var newGame = new Game
+                            {
+                                ExternalId = GenerateExternalId(espnGame, gameDate),
+                                Date = espnGame.Date.Date,
+                                DateTime = espnGame.Date,
+                                HomeTeamId = homeTeamId,
+                                VisitorTeamId = visitorTeamId,
+                                HomeTeamScore = espnGame.HomeTeamScore,
+                                VisitorTeamScore = espnGame.AwayTeamScore,
+                                Status = DetermineGameStatus(espnGame),
+                                Period = espnGame.Period, 
+                                TimeRemaining = espnGame.TimeRemaining, 
+                                PostSeason = DeterminePostseason(espnGame), 
+                                Season = espnGame.Season ?? GetSeasonYear(espnGame.Date), 
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+
+                            await _gameRepository.InsertAsync(newGame);
+                            syncCount++;
+                            _logger.LogDebug("Inserido: {Away} @ {Home}", visitorTeam.Abbreviation, homeTeam.Abbreviation);
+                        }
+                        else
+                        {
+                            var hasChanges = false;
+
+                            if (existingGame.HomeTeamScore != espnGame.HomeTeamScore)
+                            {
+                                existingGame.HomeTeamScore = espnGame.HomeTeamScore;
+                                hasChanges = true;
+                            }
+
+                            if (existingGame.VisitorTeamScore != espnGame.AwayTeamScore)
+                            {
+                                existingGame.VisitorTeamScore = espnGame.AwayTeamScore;
+                                hasChanges = true;
+                            }
+
+                            var newStatus = DetermineGameStatus(espnGame);
+                            if (existingGame.Status != newStatus)
+                            {
+                                existingGame.Status = newStatus;
+                                hasChanges = true;
+                            }
+
+                            if (existingGame.Period != espnGame.Period)
+                            {
+                                existingGame.Period = espnGame.Period;
+                                hasChanges = true;
+                            }
+
+                            if (existingGame.TimeRemaining != espnGame.TimeRemaining)
+                            {
+                                existingGame.TimeRemaining = espnGame.TimeRemaining;
+                                hasChanges = true;
+                            }
+
+                            var isPostseason = DeterminePostseason(espnGame);
+                            if (existingGame.PostSeason != isPostseason)
+                            {
+                                existingGame.PostSeason = isPostseason;
+                                hasChanges = true;
+                            }
+
+                            if (hasChanges)
+                            {
+                                existingGame.DateTime = espnGame.Date;
+                                existingGame.UpdatedAt = DateTime.UtcNow;
+                                await _gameRepository.UpdateAsync(existingGame);
+                                updateCount++;
+                                _logger.LogDebug("Atualizado: {Away} {AwayScore} @ {Home} {HomeScore} (Q{Period})",
+                                    visitorTeam.Abbreviation, espnGame.AwayTeamScore ?? 0,
+                                    homeTeam.Abbreviation, espnGame.HomeTeamScore ?? 0,
+                                    espnGame.Period ?? 0);
+                            }
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        // Atualizar jogo existente
-                        existingGame.HomeTeamScore = externalGame.HomeTeamScore;
-                        existingGame.VisitorTeamScore = externalGame.VisitorTeamScore;
-                        existingGame.Status = MapGameStatus(externalGame.Status);
-                        existingGame.Period = externalGame.Period;
-                        existingGame.TimeRemaining = externalGame.Time;
-                        existingGame.UpdatedAt = DateTime.UtcNow;
-
-                        await _gameRepository.UpdateAsync(existingGame);
+                        _logger.LogError(ex, "Erro ao processar jogo ESPN ID {GameId}", espnGame.Id);
                     }
                 }
 
-                // Limpar cache
-                _cache.Remove($"games_today_{DateTime.Today:yyyy-MM-dd}");
-                _cache.Remove($"games_date_{date:yyyy-MM-dd}");
+                // 4. Invalidar cache
+                await InvalidateCacheForDate(date);
 
-                _logger.LogInformation("Synced {Count} new games for {Date}", syncCount, date.ToShortDateString());
-                return syncCount;
+                _logger.LogInformation("✅ Sincronização concluída para {Date}: {New} novos, {Updated} atualizados",
+                    date.ToShortDateString(), syncCount, updateCount);
+
+                return syncCount + updateCount;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error syncing games for date: {Date}", date);
-                throw new ExternalApiException("Ball Don't Lie", $"Failed to sync games for {date:yyyy-MM-dd}", ex);
+                _logger.LogError(ex, "❌ Erro crítico ao sincronizar jogos para {Date}", date);
+                return syncCount + updateCount; 
             }
         }
+
+
+        /// <summary>
+        /// Gera ExternalId baseado no ID da ESPN (agora STRING)
+        /// </summary>
+        private string GenerateExternalId(EspnGameDto espnGame, DateTime date)
+        {
+            if (!string.IsNullOrEmpty(espnGame.Id))
+            {
+                return espnGame.Id;
+            }
+
+            return $"ESPN_{espnGame.HomeTeamId}_{espnGame.AwayTeamId}_{date:yyyyMMdd}";
+        }
+
+        /// <summary>
+        /// Determina status do jogo baseado nos dados da ESPN
+        /// </summary>
+        private GameStatus DetermineGameStatus(EspnGameDto espnGame)
+        {
+            if (espnGame.HomeTeamScore.HasValue && espnGame.AwayTeamScore.HasValue &&
+                espnGame.Date < DateTime.Now.AddHours(-2))
+            {
+                _logger.LogDebug("🏁 Forcing Final status - game has scores ({Away}-{Home}) and date is in the past ({Date})",
+                    espnGame.AwayTeamScore, espnGame.HomeTeamScore, espnGame.Date);
+                return GameStatus.Final;
+            }
+
+            if (!string.IsNullOrEmpty(espnGame.Status))
+            {
+                return MapGameStatus(espnGame.Status);
+            }
+
+            return espnGame.Date > DateTime.Now ? GameStatus.Scheduled : GameStatus.Final;
+        }
+
+        /// <summary>
+        /// Invalida cache para uma data específica
+        /// </summary>
+        private async Task InvalidateCacheForDate(DateTime date)
+        {
+            await _cacheService.RemoveAsync(CacheKeys.TodayGames());
+            await _cacheService.RemoveAsync(CacheKeys.GamesByDate(date));
+        }
+
 
         /// <summary>
         /// Sincroniza jogos de um período
@@ -426,13 +587,86 @@ namespace HoopGameNight.Core.Services
                 var synced = await SyncGamesByDateAsync(currentDate);
                 totalSynced += synced;
 
-                // Delay para evitar rate limit
                 await Task.Delay(1000);
 
                 currentDate = currentDate.AddDays(1);
             }
 
             return totalSynced;
+        }
+
+        /// <summary>
+        /// Sincroniza jogos FUTUROS da ESPN 
+        /// </summary>
+        public async Task<int> SyncFutureGamesAsync(int days = 10)
+        {
+            try
+            {
+                var startDate = DateTime.Today.AddDays(1);
+                var endDate = DateTime.Today.AddDays(days);
+
+                _logger.LogInformation(
+                    "Syncing future games from {Start} to {End}",
+                    startDate.ToShortDateString(),
+                    endDate.ToShortDateString()
+                );
+
+                var totalSynced = 0;
+
+                var currentDate = startDate;
+                while (currentDate <= endDate)
+                {
+                    try
+                    {
+                        var synced = await SyncGamesByDateAsync(currentDate);
+                        totalSynced += synced;
+
+                        await Task.Delay(500);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error syncing future games for {Date}", currentDate);
+                    }
+
+                    currentDate = currentDate.AddDays(1);
+                }
+
+                _logger.LogInformation("Synced {Count} future games across {Days} days", totalSynced, days);
+                return totalSynced;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error syncing future games");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Determina o ano da temporada baseado na data
+        /// </summary>
+        private int GetSeasonYear(DateTime date)
+        {
+            return date.Month >= 10 ? date.Year : date.Year - 1;
+        }
+
+        /// <summary>
+        /// Determina se o jogo é de playoffs
+        /// </summary>
+        private bool DeterminePostseason(EspnGameDto espnGame)
+        {
+            if (espnGame.IsPostseason.HasValue)
+            {
+                return espnGame.IsPostseason.Value;
+            }
+
+            var month = espnGame.Date.Month;
+            if (month >= 4 && month <= 6)
+            {
+                _logger.LogDebug("Jogo detectado como Playoff (mês {Month})", month);
+                return true;
+            }
+
+            return false;
         }
 
         #endregion
@@ -446,8 +680,6 @@ namespace HoopGameNight.Core.Services
         {
             var allGames = new List<Game>();
 
-            // Otimização: buscar todos os jogos do período de uma vez
-            // CORREÇÃO: Usar método que existe no repositório
             var currentDate = startDate;
             while (currentDate <= endDate)
             {
@@ -456,7 +688,6 @@ namespace HoopGameNight.Core.Services
                 currentDate = currentDate.AddDays(1);
             }
 
-            // Filtrar jogos dos times solicitados
             allGames = allGames
                 .Where(g => teamIds.Contains(g.HomeTeamId) || teamIds.Contains(g.VisitorTeamId))
                 .ToList();
@@ -471,13 +702,12 @@ namespace HoopGameNight.Core.Services
         {
             var allGames = new List<GameResponse>();
 
-            // Buscar para cada time
             var tasks = teamIds.Select(async teamId =>
             {
                 try
                 {
                     var espnGames = await _espnService.GetTeamScheduleAsync(teamId, startDate, endDate);
-                    return ConvertEspnGamesToResponse(espnGames);
+                    return await ConvertEspnGamesToResponseAsync(espnGames);
                 }
                 catch (Exception ex)
                 {
@@ -489,7 +719,6 @@ namespace HoopGameNight.Core.Services
             var results = await Task.WhenAll(tasks);
             allGames = results.SelectMany(r => r).ToList();
 
-            // Remover duplicatas
             return allGames
                 .GroupBy(g => new { Date = g.Date.Date, HomeTeamId = g.HomeTeam.Id, VisitorTeamId = g.VisitorTeam.Id })
                 .Select(g => g.First())
@@ -497,40 +726,70 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Converte jogos da ESPN para GameResponse
+        /// Converte jogos da ESPN para GameResponse (ASYNC para buscar times do banco)
         /// </summary>
-        private List<GameResponse> ConvertEspnGamesToResponse(List<EspnGameDto> espnGames)
+        private async Task<List<GameResponse>> ConvertEspnGamesToResponseAsync(List<EspnGameDto> espnGames)
         {
-            return espnGames.Select(eg => new GameResponse
+            var responses = new List<GameResponse>();
+
+            foreach (var eg in espnGames)
             {
-                Id = -Math.Abs(eg.Id.GetHashCode()), // ID negativo para jogos futuros
-                Date = eg.Date,
-                DateTime = eg.Date,
-                HomeTeam = new TeamSummaryResponse
+                var homeTeamId = await MapEspnTeamToSystemIdAsync(eg.HomeTeamId, eg.HomeTeamAbbreviation);
+                var awayTeamId = await MapEspnTeamToSystemIdAsync(eg.AwayTeamId, eg.AwayTeamAbbreviation);
+
+                if (homeTeamId == 0 || awayTeamId == 0)
                 {
-                    Id = MapEspnToSystemTeamId(eg.HomeTeamId),
-                    Name = eg.HomeTeamName,
-                    Abbreviation = eg.HomeTeamAbbreviation
-                },
-                VisitorTeam = new TeamSummaryResponse
+                    _logger.LogWarning(
+                        "Skipping future game - mapping failed | {Away}({AwayId}) @ {Home}({HomeId})",
+                        eg.AwayTeamAbbreviation, eg.AwayTeamId,
+                        eg.HomeTeamAbbreviation, eg.HomeTeamId);
+                    continue;
+                }
+
+                var homeTeam = await _teamRepository.GetByIdAsync(homeTeamId);
+                var awayTeam = await _teamRepository.GetByIdAsync(awayTeamId);
+
+                if (homeTeam == null || awayTeam == null)
                 {
-                    Id = MapEspnToSystemTeamId(eg.AwayTeamId),
-                    Name = eg.AwayTeamName,
-                    Abbreviation = eg.AwayTeamAbbreviation
-                },
-                HomeTeamScore = eg.HomeTeamScore,
-                VisitorTeamScore = eg.AwayTeamScore,
-                Status = "Scheduled",
-                StatusDisplay = eg.Date.ToString("MMM dd, h:mm tt"),
-                GameTitle = $"{eg.AwayTeamName} @ {eg.HomeTeamName}",
-                Score = eg.HomeTeamScore.HasValue && eg.AwayTeamScore.HasValue
-                    ? $"{eg.AwayTeamScore} - {eg.HomeTeamScore}"
-                    : "-",
-                IsLive = false,
-                IsCompleted = false,
-                IsFutureGame = true,
-                DataSource = "ESPN"
-            }).ToList();
+                    _logger.LogError(
+                        "CRÍTICO: Teams not found after mapping | System IDs: Home={HomeId}, Away={AwayId}",
+                        homeTeamId, awayTeamId);
+                    continue;
+                }
+
+                responses.Add(new GameResponse
+                {
+                    Id = 0, 
+                    Date = eg.Date,
+                    DateTime = eg.Date,
+                    HomeTeam = new TeamSummaryResponse
+                    {
+                        Id = homeTeam.Id,
+                        Name = homeTeam.Name,
+                        Abbreviation = homeTeam.Abbreviation 
+                    },
+                    VisitorTeam = new TeamSummaryResponse
+                    {
+                        Id = awayTeam.Id,
+                        Name = awayTeam.Name,
+                        Abbreviation = awayTeam.Abbreviation 
+                    },
+                    HomeTeamScore = eg.HomeTeamScore,
+                    VisitorTeamScore = eg.AwayTeamScore,
+                    Status = "Scheduled",
+                    StatusDisplay = eg.Date.ToString("MMM dd, h:mm tt"),
+                    GameTitle = $"{awayTeam.Name} @ {homeTeam.Name}",
+                    Score = eg.HomeTeamScore.HasValue && eg.AwayTeamScore.HasValue
+                        ? $"{eg.AwayTeamScore} - {eg.HomeTeamScore}"
+                        : "-",
+                    IsLive = false,
+                    IsCompleted = false,
+                    IsFutureGame = true,
+                    DataSource = "ESPN"
+                });
+            }
+
+            return responses;
         }
 
         /// <summary>
@@ -603,26 +862,52 @@ namespace HoopGameNight.Core.Services
             if (string.IsNullOrEmpty(externalStatus))
                 return GameStatus.Scheduled;
 
-            return externalStatus.ToLower() switch
+            var normalized = externalStatus.Trim().ToLowerInvariant();
+
+            var mapped = normalized switch
             {
-                "final" => GameStatus.Final,
-                "completed" => GameStatus.Final,
-                "in progress" => GameStatus.Live,
-                "live" => GameStatus.Live,
-                "scheduled" => GameStatus.Scheduled,
-                "postponed" => GameStatus.Postponed,
-                "cancelled" => GameStatus.Cancelled,
-                _ => GameStatus.Scheduled
+                "final" or "completed" => GameStatus.Final,
+                "in progress" or "live" or "in_progress" => GameStatus.Live,
+                "scheduled" or "pre" or "pregame" => GameStatus.Scheduled,
+                "postponed" or "delayed" => GameStatus.Postponed,
+                "cancelled" or "canceled" => GameStatus.Cancelled,
+                _ => (GameStatus?)null
             };
+
+            if (mapped == null)
+            {
+                _logger.LogWarning("Status de jogo desconhecido: '{Status}' - usando Scheduled como padrão", externalStatus);
+                return GameStatus.Scheduled;
+            }
+
+            return mapped.Value;
         }
 
         /// <summary>
-        /// Mapeia ID da ESPN para ID do sistema
+        /// Mapeia time da ESPN para ID do sistema usando ABREVIAÇÃO
         /// </summary>
-        private int MapEspnToSystemTeamId(string espnTeamId)
+        private async Task<int> MapEspnTeamToSystemIdAsync(string espnTeamId, string espnAbbreviation)
         {
-            return _espnToSystemTeamMapping.TryGetValue(espnTeamId, out var systemId) ? systemId : 0;
+            if (string.IsNullOrEmpty(espnAbbreviation))
+            {
+                _logger.LogWarning("ESPN Abbreviation is null/empty for team ID: {EspnTeamId}", espnTeamId);
+                return 0;
+            }
+
+            var team = await _teamRepository.GetByAbbreviationAsync(espnAbbreviation);
+
+            if (team != null)
+            {
+                _logger.LogTrace("Mapped {Abbr} → System ID {Id}", espnAbbreviation, team.Id);
+                return team.Id;
+            }
+
+            _logger.LogWarning(
+                "Team not found in database | ESPN Abbr: {Abbr}, ESPN ID: {EspnId}",
+                espnAbbreviation, espnTeamId);
+            return 0;
         }
+
 
         #endregion
     }

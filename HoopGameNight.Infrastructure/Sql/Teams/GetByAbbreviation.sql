@@ -1,6 +1,7 @@
 ﻿SELECT
     id,
     external_id,
+    external_espn_id,
     name,
     full_name,
     abbreviation,

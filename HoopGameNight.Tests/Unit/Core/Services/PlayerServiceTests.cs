@@ -22,7 +22,6 @@ namespace HoopGameNight.Tests.Unit.Core.Services
     public class PlayerServiceTests : IDisposable
     {
         private readonly Mock<IPlayerRepository> _mockPlayerRepository;
-        private readonly Mock<IBallDontLieService> _mockBallDontLieService;
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<ILogger<PlayerService>> _mockLogger;
         private readonly IMemoryCache _memoryCache;
@@ -31,19 +30,15 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         public PlayerServiceTests()
         {
             _mockPlayerRepository = new Mock<IPlayerRepository>();
-            _mockBallDontLieService = new Mock<IBallDontLieService>();
             _mockMapper = new Mock<IMapper>();
             _mockLogger = new Mock<ILogger<PlayerService>>();
             _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
             var mockEspnService = new Mock<IEspnApiService>();
-            var mockNbaStatsService = new Mock<INbaStatsApiService>();
 
             _playerService = new PlayerService(
                 _mockPlayerRepository.Object,
-                _mockBallDontLieService.Object,
                 mockEspnService.Object,
-                mockNbaStatsService.Object,
                 _mockMapper.Object,
                 _memoryCache,
                 _mockLogger.Object
@@ -388,185 +383,9 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         #endregion
 
         #region Testes de Sincronização de Jogadores
-
-        /// <summary>
-        /// Testa se sincroniza novos jogadores quando há jogadores externos
-        /// </summary>
-        [Fact(DisplayName = "Deve sincronizar novos jogadores quando há jogadores externos")]
-        public async Task DeveSincronizarNovosJogadores_QuandoHaJogadoresExternos()
-        {
-            // Arrange: Configura jogadores externos
-            const string termoBusca = "lebron";
-            var jogadoresExternos = new[]
-            {
-                TestDataBuilder.CreateBallDontLiePlayer(1),
-                TestDataBuilder.CreateBallDontLiePlayer(2)
-            };
-
-            var jogadoresMapeados = new[]
-            {
-                TestDataBuilder.CreatePlayer(1),
-                TestDataBuilder.CreatePlayer(2)
-            };
-
-            _mockBallDontLieService
-                .Setup(x => x.SearchPlayersAsync(termoBusca, 1))
-                .ReturnsAsync(jogadoresExternos);
-
-            _mockMapper
-                .Setup(x => x.Map<List<Player>>(jogadoresExternos))
-                .Returns(jogadoresMapeados.ToList());
-
-            // Setup: Nenhum jogador existe ainda
-            _mockPlayerRepository
-                .Setup(x => x.ExistsAsync(It.IsAny<int>()))
-                .ReturnsAsync(false);
-
-            _mockPlayerRepository
-                .Setup(x => x.InsertAsync(It.IsAny<Player>()))
-                .ReturnsAsync(1);
-
-            // Act: Executa sincronização
-            await _playerService.SyncPlayersAsync(termoBusca);
-
-            // Assert: Verifica se sincronizou todos os jogadores
-            _mockBallDontLieService.Verify(x => x.SearchPlayersAsync(termoBusca, 1), Times.Once,
-                "porque deve buscar jogadores da API externa");
-            _mockPlayerRepository.Verify(x => x.InsertAsync(It.IsAny<Player>()), Times.Exactly(2),
-                "porque deve inserir os 2 jogadores novos");
-        }
-
-        /// <summary>
-        /// Testa se pula jogadores que já existem durante sincronização
-        /// </summary>
-        [Fact(DisplayName = "Deve pular jogadores que já existem durante sincronização")]
-        public async Task DevePularJogadores_QueJaExistemDuranteSincronizacao()
-        {
-            // Arrange: Configura jogadores que já existem
-            const string termoBusca = "curry";
-            var jogadoresExternos = new[] { TestDataBuilder.CreateBallDontLiePlayer(1) };
-            var jogadoresMapeados = new[] { TestDataBuilder.CreatePlayer(1) };
-
-            _mockBallDontLieService
-                .Setup(x => x.SearchPlayersAsync(termoBusca, 1))
-                .ReturnsAsync(jogadoresExternos);
-
-            _mockMapper
-                .Setup(x => x.Map<List<Player>>(jogadoresExternos))
-                .Returns(jogadoresMapeados.ToList());
-
-            // Setup: Jogador já existe
-            _mockPlayerRepository
-                .Setup(x => x.ExistsAsync(It.IsAny<int>()))
-                .ReturnsAsync(true);
-
-            // Act: Executa sincronização
-            await _playerService.SyncPlayersAsync(termoBusca);
-
-            // Assert: Não deve inserir nenhum jogador
-            _mockPlayerRepository.Verify(x => x.InsertAsync(It.IsAny<Player>()), Times.Never,
-                "porque jogador já existe");
-        }
-
-        /// <summary>
-        /// Testa se usa termo de busca padrão quando null é fornecido
-        /// </summary>
-        [Fact(DisplayName = "Deve usar termo de busca padrão quando null é fornecido")]
-        public async Task DeveUsarTermoBuscaPadrao_QuandoNullEhFornecido()
-        {
-            // Arrange: Configura sincronização com termo null
-            var jogadoresExternos = new[] { TestDataBuilder.CreateBallDontLiePlayer(1) };
-            var jogadoresMapeados = new[] { TestDataBuilder.CreatePlayer(1) };
-
-            _mockBallDontLieService
-                .Setup(x => x.SearchPlayersAsync("", 1))
-                .ReturnsAsync(jogadoresExternos);
-
-            _mockMapper
-                .Setup(x => x.Map<List<Player>>(jogadoresExternos))
-                .Returns(jogadoresMapeados.ToList());
-
-            _mockPlayerRepository
-                .Setup(x => x.ExistsAsync(It.IsAny<int>()))
-                .ReturnsAsync(false);
-
-            _mockPlayerRepository
-                .Setup(x => x.InsertAsync(It.IsAny<Player>()))
-                .ReturnsAsync(1);
-
-            // Act: Executa sincronização com null
-            await _playerService.SyncPlayersAsync(null);
-
-            // Assert: Deve usar string vazia como padrão
-            _mockBallDontLieService.Verify(x => x.SearchPlayersAsync("", 1), Times.Once,
-                "porque deve usar string vazia quando termo é null");
-        }
-
-        /// <summary>
-        /// Testa sincronização com diferentes termos de busca
-        /// </summary>
-        [Theory(DisplayName = "Deve sincronizar com diferentes termos de busca")]
-        [InlineData("lebron")]
-        [InlineData("curry")]
-        [InlineData("jordan")]
-        [InlineData("kobe")]
-        [InlineData("")]
-        public async Task DeveSincronizar_ComDiferentesTermosDeBusca(string termoBusca)
-        {
-            // Arrange: Configura sincronização com termo específico
-            var jogadoresExternos = new[] { TestDataBuilder.CreateBallDontLiePlayer(1) };
-            var jogadoresMapeados = new[] { TestDataBuilder.CreatePlayer(1) };
-
-            _mockBallDontLieService
-                .Setup(x => x.SearchPlayersAsync(termoBusca, 1))
-                .ReturnsAsync(jogadoresExternos);
-
-            _mockMapper
-                .Setup(x => x.Map<List<Player>>(jogadoresExternos))
-                .Returns(jogadoresMapeados.ToList());
-
-            _mockPlayerRepository
-                .Setup(x => x.ExistsAsync(It.IsAny<int>()))
-                .ReturnsAsync(false);
-
-            _mockPlayerRepository
-                .Setup(x => x.InsertAsync(It.IsAny<Player>()))
-                .ReturnsAsync(1);
-
-            // Act: Executa sincronização
-            await _playerService.SyncPlayersAsync(termoBusca);
-
-            // Assert: Deve usar o termo específico
-            _mockBallDontLieService.Verify(x => x.SearchPlayersAsync(termoBusca, 1), Times.Once,
-                $"porque deve buscar com o termo '{termoBusca}'");
-        }
-
-        /// <summary>
-        /// Testa se lança ExternalApiException quando serviço externo falha
-        /// </summary>
-        [Fact(DisplayName = "Deve lançar ExternalApiException quando serviço externo falha")]
-        public async Task DeveLancarExternalApiException_QuandoServicoExternoFalha()
-        {
-            // Arrange
-            const string termoBusca = "test";
-            _mockBallDontLieService
-                .Setup(x => x.SearchPlayersAsync(termoBusca, 1))
-                .ThrowsAsync(new HttpRequestException("API está fora do ar"));
-
-            // Act & Assert: Esperar ExternalApiException
-            var exception = await Assert.ThrowsAsync<ExternalApiException>(
-                () => _playerService.SyncPlayersAsync(termoBusca));
-
-            // Verificar mensagem da ExternalApiException
-            exception.Message.Should().Be("Falha ao sincronizar jogadores da API externa");
-
-            // Verificar a HttpRequestException original encapsulada
-            exception.InnerException.Should().NotBeNull();
-            exception.InnerException.Should().BeOfType<HttpRequestException>();
-            exception.InnerException!.Message.Should().Be("API está fora do ar");
-        }
-
-
+        // REMOVIDO: Testes de sincronização com BallDontLie API
+        // A funcionalidade SyncPlayersAsync foi desabilitada após remoção do BallDontLie
+        // Sincronização de jogadores agora deve ser feita via ESPN API ou manualmente
         #endregion
 
         #region Testes de Performance

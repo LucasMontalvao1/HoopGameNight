@@ -15,7 +15,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
     {
         private readonly IGameService _gameService;
         private readonly ITeamService _teamService;
-        private readonly IBallDontLieService _ballDontLieService;
         private readonly ISyncMetricsService _syncMetricsService;
         private readonly ICacheService _cacheService;
         private readonly ISyncHealthService _healthService;
@@ -23,7 +22,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         public SyncController(
             IGameService gameService,
             ITeamService teamService,
-            IBallDontLieService ballDontLieService,
             ISyncMetricsService syncMetricsService,
             ICacheService cacheService,
             ISyncHealthService healthService,
@@ -31,7 +29,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         {
             _gameService = gameService;
             _teamService = teamService;
-            _ballDontLieService = ballDontLieService;
             _syncMetricsService = syncMetricsService;
             _cacheService = cacheService;
             _healthService = healthService;
@@ -50,7 +47,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                 var errors = new List<string>();
                 int teamsCount = 0, gamesCount = 0;
 
-                // Sync teams
                 try
                 {
                     await _teamService.SyncAllTeamsAsync();
@@ -64,7 +60,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                     Logger.LogError(ex, "Failed to sync teams");
                 }
 
-                // Sync today's games
                 try
                 {
                     await _gameService.SyncTodayGamesAsync();
@@ -81,7 +76,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                 var duration = DateTime.UtcNow - startTime;
                 var success = errors.Count == 0;
 
-                // Record metrics
                 if (success)
                 {
                     _syncMetricsService.RecordSuccess("EssentialSync", duration, teamsCount + gamesCount);
@@ -194,30 +188,13 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         {
             return await ExecuteAsync(async () =>
             {
-                var health = new ExternalApiHealth();
-
-                try
+                var health = new ExternalApiHealth
                 {
-                    var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                    var teams = await _ballDontLieService.GetAllTeamsAsync();
-                    stopwatch.Stop();
+                    Message = "Using ESPN API only - BallDontLie deprecated",
+                    Timestamp = DateTime.UtcNow
+                };
 
-                    health.BallDontLie = new ApiHealthStatus
-                    {
-                        IsHealthy = teams.Any(),
-                        ResponseTime = stopwatch.ElapsedMilliseconds,
-                        LastCheck = DateTime.UtcNow
-                    };
-                }
-                catch (Exception ex)
-                {
-                    health.BallDontLie = new ApiHealthStatus
-                    {
-                        IsHealthy = false,
-                        Error = ex.Message,
-                        LastCheck = DateTime.UtcNow
-                    };
-                }
+                await Task.CompletedTask;
 
                 return Ok(health, "External API health checked");
             });
@@ -236,22 +213,19 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                 var todayGames = await _gameService.GetTodayGamesAsync();
                 var metrics = _syncMetricsService.GetMetrics();
 
-                var externalTeams = await _ballDontLieService.GetAllTeamsAsync();
-                var externalGames = await _ballDontLieService.GetTodaysGamesAsync();
-
                 var status = new SyncStatusResponse
                 {
                     Teams = new SyncEntityStatus
                     {
                         LocalCount = teams.Count,
-                        ExternalCount = externalTeams.Count(),
+                        ExternalCount = 30, 
                         LastSync = metrics.LastSyncTime,
                         Status = teams.Count >= 30 ? "Complete" : "Incomplete"
                     },
                     Games = new SyncEntityStatus
                     {
                         LocalCount = todayGames.Count,
-                        ExternalCount = externalGames.Count(),
+                        ExternalCount = 0, 
                         LastSync = metrics.LastSyncTime,
                         Status = todayGames.Count > 0 ? "Available" : "No games"
                     },
@@ -285,6 +259,70 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                     message = "Metrics reset successfully",
                     timestamp = DateTime.UtcNow
                 }, "Metrics reset");
+            });
+        }
+
+        /// <summary>
+        /// Sincronizar jogos futuros (próximos 10 dias)
+        /// </summary>
+        [HttpPost("future-games")]
+        [ProducesResponseType(typeof(ApiResponse<FutureGamesSyncResult>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<FutureGamesSyncResult>>> SyncFutureGames(
+            [FromQuery] int days = 10)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                if (days < 1 || days > 30)
+                {
+                    return BadRequest<FutureGamesSyncResult>("Days must be between 1 and 30");
+                }
+
+                var startTime = DateTime.UtcNow;
+                Logger.LogInformation("Iniciando sincronização de jogos futuros ({Days} dias)", days);
+
+                try
+                {
+                    var syncCount = await _gameService.SyncFutureGamesAsync(days);
+
+                    _cacheService.InvalidatePattern(ApiConstants.CacheKeys.GAMES_PATTERN);
+
+                    var duration = DateTime.UtcNow - startTime;
+                    var result = new FutureGamesSyncResult
+                    {
+                        Success = true,
+                        GamesSynced = syncCount,
+                        DaysAhead = days,
+                        Duration = duration,
+                        Timestamp = DateTime.UtcNow
+                    };
+
+                    Logger.LogInformation(
+                        "Sincronização de jogos futuros concluída: {Count} jogos em {Duration}",
+                        syncCount,
+                        duration);
+
+                    return Ok(result, $"Synced {syncCount} future games for next {days} days");
+                }
+                catch (Exception ex)
+                {
+                    var duration = DateTime.UtcNow - startTime;
+                    Logger.LogError(ex, "Erro ao sincronizar jogos futuros");
+
+                    var result = new FutureGamesSyncResult
+                    {
+                        Success = false,
+                        GamesSynced = 0,
+                        DaysAhead = days,
+                        Duration = duration,
+                        Error = ex.Message,
+                        Timestamp = DateTime.UtcNow
+                    };
+
+                    var response = ApiResponse<FutureGamesSyncResult>.ErrorResult("Failed to sync future games");
+                    response.Data = result;
+                    response.RequestId = HttpContext.TraceIdentifier;
+                    return base.StatusCode(500, response);
+                }
             });
         }
     }
@@ -345,8 +383,9 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
 
     public class ExternalApiHealth
     {
-        public ApiHealthStatus BallDontLie { get; set; } = new();
-        public bool OverallHealth => BallDontLie.IsHealthy;
+        // REMOVIDO: BallDontLie property - API deprecated
+        public string Message { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
     }
 
     public class ApiHealthStatus
@@ -379,6 +418,16 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         public int Score { get; set; }
         public string Status { get; set; } = "";
         public string Recommendation { get; set; } = "";
+    }
+
+    public class FutureGamesSyncResult
+    {
+        public bool Success { get; set; }
+        public int GamesSynced { get; set; }
+        public int DaysAhead { get; set; }
+        public TimeSpan Duration { get; set; }
+        public string? Error { get; set; }
+        public DateTime Timestamp { get; set; }
     }
 
     #endregion

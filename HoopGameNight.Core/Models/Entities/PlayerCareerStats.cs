@@ -5,13 +5,10 @@ namespace HoopGameNight.Core.Models.Entities
     {
         public int PlayerId { get; set; }
 
-        // Totais de carreira
         public int TotalSeasons { get; set; }
         public int TotalGames { get; set; }
         public int TotalGamesStarted { get; set; }
         public decimal TotalMinutes { get; set; }
-
-        // Pontuação total
         public int TotalPoints { get; set; }
         public int TotalFieldGoalsMade { get; set; }
         public int TotalFieldGoalsAttempted { get; set; }
@@ -19,34 +16,27 @@ namespace HoopGameNight.Core.Models.Entities
         public int TotalThreePointersAttempted { get; set; }
         public int TotalFreeThrowsMade { get; set; }
         public int TotalFreeThrowsAttempted { get; set; }
-
-        // Outros totais
         public int TotalRebounds { get; set; }
         public int TotalAssists { get; set; }
         public int TotalSteals { get; set; }
         public int TotalBlocks { get; set; }
         public int TotalTurnovers { get; set; }
 
-        // Médias de carreira
-        public decimal CareerPPG { get; set; } // Points per game
-        public decimal CareerRPG { get; set; } // Rebounds per game
-        public decimal CareerAPG { get; set; } // Assists per game
+        public decimal CareerPPG { get; set; } 
+        public decimal CareerRPG { get; set; }
+        public decimal CareerAPG { get; set; } 
         public decimal CareerFgPercentage { get; set; }
         public decimal Career3PtPercentage { get; set; }
         public decimal CareerFtPercentage { get; set; }
 
-        // Recordes
         public int HighestPointsGame { get; set; }
         public int HighestReboundsGame { get; set; }
         public int HighestAssistsGame { get; set; }
 
-        // Timestamps
         public DateTime? LastGameDate { get; set; }
 
-        // Navigation Properties
         public Player? Player { get; set; }
 
-        // Computed Properties
         public decimal AverageMinutesPerGame => TotalGames > 0
             ? Math.Round(TotalMinutes / TotalGames, 1)
             : 0;

@@ -199,7 +199,7 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Data
             // Carrega ambos no cache
             _sqlLoader.LoadSql("Teams", "GetAll");
             _sqlLoader.LoadSql("Players", "GetAll");
-            _mockLogger.Reset(); // Reset para contar apenas após clear
+            _mockLogger.Reset(); 
 
             // Act
             _sqlLoader.ClearCache("Teams");

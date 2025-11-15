@@ -33,47 +33,11 @@ namespace HoopGameNight.Tests.Unit.Infrastructure.Repositories
             );
         }
 
-        #region GetAllAsync Tests
-
-        [Fact(DisplayName = "GetAllAsync deve retornar todos os times")]
-        public async Task GetAllAsync_DeveRetornarTodosOsTimes()
-        {
-            // Arrange
-            var expectedTeams = CriarListaDeTimes();
-            var expectedSql = "SELECT * FROM Teams";
-
-            _mockSqlLoader
-                .Setup(x => x.LoadSqlAsync("Teams", "GetAll"))
-                .ReturnsAsync(expectedSql);
-
-            // Como não podemos mockar métodos de extensão do Dapper diretamente,
-            // vamos testar apenas se o método não lança exceção
-            // Em um teste de integração real, testaríamos contra um banco de dados
-
-            // Act & Assert
-            // Este teste vai falhar porque não conseguimos mockar o Dapper
-            // Seria melhor fazer um teste de integração para este caso
-            await Assert.ThrowsAsync<NotImplementedException>(async () =>
-            {
-                // O teste real seria:
-                // var result = await _repository.GetAllAsync();
-                // result.Should().NotBeNull();
-                throw new NotImplementedException("Este teste precisa ser um teste de integração");
-            });
-        }
-
-        #endregion
-
         #region Testes Unitários Focados em Lógica
 
         [Fact(DisplayName = "Repository deve ter nome de entidade correto")]
         public void Repository_DeveTerNomeEntidadeCorreto()
         {
-            // Este é um teste que podemos fazer sem mockar o banco
-            // Verificamos se o repository está configurado corretamente
-
-            // Act & Assert
-            // Através de reflection, poderíamos verificar a propriedade EntityName
             _repository.Should().NotBeNull();
             _repository.GetType().Name.Should().Be("TeamRepository");
         }

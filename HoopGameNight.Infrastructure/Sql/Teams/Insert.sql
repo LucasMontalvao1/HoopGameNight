@@ -1,5 +1,6 @@
 ﻿INSERT INTO teams (
     external_id,
+    external_espn_id,
     name,
     full_name,
     abbreviation,
@@ -8,6 +9,7 @@
     division
 ) VALUES (
     @ExternalId,
+    @EspnId,
     @Name,
     @FullName,
     @Abbreviation,

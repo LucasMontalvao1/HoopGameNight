@@ -7,7 +7,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- API Versioning - VERSÃO CORRETA -->
+		<!-- API Versioning -->
 		<PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="8.1.0" />
 
 		<!-- Health Checks -->
@@ -36,6 +36,8 @@
 
 		<!-- Caching -->
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.6" />
+		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
+		<PackageReference Include="StackExchange.Redis" Version="2.8.16" />
 
 		<!-- Logging -->
 		<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
@@ -48,7 +50,6 @@
 		<ProjectReference Include="..\HoopGameNight.Infrastructure\HoopGameNight.Infrastructure.csproj" />
 	</ItemGroup>
 
-	<!-- INCLUIR ARQUIVOS SQL NO BUILD -->
 	<ItemGroup>
 		<Content Include="..\HoopGameNight.Infrastructure\Sql\**\*.sql" Condition="Exists('..\HoopGameNight.Infrastructure\Sql')">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

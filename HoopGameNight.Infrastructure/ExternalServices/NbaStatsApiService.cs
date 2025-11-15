@@ -26,10 +26,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             _httpClient = httpClient;
             _logger = logger;
-
-            // Usar a mesma API key do Ball Don't Lie
-            var ballDontLieConfig = configuration.GetSection("ExternalApis:BallDontLie");
-            _apiKey = ballDontLieConfig["ApiKey"] ?? throw new InvalidOperationException("BallDontLie ApiKey not configured");
+            _apiKey = configuration["NbaStatsApiKey"] ?? string.Empty;
 
             _jsonOptions = new JsonSerializerOptions
             {
@@ -44,7 +41,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             try
             {
-                // Ball Don't Lie v1 endpoint: /v1/players?search={name}
                 var searchTerm = $"{firstName} {lastName}".Trim();
                 _logger.LogDebug("Searching NBA player: {SearchTerm}", searchTerm);
 
@@ -61,7 +57,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
-                var apiResponse = JsonSerializer.Deserialize<BallDontLieApiResponseWrapper>(json, _jsonOptions);
+                var apiResponse = JsonSerializer.Deserialize<NbaStatsApiResponseWrapper>(json, _jsonOptions);
 
                 if (apiResponse?.Data == null || apiResponse.Data.Count == 0)
                 {
@@ -94,7 +90,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             try
             {
-                // Ball Don't Lie v1: /v1/season_averages?season={season}&player_ids[]={id}
                 _logger.LogDebug("Fetching season stats for player {PlayerId}, season {Season}", playerId, season);
 
                 var request = new HttpRequestMessage(HttpMethod.Get,
@@ -109,7 +104,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                 }
 
                 var json = await response.Content.ReadAsStringAsync();
-                var apiResponse = JsonSerializer.Deserialize<BallDontLieSeasonStatsWrapper>(json, _jsonOptions);
+                var apiResponse = JsonSerializer.Deserialize<NbaStatsSeasonStatsWrapper>(json, _jsonOptions);
 
                 if (apiResponse?.Data == null || apiResponse.Data.Count == 0)
                 {
@@ -160,7 +155,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         }
 
         // Classes auxiliares para desserialização
-        private class BallDontLieApiResponseWrapper
+        private class NbaStatsApiResponseWrapper
         {
             [JsonPropertyName("data")]
             public List<PlayerData> Data { get; set; } = new();
@@ -178,7 +173,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             public string? LastName { get; set; }
         }
 
-        private class BallDontLieSeasonStatsWrapper
+        private class NbaStatsSeasonStatsWrapper
         {
             [JsonPropertyName("data")]
             public List<SeasonStatsData> Data { get; set; } = new();

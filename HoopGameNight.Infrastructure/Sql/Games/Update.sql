@@ -1,4 +1,5 @@
-﻿UPDATE games SET
+-- Update jogo existente (campos otimizados - sem is_future_game e data_source)
+UPDATE games SET
     home_team_score = @HomeTeamScore,
     visitor_team_score = @VisitorTeamScore,
     status = @Status,

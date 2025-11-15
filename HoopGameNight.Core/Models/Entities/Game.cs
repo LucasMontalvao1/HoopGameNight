@@ -4,7 +4,7 @@ namespace HoopGameNight.Core.Models.Entities
 {
     public class Game : BaseEntity
     {
-        public int ExternalId { get; set; }
+        public string ExternalId { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public DateTime DateTime { get; set; }
         public int HomeTeamId { get; set; }
@@ -17,16 +17,16 @@ namespace HoopGameNight.Core.Models.Entities
         public bool PostSeason { get; set; }
         public int Season { get; set; }
 
-        // Navigation Properties 
         public Team? HomeTeam { get; set; }
         public Team? VisitorTeam { get; set; }
 
-        // Computed Properties
         public bool IsToday => Date.Date == DateTime.Today;
         public bool IsTomorrow => Date.Date == DateTime.Today.AddDays(1);
+        public bool IsFutureGame => Date.Date > DateTime.Today; 
         public bool IsLive => Status == GameStatus.Live;
         public bool IsCompleted => Status == GameStatus.Final;
         public bool IsScheduled => Status == GameStatus.Scheduled;
+        public string DataSource => "ESPN"; 
 
         public string Score => HomeTeamScore.HasValue && VisitorTeamScore.HasValue
             ? $"{HomeTeamScore} - {VisitorTeamScore}"
@@ -55,10 +55,9 @@ namespace HoopGameNight.Core.Models.Entities
         public int? WinningScore => WinningTeam?.Id == HomeTeamId ? HomeTeamScore : VisitorTeamScore;
         public int? LosingScore => WinningTeam?.Id == HomeTeamId ? VisitorTeamScore : HomeTeamScore;
 
-        // Validation
         public bool IsValid()
         {
-            return ExternalId > 0 &&
+            return !string.IsNullOrEmpty(ExternalId) &&
                    HomeTeamId > 0 &&
                    VisitorTeamId > 0 &&
                    HomeTeamId != VisitorTeamId &&

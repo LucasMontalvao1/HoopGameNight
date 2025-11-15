@@ -126,7 +126,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return _sqlLoader.SqlExists(EntityName, fileName);
         }
 
-        // Método auxiliar para criar transações
         protected async Task<TResult> ExecuteInTransactionAsync<TResult>(Func<IDbConnection, IDbTransaction, Task<TResult>> operation)
         {
             using var connection = _connection.CreateConnection();
@@ -149,7 +148,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             }
         }
 
-        // Método para operações batch
         protected async Task<int> ExecuteBatchAsync(string sql, IEnumerable<object> parameters)
         {
             try

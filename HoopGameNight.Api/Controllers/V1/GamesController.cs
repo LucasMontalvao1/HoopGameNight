@@ -12,19 +12,16 @@ namespace HoopGameNight.Api.Controllers.V1
     public class GamesController : BaseApiController
     {
         private readonly IGameService _gameService;
-        private readonly IBallDontLieService _ballDontLieService;
         private readonly IEspnApiService _espnService;
         private readonly IMemoryCache _cache;
 
         public GamesController(
             IGameService gameService,
-            IBallDontLieService ballDontLieService,
             IEspnApiService espnService,
             IMemoryCache cache,
             ILogger<GamesController> logger) : base(logger)
         {
             _gameService = gameService;
-            _ballDontLieService = ballDontLieService;
             _espnService = espnService;
             _cache = cache;
         }
@@ -70,7 +67,6 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var games = await _gameService.GetGamesByDateAsync(date);
 
-                // Adicionar header indicando a fonte dos dados
                 if (date > DateTime.Today)
                 {
                     Response.Headers.Add("X-Data-Source", "ESPN");
@@ -226,7 +222,6 @@ namespace HoopGameNight.Api.Controllers.V1
                     request.EndDate.ToShortDateString()
                 );
 
-                // Agora sempre usa GameService que já tem suporte a jogos futuros
                 var result = await _gameService.GetGamesForMultipleTeamsAsync(request);
 
                 if (result == null)
@@ -236,7 +231,6 @@ namespace HoopGameNight.Api.Controllers.V1
                     ));
                 }
 
-                // Adicionar informações nos headers
                 Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
                 Response.Headers.Add("X-Total-Games", result.AllGames.Count.ToString());
 
@@ -486,10 +480,9 @@ namespace HoopGameNight.Api.Controllers.V1
                 var startDate = new DateTime(year, month, 1);
                 var endDate = startDate.AddMonths(1).AddDays(-1);
 
-                // Buscar jogos de todos os times para o mês
                 var request = new GetMultipleTeamsGamesRequest
                 {
-                    TeamIds = Enumerable.Range(1, 30).ToList(), // Todos os times
+                    TeamIds = Enumerable.Range(1, 30).ToList(), 
                     StartDate = startDate,
                     EndDate = endDate,
                     GroupByTeam = false,
@@ -498,7 +491,6 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var result = await _gameService.GetGamesForMultipleTeamsAsync(request);
 
-                // Agrupar por data
                 var calendar = result.AllGames
                     .GroupBy(g => g.Date.Date)
                     .ToDictionary(g => g.Key, g => g.ToList());
@@ -530,7 +522,6 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 await _gameService.SyncTodayGamesAsync();
 
-                // Limpar cache após sincronização
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
 
                 var games = await _gameService.GetTodayGamesAsync();
@@ -578,7 +569,6 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var syncCount = await _gameService.SyncGamesByDateAsync(date);
 
-                // Limpar cache
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
                 _cache.Remove(string.Format(ApiConstants.CacheKeys.GAMES_BY_DATE, date.ToString("yyyy-MM-dd")));
 
@@ -614,7 +604,8 @@ namespace HoopGameNight.Api.Controllers.V1
             try
             {
                 var localGamesCount = (await _gameService.GetTodayGamesAsync()).Count;
-                var externalGamesCount = (await _ballDontLieService.GetTodaysGamesAsync()).Count();
+
+                var externalGamesCount = (await _espnService.GetGamesByDateAsync(DateTime.Today)).Count;
 
                 var status = new
                 {
@@ -622,6 +613,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     externalGames = externalGamesCount,
                     needsSync = localGamesCount != externalGamesCount,
                     lastCheck = DateTime.UtcNow,
+                    dataSource = "ESPN API",
                     recommendation = localGamesCount != externalGamesCount ?
                        "Sincronização recomendada - divergência detectada" :
                         "Dados sincronizados"
@@ -695,106 +687,6 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
-
-        #region Endpoints de Desenvolvimento/Debug (remover em produção)
-
-        /// <summary>
-        /// Buscar jogos diretamente da API externa (sem salvar) - APENAS DESENVOLVIMENTO
-        /// </summary>
-        [HttpGet("external/today")]
-        [ProducesResponseType(typeof(ApiResponse<List<ExternalGameDto>>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<List<ExternalGameDto>>>> GetTodayGamesFromExternal()
-        {
-            if (!HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
-            {
-                return NotFound();
-            }
-
-            try
-            {
-                Logger.LogInformation("Buscando jogos de hoje diretamente da API externa");
-
-                var externalGames = await _ballDontLieService.GetTodaysGamesAsync();
-                var gamesList = externalGames.Select(g => new ExternalGameDto
-                {
-                    Id = g.Id,
-                    Date = g.Date,
-                    HomeTeam = g.HomeTeam.FullName,
-                    VisitorTeam = g.VisitorTeam.FullName,
-                    Status = g.Status,
-                    HomeScore = g.HomeTeamScore,
-                    VisitorScore = g.VisitorTeamScore
-                }).ToList();
-
-                Logger.LogInformation("Recuperados {GameCount} jogos da API externa", gamesList.Count);
-                return Ok(gamesList, "Jogos de hoje da API externa");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao buscar jogos da API externa");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Testar API da ESPN diretamente - APENAS DESENVOLVIMENTO
-        /// </summary>
-        [HttpGet("test/espn/{teamId}")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<object>>> TestEspnApi(int teamId)
-        {
-            if (!HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment())
-            {
-                return NotFound();
-            }
-
-            try
-            {
-                Logger.LogInformation("Testando ESPN API para time {TeamId}", teamId);
-
-                // Buscar próximos 30 dias
-                var futureGames = await _espnService.GetTeamScheduleAsync(
-                    teamId,
-                    DateTime.Today,
-                    DateTime.Today.AddDays(30)
-                );
-
-                // Buscar últimos 30 dias
-                var pastGames = await _espnService.GetTeamScheduleAsync(
-                    teamId,
-                    DateTime.Today.AddDays(-30),
-                    DateTime.Today
-                );
-
-                var result = new
-                {
-                    teamId,
-                    currentDate = DateTime.Today.ToString("yyyy-MM-dd"),
-                    futureGames = new
-                    {
-                        count = futureGames.Count,
-                        dateRange = $"{DateTime.Today:yyyy-MM-dd} to {DateTime.Today.AddDays(30):yyyy-MM-dd}",
-                        games = futureGames.Take(5).ToList()
-                    },
-                    pastGames = new
-                    {
-                        count = pastGames.Count,
-                        dateRange = $"{DateTime.Today.AddDays(-30):yyyy-MM-dd} to {DateTime.Today:yyyy-MM-dd}",
-                        games = pastGames.TakeLast(5).ToList()
-                    },
-                    note = "Se não há jogos futuros, pode ser offseason ou a ESPN não tem dados disponíveis ainda"
-                };
-
-                return Ok((object)result, "ESPN API test completed");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao testar ESPN API");
-                return Ok((object)new { error = ex.Message }, "ESPN API test failed");
-            }
-        }
-
-        #endregion
     }
 
     public class ExternalGameDto

@@ -1,6 +1,7 @@
-﻿SELECT 
+﻿SELECT
     id,
     external_id,
+    external_espn_id,
     name,
     full_name,
     abbreviation,
@@ -9,5 +10,5 @@
     division,
     created_at,
     updated_at
-FROM teams 
+FROM teams
 ORDER BY conference, division, city;

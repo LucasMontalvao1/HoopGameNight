@@ -64,7 +64,7 @@ namespace HoopGameNight.Infrastructure.Data
             var schemaName = builder.Database;
             if (string.IsNullOrEmpty(schemaName))
             {
-                schemaName = "hoop_game_night"; // Nome padrão se não especificado
+                schemaName = "hoop_game_night"; 
             }
 
             _logger.LogInformation("Nome do esquema: {SchemaName}", schemaName);
