@@ -42,10 +42,13 @@ export interface PaginatedResponse<T> {
   message: string;
   data: T[];
   pagination: {
-    page: number;
+    currentPage: number;
+    page?: number;
     pageSize: number;
     totalCount: number;
     totalPages: number;
+    hasNext?: boolean;
+    hasPrevious?: boolean;
   };
   timestamp: string;
 }
@@ -131,3 +134,44 @@ export interface Division {
   name: string;
   teams: TeamResponse[];
 }
+
+// Player Interfaces
+export interface PlayerResponse {
+  id: number;
+  externalId: number;
+  nbaStatsId?: string | null;
+  espnId?: string | null;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  position: string;
+  positionDisplay: string;
+  height: string;
+  weight: string;
+  team: TeamSummaryResponse;
+  displayName: string;
+}
+
+export interface SearchPlayerRequest {
+  search?: string;
+  teamId?: number;
+  position?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export enum PlayerPosition {
+  PG = 'PG',
+  SG = 'SG',
+  SF = 'SF',
+  PF = 'PF',
+  C = 'C'
+}
+
+export const POSITION_NAMES: Record<PlayerPosition, string> = {
+  [PlayerPosition.PG]: 'Point Guard',
+  [PlayerPosition.SG]: 'Shooting Guard',
+  [PlayerPosition.SF]: 'Small Forward',
+  [PlayerPosition.PF]: 'Power Forward',
+  [PlayerPosition.C]: 'Center'
+};

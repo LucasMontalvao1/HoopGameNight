@@ -32,18 +32,23 @@ export const routes: Routes = [
     loadComponent: () => import('./features/teams/team-details/team-details').then(m => m.TeamDetails),
     title: 'Team Details - HoopGameNight'
   },
+  {
+    path: 'players',
+    loadComponent: () => import('./features/players/players').then(m => m.PlayersComponent),
+    title: 'Players - HoopGameNight'
+  },
+  {
+    path: 'players/:id',
+    loadComponent: () => import('./features/players/player-details/player-details').then(m => m.PlayerDetailsComponent),
+    title: 'Player Details - HoopGameNight'
+  },
   // {
-  //   path: 'players',
-  //   loadComponent: () => import('./features/players/players').then(m => m.Players),
-  //   title: 'Players - HoopGameNight'
-  // },
-  // { 
-  //   path: 'settings', 
+  //   path: 'settings',
   //   loadComponent: () => import('./features/settings/settings').then(m => m.Settings),
   //   title: 'Settings - HoopGameNight'
   // },
-  { 
-    path: '**', 
-    redirectTo: '/dashboard' 
+  {
+    path: '**',
+    redirectTo: '/dashboard'
   }
 ];

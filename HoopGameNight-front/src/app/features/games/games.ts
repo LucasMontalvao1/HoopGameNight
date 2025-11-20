@@ -51,22 +51,22 @@ export class Games implements OnInit, OnDestroy {
   }
 
   async loadCompletedGames(): Promise<void> {
-    // Carregar jogos de 3 dias atrás (geralmente têm jogos finalizados)
+    // Carregar jogos de 3 dias atrás 
     const date = new Date();
     date.setDate(date.getDate() - 3);
 
-    console.log(`🔄 Carregando jogos de ${date.toLocaleDateString('pt-BR')}...`);
+    console.log(`Carregando jogos de ${date.toLocaleDateString('pt-BR')}...`);
     await this.gamesService.loadGamesByDate(date);
 
     // Forçar sincronização
     await this.syncCurrentDate();
 
     const games = this.gamesService.currentGames();
-    console.log(`📊 Total de jogos: ${games.length}`);
+    console.log(`Total de jogos: ${games.length}`);
 
     // Mostrar status de TODOS os jogos
     games.forEach(game => {
-      console.log(`🏀 ${game.gameTitle}:`, {
+      console.log(`${game.gameTitle}:`, {
         status: game.status,
         statusDisplay: game.statusDisplay,
         isLive: game.isLive,
@@ -77,7 +77,7 @@ export class Games implements OnInit, OnDestroy {
     });
 
     const completed = games.filter(g => g.isCompleted);
-    console.log(`✅ ${completed.length} jogos finalizados encontrados!`);
+    console.log(`${completed.length} jogos finalizados encontrados!`);
   }
 
   async onDateChange(date: Date): Promise<void> {
@@ -123,11 +123,34 @@ export class Games implements OnInit, OnDestroy {
     });
   }
 
+  formatGamePeriod(game: GameResponse): string {
+    if (!game.period) {
+      return game.statusDisplay || 'AO VIVO';
+    }
+
+    const periodNames: { [key: number]: string } = {
+      1: '1º Q',
+      2: '2º Q',
+      3: '3º Q',
+      4: '4º Q',
+      5: 'OT',
+      6: '2OT',
+      7: '3OT'
+    };
+
+    const periodName = periodNames[game.period] || `${game.period}Q`;
+
+    if (game.timeRemaining) {
+      return `${periodName} - ${game.timeRemaining}`;
+    }
+
+    return periodName;
+  }
+
   trackByGameId(index: number, game: GameResponse): number {
     return game.id;
   }
 
-  // Usar TeamsService para logos (centralizado)
   getTeamLogoUrl(abbreviation: string): string {
     return this.teamsService.getTeamLogoUrl(abbreviation);
   }
@@ -162,12 +185,11 @@ export class Games implements OnInit, OnDestroy {
         await this.gamesService.loadGamesByDate(this.gamesService.selectedDate());
       }
 
-      // Debug: verificar vencedores
       const games = this.gamesService.currentGames();
       const completedGames = games.filter(g => g.isCompleted);
-      console.log(`✅ Jogos finalizados: ${completedGames.length}`);
+      console.log(`Jogos finalizados: ${completedGames.length}`);
       completedGames.forEach(game => {
-        console.log(`🏀 ${game.gameTitle}:`, {
+        console.log(`${game.gameTitle}:`, {
           completed: game.isCompleted,
           score: `${game.visitorTeamScore} x ${game.homeTeamScore}`,
           winningTeam: game.winningTeam,

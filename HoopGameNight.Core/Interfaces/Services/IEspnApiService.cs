@@ -17,5 +17,6 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<EspnPlayerStatsDto?> GetPlayerSeasonStatsAsync(string playerId, int season);
         Task<List<EspnPlayerStatsDto>> GetPlayerCareerStatsAsync(string playerId);
         Task<EspnPlayerStatsDto?> GetPlayerGameStatsAsync(string playerId, string gameId);
+        Task<List<EspnPlayerDetailsDto>> GetTeamRosterAsync(string teamId);
     }
 }

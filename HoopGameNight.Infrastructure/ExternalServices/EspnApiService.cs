@@ -426,6 +426,121 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             }
         }
 
+        public async Task<List<EspnPlayerDetailsDto>> GetTeamRosterAsync(string teamId)
+        {
+            try
+            {
+                var url = $"{BASE_URL}/teams/{teamId}/roster";
+                _logger.LogInformation("Fetching ESPN team roster for team: {TeamId}", teamId);
+
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                var players = new List<EspnPlayerDetailsDto>();
+
+                if (root.TryGetProperty("athletes", out var athletes))
+                {
+                    foreach (var athleteElement in athletes.EnumerateArray())
+                    {
+                        var player = ParsePlayerFromRoster(athleteElement);
+                        if (player != null)
+                        {
+                            players.Add(player);
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Found {Count} players in team {TeamId} roster", players.Count, teamId);
+                return players;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching ESPN team roster for team: {TeamId}", teamId);
+                return new List<EspnPlayerDetailsDto>();
+            }
+        }
+
+        private EspnPlayerDetailsDto? ParsePlayerFromRoster(JsonElement item)
+        {
+            try
+            {
+                var player = new EspnPlayerDetailsDto();
+
+                if (item.TryGetProperty("id", out var id))
+                    player.Id = id.GetString() ?? "";
+
+                if (item.TryGetProperty("uid", out var uid))
+                    player.Uid = uid.GetString() ?? "";
+
+                if (item.TryGetProperty("guid", out var guid))
+                    player.Guid = guid.GetString() ?? "";
+
+                if (item.TryGetProperty("firstName", out var firstName))
+                    player.FirstName = firstName.GetString() ?? "";
+
+                if (item.TryGetProperty("lastName", out var lastName))
+                    player.LastName = lastName.GetString() ?? "";
+
+                if (item.TryGetProperty("fullName", out var fullName))
+                    player.FullName = fullName.GetString() ?? "";
+
+                if (item.TryGetProperty("displayName", out var displayName))
+                    player.DisplayName = displayName.GetString() ?? "";
+
+                if (item.TryGetProperty("shortName", out var shortName))
+                    player.ShortName = shortName.GetString() ?? "";
+
+                if (item.TryGetProperty("weight", out var weight))
+                    player.Weight = weight.TryGetDouble(out var w) ? w : 0;
+
+                if (item.TryGetProperty("displayWeight", out var displayWeight))
+                    player.DisplayWeight = displayWeight.GetString() ?? "";
+
+                if (item.TryGetProperty("height", out var height))
+                    player.Height = height.TryGetDouble(out var h) ? h : 0;
+
+                if (item.TryGetProperty("displayHeight", out var displayHeight))
+                    player.DisplayHeight = displayHeight.GetString() ?? "";
+
+                if (item.TryGetProperty("age", out var age))
+                    player.Age = age.TryGetInt32(out var a) ? a : 0;
+
+                if (item.TryGetProperty("dateOfBirth", out var dob))
+                    player.DateOfBirth = dob.GetString() ?? "";
+
+                if (item.TryGetProperty("debutYear", out var debutYear))
+                    player.DebutYear = debutYear.TryGetInt32(out var dy) ? dy : 0;
+
+                if (item.TryGetProperty("jersey", out var jersey))
+                    player.Jersey = jersey.GetString() ?? "";
+
+                if (item.TryGetProperty("position", out var position))
+                {
+                    player.Position = new EspnPositionDto
+                    {
+                        Id = position.TryGetProperty("id", out var posId) ? posId.GetString() ?? "" : "",
+                        Name = position.TryGetProperty("name", out var posName) ? posName.GetString() ?? "" : "",
+                        DisplayName = position.TryGetProperty("displayName", out var posDisplayName) ? posDisplayName.GetString() ?? "" : "",
+                        Abbreviation = position.TryGetProperty("abbreviation", out var posAbbr) ? posAbbr.GetString() ?? "" : ""
+                    };
+                }
+
+                if (item.TryGetProperty("active", out var active))
+                    player.Active = active.GetBoolean();
+
+                return player;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error parsing player from roster");
+                return null;
+            }
+        }
+
         private async Task<EspnPlayerStatsDto?> GetPlayerStatsFromUrl(string? url)
         {
             if (string.IsNullOrEmpty(url)) return null;

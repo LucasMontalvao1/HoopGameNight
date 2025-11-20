@@ -1,4 +1,6 @@
 ﻿using HoopGameNight.Api.Extensions;
+using HoopGameNight.Core.Enums;
+using HoopGameNight.Infrastructure.TypeHandlers;
 using Serilog;
 using Dapper;
 
@@ -7,6 +9,10 @@ DotNetEnv.Env.Load("../.env");
 
 // ===== CONFIGURAR DAPPER PARA MAPEAR SNAKE_CASE → PASCALCASE =====
 DefaultTypeMap.MatchNamesWithUnderscores = true;
+
+// ===== REGISTRAR TYPE HANDLERS PARA ENUMS =====
+SqlMapper.AddTypeHandler(new PlayerPositionTypeHandler());
+SqlMapper.AddTypeHandler(new PlayerPositionNonNullableTypeHandler());
 
 // ===== CONFIGURAR SERILOG =====
 Log.Logger = new LoggerConfiguration()

@@ -1,14 +1,3 @@
--- =====================================================
--- GAMES TABLE - OTIMIZADO PARA ESPN API
--- =====================================================
--- Mudanças principais:
--- ✅ external_id: VARCHAR(100) (ESPN usa IDs string)
--- ✅ REMOVIDO: is_future_game (redundante)
--- ✅ REMOVIDO: data_source (só usamos ESPN)
--- ✅ UNIQUE constraint natural (home + visitor + date)
--- ✅ Índices otimizados para queries comuns
--- =====================================================
-
 CREATE TABLE IF NOT EXISTS games (
     id INT AUTO_INCREMENT PRIMARY KEY,
 

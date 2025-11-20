@@ -1,23 +1,33 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { Subject } from 'rxjs';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 
 import { HealthCheck } from '../../core/services/health-check';
 import { GamesService } from '../../core/services/games.service';
 import { TeamsService } from '../../core/services/teams.service';
+import { PlayersService } from '../../core/services/players.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
-import { ApiStatus } from '../../core/interfaces/api.interface';
+import { ApiStatus, PlayerResponse } from '../../core/interfaces/api.interface';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, StatusIndicator],
+  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss']
 })
 export class Dashboard implements OnInit {
   readonly ApiStatusEnum = ApiStatus;
   protected selectedDateOption: string = 'today';
+
+  // Player search
+  protected playerSearchQuery = signal<string>('');
+  protected playerSearchResults = signal<PlayerResponse[]>([]);
+  protected isSearchingPlayers = signal<boolean>(false);
+  protected showPlayerResults = signal<boolean>(false);
 
   protected readonly myTeams = [
     { code: 'LAL', name: 'Lakers', city: 'Los Angeles', nextGame: 'vs Warriors hoje', color: '#552583' },
@@ -41,6 +51,7 @@ export class Dashboard implements OnInit {
     protected readonly healthCheck: HealthCheck,
     protected readonly gamesService: GamesService,
     protected readonly teamsService: TeamsService,
+    protected readonly playersService: PlayersService,
     private readonly router: Router
   ) {}
 
@@ -134,7 +145,7 @@ export class Dashboard implements OnInit {
         break;
     }
 
-    console.log(`📅 Dashboard: Carregando jogos para ${targetDate.toLocaleDateString('pt-BR')}`);
+    console.log(`Dashboard: Carregando jogos para ${targetDate.toLocaleDateString('pt-BR')}`);
 
     if (value === 'today') {
       await this.gamesService.loadTodayGames(true);
@@ -145,7 +156,7 @@ export class Dashboard implements OnInit {
 
   navigateToTeam(abbreviation: string): void {
     if (abbreviation) {
-      console.log(`🏀 Navegando para detalhes do time: ${abbreviation}`);
+      console.log(`Navegando para detalhes do time: ${abbreviation}`);
       this.router.navigate(['/teams', abbreviation]);
     }
   }
@@ -154,5 +165,56 @@ export class Dashboard implements OnInit {
     return this.selectedDateOption === 'today'
       ? this.gamesService.todayGames()
       : this.gamesService.currentGames();
+  }
+
+  // Player search methods
+  updatePlayerSearch(value: string): void {
+    this.playerSearchQuery.set(value);
+    if (value.length === 0) {
+      this.playerSearchResults.set([]);
+      this.showPlayerResults.set(false);
+    }
+  }
+
+  async searchPlayers(): Promise<void> {
+    const query = this.playerSearchQuery();
+    if (query.trim().length < 2) {
+      return;
+    }
+
+    this.isSearchingPlayers.set(true);
+    this.showPlayerResults.set(true);
+
+    try {
+      await this.playersService.searchPlayers(query, 1, 5);
+      this.playerSearchResults.set(this.playersService.searchResults());
+    } catch (error) {
+      console.error('Erro ao buscar jogadores:', error);
+      this.playerSearchResults.set([]);
+    } finally {
+      this.isSearchingPlayers.set(false);
+    }
+  }
+
+  selectPlayer(player: PlayerResponse): void {
+    this.showPlayerResults.set(false);
+    this.playerSearchQuery.set('');
+    this.router.navigate(['/players', player.id]);
+  }
+
+  getPlayerPhotoUrl(player: PlayerResponse): string {
+    return this.playersService.getPlayerPhotoUrl(player.espnId || player.externalId);
+  }
+
+  onPlayerImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (!img.dataset['fallback']) {
+      img.dataset['fallback'] = 'true';
+      img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjOTk5OTk5Ij48cGF0aCBkPSJNMTIgMTJjMi43NiAwIDUtMi4yNCA1LTVzLTIuMjQtNS01LTUtNSAyLjI0LTUgNSAyLjI0IDUgNSA1em0wIDJjLTIuNjcgMC04IDEuMzQtOCA0djJINHYyaDE2di0yaDR2LTJjMC0yLjY2LTUuMzMtNC04LTR6Ii8+PC9zdmc+';
+    }
+  }
+
+  closePlayerResults(): void {
+    this.showPlayerResults.set(false);
   }
 }

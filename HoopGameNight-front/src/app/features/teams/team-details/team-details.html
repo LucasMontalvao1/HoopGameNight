@@ -86,6 +86,51 @@
       </div>
     </div>
 
+    <!-- Team Players Section -->
+    <div class="team-players-section">
+      <div class="section-header">
+        <h2>
+          <span class="material-icons">person</span>
+          Jogadores do Time
+        </h2>
+        <button class="btn-view-all" (click)="navigateToAllPlayers()">
+          Ver todos os jogadores
+          <span class="material-icons">arrow_forward</span>
+        </button>
+      </div>
+
+      <div *ngIf="loadingPlayers()" class="loading-players">
+        <div class="loading-spinner-small"></div>
+        <span>Carregando jogadores...</span>
+      </div>
+
+      <div *ngIf="!loadingPlayers() && teamPlayers().length === 0" class="no-players">
+        <span class="material-icons">person_off</span>
+        <p>Nenhum jogador encontrado para este time</p>
+      </div>
+
+      <div *ngIf="teamPlayers().length > 0" class="players-list">
+        <div
+          *ngFor="let player of teamPlayers(); trackBy: trackByPlayerId"
+          class="player-card-mini"
+          (click)="navigateToPlayer(player.id)"
+        >
+          <div class="player-photo">
+            <img
+              [src]="getPlayerPhotoUrl(player)"
+              [alt]="player.fullName"
+              (error)="handleLogoError($event, 'player')"
+            />
+            <span class="player-position-badge">{{ player.position }}</span>
+          </div>
+          <div class="player-info">
+            <span class="player-name">{{ player.fullName }}</span>
+            <span class="player-details-mini">{{ player.height }} | {{ player.weight }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Recent Games Section -->
     <div class="recent-games-section">
       <div class="section-header">

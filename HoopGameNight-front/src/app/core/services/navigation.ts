@@ -34,7 +34,12 @@ export class NavigationService {
       icon: 'groups',
       route: '/teams'
     },
-
+    {
+      id: 'players',
+      label: 'Players',
+      icon: 'person',
+      route: '/players'
+    },
     {
       id: 'api-status',
       label: 'API Status',
@@ -42,12 +47,7 @@ export class NavigationService {
       route: '/api-status'
     }
 
-    // {
-    //   id: 'players',
-    //   label: 'Players',
-    //   icon: 'person',
-    //   route: '/players'
-    // },
+    //
     // {
     //   id: 'settings',
     //   label: 'Settings',

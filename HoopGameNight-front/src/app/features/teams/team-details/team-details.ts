@@ -4,7 +4,8 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 import { TeamsService } from '../../../core/services/teams.service';
 import { GamesService } from '../../../core/services/games.service';
-import { TeamResponse, GameResponse, TeamSummaryResponse } from '../../../core/interfaces/api.interface';
+import { PlayersService } from '../../../core/services/players.service';
+import { TeamResponse, GameResponse, TeamSummaryResponse, PlayerResponse } from '../../../core/interfaces/api.interface';
 
 @Component({
   selector: 'app-team-details',
@@ -17,13 +18,17 @@ export class TeamDetails implements OnInit {
   private readonly _team = signal<TeamResponse | null>(null);
   private readonly _recentGames = signal<GameResponse[]>([]);
   private readonly _upcomingGames = signal<GameResponse[]>([]);
+  private readonly _teamPlayers = signal<PlayerResponse[]>([]);
   private readonly _loading = signal<boolean>(true);
+  private readonly _loadingPlayers = signal<boolean>(false);
   private readonly _error = signal<string | null>(null);
 
   readonly team = this._team.asReadonly();
   readonly recentGames = this._recentGames.asReadonly();
   readonly upcomingGames = this._upcomingGames.asReadonly();
+  readonly teamPlayers = this._teamPlayers.asReadonly();
   readonly loading = this._loading.asReadonly();
+  readonly loadingPlayers = this._loadingPlayers.asReadonly();
   readonly error = this._error.asReadonly();
 
   readonly teamDisplayName = computed(() => {
@@ -60,7 +65,8 @@ export class TeamDetails implements OnInit {
     private readonly route: ActivatedRoute,
     private readonly router: Router,
     protected readonly teamsService: TeamsService,
-    protected readonly gamesService: GamesService
+    protected readonly gamesService: GamesService,
+    protected readonly playersService: PlayersService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -72,7 +78,7 @@ export class TeamDetails implements OnInit {
       return;
     }
 
-    console.log(`🏀 TeamDetails: Carregando time com abreviação: ${abbreviation}`);
+    console.log(`TeamDetails: Carregando time com abreviação: ${abbreviation}`);
     await this.loadTeamData(abbreviation);
   }
 
@@ -81,11 +87,11 @@ export class TeamDetails implements OnInit {
       this._loading.set(true);
       this._error.set(null);
 
-      console.log(`📋 Carregando dados do time: ${abbreviation}`);
+      console.log(`Carregando dados do time: ${abbreviation}`);
 
       // Carregar todos os times se ainda não foram carregados
       if (this.teamsService.allTeams().length === 0) {
-        console.log('⏳ Carregando lista de times...');
+        console.log('Carregando lista de times...');
         await this.teamsService.loadAllTeams();
       }
 
@@ -93,24 +99,27 @@ export class TeamDetails implements OnInit {
       const upperAbbr = abbreviation.toUpperCase();
       const team = this.teamsService.getTeamByAbbreviation(upperAbbr);
 
-      console.log(`🔍 Time encontrado:`, team);
+      console.log(`Time encontrado:`, team);
 
       if (!team) {
         const availableTeams = this.teamsService.allTeams().map(t => t.abbreviation).join(', ');
-        console.error(`❌ Time "${abbreviation}" não encontrado. Times disponíveis: ${availableTeams}`);
+        console.error(`Time "${abbreviation}" não encontrado. Times disponíveis: ${availableTeams}`);
         this._error.set(`Time "${abbreviation}" não encontrado`);
         this._loading.set(false);
         return;
       }
 
       this._team.set(team);
-      console.log(`✅ Time carregado: ${team.displayName || team.name} (ID: ${team.id})`);
+      console.log(`Time carregado: ${team.displayName || team.name} (ID: ${team.id})`);
 
       // Buscar jogos do time
       await this.loadTeamGames(team.id);
 
+      // Buscar jogadores do time
+      this.loadTeamPlayers(team.id);
+
     } catch (error) {
-      console.error('❌ Error loading team data:', error);
+      console.error('Error loading team data:', error);
       this._error.set('Erro ao carregar dados do time');
     } finally {
       this._loading.set(false);
@@ -119,13 +128,13 @@ export class TeamDetails implements OnInit {
 
   private async loadTeamGames(teamId: number): Promise<void> {
     try {
-      console.log(`🏀 Buscando jogos recentes para o time ID: ${teamId}`);
+      console.log(`Buscando jogos recentes para o time ID: ${teamId}`);
 
       // Buscar jogos recentes (últimos 30 dias) - otimizado com endpoint específico
       const recentGames = await this.gamesService.getRecentGamesForTeam(teamId, 30);
 
-      console.log(`✅ Jogos recentes carregados:`, recentGames.length);
-      console.log('📊 Primeiros jogos recentes:', recentGames.slice(0, 3));
+      console.log(`Jogos recentes carregados:`, recentGames.length);
+      console.log('Primeiros jogos recentes:', recentGames.slice(0, 3));
 
       // Filtrar jogos completados e ordenar por data (mais recente primeiro)
       const completedGames = recentGames
@@ -136,17 +145,17 @@ export class TeamDetails implements OnInit {
       const last5Games = completedGames.slice(0, 5);
       this._recentGames.set(last5Games);
 
-      console.log(`✅ Exibindo ${last5Games.length} jogos recentes completados`);
+      console.log(`Exibindo ${last5Games.length} jogos recentes completados`);
 
       // Buscar próximos jogos (próximos 7 dias)
-      console.log(`🔮 Buscando próximos jogos para o time ID: ${teamId}`);
+      console.log(`Buscando próximos jogos para o time ID: ${teamId}`);
       const upcomingGames = await this.gamesService.getUpcomingGamesForTeam(teamId, 7);
       this._upcomingGames.set(upcomingGames);
 
-      console.log(`✅ ${upcomingGames.length} próximos jogos carregados`);
+      console.log(`${upcomingGames.length} próximos jogos carregados`);
 
     } catch (error) {
-      console.error('❌ Erro ao carregar jogos do time:', error);
+      console.error('Erro ao carregar jogos do time:', error);
     }
   }
 
@@ -224,5 +233,43 @@ export class TeamDetails implements OnInit {
 
   trackByGameId(index: number, game: GameResponse): number {
     return game.id;
+  }
+
+  trackByPlayerId(index: number, player: PlayerResponse): number {
+    return player.id;
+  }
+
+  private async loadTeamPlayers(teamId: number): Promise<void> {
+    try {
+      this._loadingPlayers.set(true);
+      console.log(`Buscando jogadores do time ID: ${teamId}`);
+
+      // Carregar todos os jogadores do time (máximo 100)
+      await this.playersService.loadPlayersByTeam(teamId, 1, 100);
+      this._teamPlayers.set(this.playersService.teamPlayers());
+
+      console.log(`${this._teamPlayers().length} jogadores carregados`);
+    } catch (error) {
+      console.error('Erro ao carregar jogadores:', error);
+    } finally {
+      this._loadingPlayers.set(false);
+    }
+  }
+
+  getPlayerPhotoUrl(player: PlayerResponse): string {
+    return this.playersService.getPlayerPhotoUrl(player.espnId || player.externalId);
+  }
+
+  navigateToPlayer(playerId: number): void {
+    this.router.navigate(['/players', playerId]);
+  }
+
+  navigateToAllPlayers(): void {
+    const team = this._team();
+    if (team) {
+      this.router.navigate(['/players'], { queryParams: { teamId: team.id } });
+    } else {
+      this.router.navigate(['/players']);
+    }
   }
 }

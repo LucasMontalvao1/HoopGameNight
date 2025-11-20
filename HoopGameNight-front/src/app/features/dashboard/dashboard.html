@@ -95,14 +95,13 @@
             </button>
           </div>
         } @else {
-          <!-- ✅ TODOS OS JOGOS DO DIA (IGUAL GAMES PAGE) -->
           <div class="games-mini-list">
             @for (game of getCurrentGames(); track trackByGameId($index, game)) {
               <div class="game-mini-card"
                    [class.game-mini-card--live]="game.isLive"
                    [class.game-mini-card--completed]="game.isCompleted">
 
-                <!-- Time Visitante (Coluna 1) -->
+                <!-- Time Visitante-->
                 <div class="game-mini-card__team team--clickable" (click)="navigateToTeam(game.visitorTeam.abbreviation)">
                   <img
                     [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
@@ -121,10 +120,10 @@
                   }
                 </div>
 
-                <!-- Separador VS (Coluna 2) -->
+                <!-- Separador VS -->
                 <div class="game-mini-card__vs">vs</div>
 
-                <!-- Time da Casa (Coluna 3) -->
+                <!-- Time da Casa -->
                 <div class="game-mini-card__team team--clickable" (click)="navigateToTeam(game.homeTeam.abbreviation)">
                   <img
                     [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
@@ -143,7 +142,7 @@
                   }
                 </div>
 
-                <!-- Info do Jogo (Coluna 4) -->
+                <!-- Info do Jogo -->
                 <div class="game-mini-card__info">
                   @if (game.isLive) {
                     <span class="status status--live">
@@ -215,21 +214,58 @@
       <!-- Search Player -->
       <section class="player-search">
         <h3 class="section-title-small">Buscar Jogador</h3>
-        
+
         <div class="search-box">
-          <input 
-            type="text" 
-            class="search-input" 
+          <input
+            type="text"
+            class="search-input"
             placeholder="LeBron James, Stephen Curry..."
-            disabled>
-          <button class="search-btn" disabled>
+            [ngModel]="playerSearchQuery()"
+            (ngModelChange)="updatePlayerSearch($event)"
+            (keyup.enter)="searchPlayers()">
+          <button class="search-btn" (click)="searchPlayers()" [disabled]="playerSearchQuery().length < 2">
             <span class="material-icons">search</span>
           </button>
         </div>
-        
-        <p class="search-placeholder">
-          Busca de jogadores será implementada com a NBA API
-        </p>
+
+        @if (showPlayerResults()) {
+          <div class="search-results-dropdown">
+            @if (isSearchingPlayers()) {
+              <div class="search-loading">
+                <div class="loading-spinner-small"></div>
+                <span>Buscando...</span>
+              </div>
+            } @else if (playerSearchResults().length === 0) {
+              <div class="search-no-results">
+                <span class="material-icons">person_search</span>
+                <p>Nenhum jogador encontrado</p>
+              </div>
+            } @else {
+              <div class="search-results-list">
+                @for (player of playerSearchResults(); track player.id) {
+                  <div class="search-result-item" (click)="selectPlayer(player)">
+                    <img
+                      [src]="getPlayerPhotoUrl(player)"
+                      [alt]="player.fullName"
+                      class="player-thumb"
+                      (error)="onPlayerImageError($event)">
+                    <div class="player-info">
+                      <span class="player-name">{{ player.fullName }}</span>
+                      <span class="player-details">{{ player.position }} - {{ player.team.displayName }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+              <button class="btn btn--ghost btn--sm view-all-btn" routerLink="/players">
+                Ver todos os jogadores
+              </button>
+            }
+          </div>
+        } @else {
+          <p class="search-hint">
+            Digite pelo menos 2 caracteres para buscar
+          </p>
+        }
       </section>
 
       <!-- AI Insights -->

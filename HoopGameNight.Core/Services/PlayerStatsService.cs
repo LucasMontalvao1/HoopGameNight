@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Repositories;
@@ -41,12 +41,14 @@ namespace HoopGameNight.Core.Services
                 var cacheKey = $"player_stats_{request.PlayerId}_{request.Season}_{request.IncludeCareer}_{request.IncludeCurrentSeason}_{request.LastGames}";
 
                 if (_cache.TryGetValue(cacheKey, out PlayerDetailedResponse? cached))
+                {
                     return cached;
+                }
 
                 var player = await _playerRepository.GetByIdAsync(request.PlayerId);
                 if (player == null)
                 {
-                    _logger.LogWarning("Player not found: {PlayerId}", request.PlayerId);
+                    _logger.LogWarning("Jogador não encontrado: {PlayerId}", request.PlayerId);
                     return null;
                 }
 
@@ -61,7 +63,7 @@ namespace HoopGameNight.Core.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error getting current season stats for player {PlayerId}", request.PlayerId);
+                        _logger.LogError(ex, "Erro ao buscar estatísticas da temporada atual para jogador {PlayerId}", request.PlayerId);
                     }
                 }
 
@@ -73,7 +75,7 @@ namespace HoopGameNight.Core.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error getting career stats for player {PlayerId}", request.PlayerId);
+                        _logger.LogError(ex, "Erro ao buscar estatísticas de carreira para jogador {PlayerId}", request.PlayerId);
                     }
                 }
 
@@ -85,7 +87,7 @@ namespace HoopGameNight.Core.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error getting recent games for player {PlayerId}", request.PlayerId);
+                        _logger.LogError(ex, "Erro ao buscar jogos recentes para jogador {PlayerId}", request.PlayerId);
                     }
                 }
 
@@ -94,7 +96,7 @@ namespace HoopGameNight.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error in GetPlayerDetailedStatsAsync for player {PlayerId}", request.PlayerId);
+                _logger.LogError(ex, "Erro inesperado em GetPlayerDetailedStatsAsync para jogador {PlayerId}", request.PlayerId);
                 throw;
             }
         }
@@ -103,33 +105,14 @@ namespace HoopGameNight.Core.Services
         {
             var stats = await _statsRepository.GetSeasonStatsAsync(playerId, season);
 
-            // TODO: AUTO-SYNC desabilitado temporariamente - PlayerStatsSyncService será reimplementado
-            // Estatísticas de jogadores devem ser sincronizadas via job em background no futuro
             if (stats == null)
             {
-                _logger.LogWarning("Season stats not found for player {PlayerId}, season {Season}. Auto-sync not available yet.", playerId, season);
+                _logger.LogWarning(
+                    "Estatísticas de temporada não encontradas para jogador {PlayerId}, temporada {Season}",
+                    playerId,
+                    season);
                 return null;
             }
-
-            /* CÓDIGO COMENTADO - Será reativado quando PlayerStatsSyncService for reimplementado
-            if (stats == null)
-            {
-                _logger.LogInformation("Season stats not found for player {PlayerId}, season {Season}. Attempting auto-sync...", playerId, season);
-                var syncSuccess = await _syncService.SyncPlayerSeasonStatsAsync(playerId, season);
-                if (syncSuccess)
-                {
-                    _logger.LogInformation("Auto-sync successful for player {PlayerId}, season {Season}. Retrieving data...", playerId, season);
-                    stats = await _statsRepository.GetSeasonStatsAsync(playerId, season);
-                }
-                else
-                {
-                    _logger.LogWarning("Auto-sync failed for player {PlayerId}, season {Season}", playerId, season);
-                }
-            }
-            */
-
-            if (stats == null)
-                return null;
 
             var response = _mapper.Map<PlayerSeasonStatsResponse>(stats);
 
@@ -137,7 +120,9 @@ namespace HoopGameNight.Core.Services
             {
                 var team = await _teamRepository.GetByIdAsync(stats.TeamId.Value);
                 if (team != null)
+                {
                     response.TeamName = team.FullName;
+                }
             }
 
             return response;
@@ -155,7 +140,9 @@ namespace HoopGameNight.Core.Services
                 {
                     var team = await _teamRepository.GetByIdAsync(season.TeamId.Value);
                     if (team != null)
+                    {
                         response.TeamName = team.FullName;
+                    }
                 }
             }
 
@@ -166,41 +153,15 @@ namespace HoopGameNight.Core.Services
         {
             var stats = await _statsRepository.GetCareerStatsAsync(playerId);
 
-            // AUTO-SYNC: Se não encontrar estatísticas de carreira, tenta sincronizar algumas temporadas e recalcular
             if (stats == null)
             {
-                _logger.LogInformation("Career stats not found for player {PlayerId}. Attempting to sync recent seasons...", playerId);
-
-                var currentYear = DateTime.Now.Year;
-                // TODO: AUTO-SYNC desabilitado - PlayerStatsSyncService será reimplementado
-                _logger.LogWarning("Career stats for player {PlayerId} incomplete. Auto-sync not available yet.", playerId);
-
-                /* CÓDIGO COMENTADO - Será reativado quando PlayerStatsSyncService for reimplementado
-                var seasonsToSync = new List<int> { currentYear, currentYear - 1, currentYear - 2 }; // Últimas 3 temporadas
-                var syncedAny = false;
-                foreach (var season in seasonsToSync)
-                {
-                    var seasonExists = await _statsRepository.GetSeasonStatsAsync(playerId, season);
-                    if (seasonExists == null)
-                    {
-                        var syncSuccess = await _syncService.SyncPlayerSeasonStatsAsync(playerId, season);
-                        if (syncSuccess)
-                        {
-                            syncedAny = true;
-                            _logger.LogInformation("Auto-synced season {Season} for player {PlayerId}", season, playerId);
-                        }
-                    }
-                }
-                if (syncedAny)
-                {
-                    _logger.LogInformation("Updating career stats for player {PlayerId} after auto-sync", playerId);
-                    await UpdatePlayerCareerStatsAsync(playerId);
-                    stats = await _statsRepository.GetCareerStatsAsync(playerId);
-                }
-                */
+                _logger.LogWarning(
+                    "Estatísticas de carreira não encontradas para jogador {PlayerId}",
+                    playerId);
+                return null;
             }
 
-            return stats != null ? _mapper.Map<PlayerCareerStatsResponse>(stats) : null;
+            return _mapper.Map<PlayerCareerStatsResponse>(stats);
         }
 
         public async Task<List<PlayerRecentGameResponse>> GetPlayerRecentGamesAsync(int playerId, int limit)
@@ -213,31 +174,16 @@ namespace HoopGameNight.Core.Services
         {
             var stats = await _statsRepository.GetGameStatsAsync(playerId, gameId);
 
-            // TODO: AUTO-SYNC desabilitado - PlayerStatsSyncService será reimplementado
             if (stats == null)
             {
-                _logger.LogWarning("Game stats not found for player {PlayerId}, game {GameId}. Auto-sync not available yet.", playerId, gameId);
+                _logger.LogWarning(
+                    "Estatísticas do jogo não encontradas para jogador {PlayerId}, jogo {GameId}",
+                    playerId,
+                    gameId);
                 return null;
             }
 
-            /* CÓDIGO COMENTADO - Será reativado quando PlayerStatsSyncService for reimplementado
-            if (stats == null)
-            {
-                _logger.LogInformation("Game stats not found for player {PlayerId}, game {GameId}. Attempting auto-sync...", playerId, gameId);
-                var syncSuccess = await _syncService.SyncPlayerGameStatsAsync(playerId, gameId);
-                if (syncSuccess)
-                {
-                    _logger.LogInformation("Auto-sync successful for player {PlayerId}, game {GameId}. Retrieving data...", playerId, gameId);
-                    stats = await _statsRepository.GetGameStatsAsync(playerId, gameId);
-                }
-                else
-                {
-                    _logger.LogWarning("Auto-sync failed for player {PlayerId}, game {GameId}", playerId, gameId);
-                }
-            }
-            */
-
-            return stats != null ? _mapper.Map<PlayerRecentGameResponse>(stats) : null;
+            return _mapper.Map<PlayerRecentGameResponse>(stats);
         }
 
         public async Task<PlayerComparisonResponse?> ComparePlayersAsync(int player1Id, int player2Id, int? season = null)
@@ -267,8 +213,10 @@ namespace HoopGameNight.Core.Services
 
                 if (player1Stats == null || player2Stats == null)
                 {
-                    _logger.LogWarning("Cannot compare - Player1: {Player1Found}, Player2: {Player2Found}",
-                        player1Stats != null, player2Stats != null);
+                    _logger.LogWarning(
+                        "Não foi possível comparar - Jogador1: {Player1Found}, Jogador2: {Player2Found}",
+                        player1Stats != null,
+                        player2Stats != null);
                     return null;
                 }
 
@@ -281,7 +229,7 @@ namespace HoopGameNight.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error comparing players {Player1Id} and {Player2Id}", player1Id, player2Id);
+                _logger.LogError(ex, "Erro ao comparar jogadores {Player1Id} e {Player2Id}", player1Id, player2Id);
                 throw;
             }
         }
@@ -291,7 +239,9 @@ namespace HoopGameNight.Core.Services
             var cacheKey = $"stat_leaders_{season}_{minGames}_{limit}";
 
             if (_cache.TryGetValue(cacheKey, out StatLeadersResponse? cached))
+            {
                 return cached!;
+            }
 
             var scoringLeaders = await _statsRepository.GetScoringLeadersAsync(season, minGames, limit);
             var reboundLeaders = await _statsRepository.GetReboundLeadersAsync(season, minGames, limit);
@@ -313,7 +263,9 @@ namespace HoopGameNight.Core.Services
         {
             var seasons = await _statsRepository.GetAllSeasonStatsAsync(playerId);
             if (!seasons.Any())
+            {
                 return false;
+            }
 
             var careerStats = new PlayerCareerStats
             {
@@ -328,15 +280,12 @@ namespace HoopGameNight.Core.Services
                 TotalSteals = seasons.Sum(s => s.Steals),
                 TotalBlocks = seasons.Sum(s => s.Blocks),
                 TotalTurnovers = seasons.Sum(s => s.Turnovers),
-
-                // Totais de arremessos (necessários para calcular porcentagens)
                 TotalFieldGoalsMade = seasons.Sum(s => s.FieldGoalsMade),
                 TotalFieldGoalsAttempted = seasons.Sum(s => s.FieldGoalsAttempted),
                 TotalThreePointersMade = seasons.Sum(s => s.ThreePointersMade),
                 TotalThreePointersAttempted = seasons.Sum(s => s.ThreePointersAttempted),
                 TotalFreeThrowsMade = seasons.Sum(s => s.FreeThrowsMade),
                 TotalFreeThrowsAttempted = seasons.Sum(s => s.FreeThrowsAttempted),
-
                 LastGameDate = DateTime.Today
             };
 
@@ -348,23 +297,29 @@ namespace HoopGameNight.Core.Services
                 careerStats.CareerAPG = Math.Round((decimal)careerStats.TotalAssists / careerStats.TotalGames, 2);
             }
 
-            // Calcular porcentagens de carreira
+            // Calcular porcentagens
             if (careerStats.TotalFieldGoalsAttempted > 0)
             {
-                careerStats.CareerFgPercentage = Math.Round((decimal)careerStats.TotalFieldGoalsMade / careerStats.TotalFieldGoalsAttempted * 100, 1);
+                careerStats.CareerFgPercentage = Math.Round(
+                    (decimal)careerStats.TotalFieldGoalsMade / careerStats.TotalFieldGoalsAttempted * 100,
+                    1);
             }
 
             if (careerStats.TotalThreePointersAttempted > 0)
             {
-                careerStats.Career3PtPercentage = Math.Round((decimal)careerStats.TotalThreePointersMade / careerStats.TotalThreePointersAttempted * 100, 1);
+                careerStats.Career3PtPercentage = Math.Round(
+                    (decimal)careerStats.TotalThreePointersMade / careerStats.TotalThreePointersAttempted * 100,
+                    1);
             }
 
             if (careerStats.TotalFreeThrowsAttempted > 0)
             {
-                careerStats.CareerFtPercentage = Math.Round((decimal)careerStats.TotalFreeThrowsMade / careerStats.TotalFreeThrowsAttempted * 100, 1);
+                careerStats.CareerFtPercentage = Math.Round(
+                    (decimal)careerStats.TotalFreeThrowsMade / careerStats.TotalFreeThrowsAttempted * 100,
+                    1);
             }
 
-            // Buscar estatísticas de jogos individuais para calcular career highs
+            // Calcular career highs
             try
             {
                 var allGames = await _statsRepository.GetAllPlayerGamesAsync(playerId);
@@ -376,8 +331,9 @@ namespace HoopGameNight.Core.Services
                 }
                 else
                 {
-                    // Se não há estatísticas de jogos individuais, usar máximos das médias de temporadas
-                    _logger.LogWarning("No game stats found for player {PlayerId}, using season maxes for career highs", playerId);
+                    _logger.LogWarning(
+                        "Nenhuma estatística de jogo encontrada para jogador {PlayerId}, usando máximos das temporadas",
+                        playerId);
                     careerStats.HighestPointsGame = (int)Math.Ceiling(seasons.Max(s => s.PPG));
                     careerStats.HighestReboundsGame = (int)Math.Ceiling(seasons.Max(s => s.RPG));
                     careerStats.HighestAssistsGame = (int)Math.Ceiling(seasons.Max(s => s.APG));
@@ -385,13 +341,11 @@ namespace HoopGameNight.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error calculating career highs for player {PlayerId}", playerId);
-                // Continua sem career highs se houver erro
+                _logger.LogError(ex, "Erro ao calcular career highs para jogador {PlayerId}", playerId);
             }
 
-            // Clear cache
-            var pattern = $"player_stats_{playerId}_*";
-            _cache.Remove(pattern);
+            var cachePattern = $"player_stats_{playerId}_";
+            _cache.Remove(cachePattern);
 
             return await _statsRepository.UpsertCareerStatsAsync(careerStats);
         }

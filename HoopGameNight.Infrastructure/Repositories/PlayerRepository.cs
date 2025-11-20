@@ -90,6 +90,26 @@ namespace HoopGameNight.Infrastructure.Repositories
             return (players, totalCount);
         }
 
+        public async Task<(IEnumerable<Player> Players, int TotalCount)> GetAllPlayersAsync(int page, int pageSize)
+        {
+            Logger.LogDebug("Getting all players - Page: {Page}, PageSize: {PageSize}", page, pageSize);
+
+            var sql = await LoadSqlAsync("GetAllPaginated");
+            var countSql = await LoadSqlAsync("GetAllCount");
+
+            var parameters = new
+            {
+                Offset = (page - 1) * pageSize,
+                PageSize = pageSize
+            };
+
+            var players = await ExecuteQueryWithTeamAsync(sql, parameters);
+            var totalCount = await ExecuteScalarAsync<int>(countSql);
+
+            Logger.LogDebug("Found {PlayerCount} players (total: {TotalCount})", players.Count(), totalCount);
+            return (players, totalCount);
+        }
+
         public async Task<Player?> GetByIdAsync(int id)
         {
             Logger.LogDebug("Getting player by ID: {PlayerId}", id);
@@ -242,7 +262,7 @@ namespace HoopGameNight.Infrastructure.Repositories
             return deleted;
         }
 
-        // Métodos adicionais úteis (não estão na interface mas podem ser úteis)
+        // Métodos adicionais úteis 
         public async Task<IEnumerable<Player>> GetPlayersByPositionAsync(string position)
         {
             Logger.LogDebug("Getting players by position: {Position}", position);

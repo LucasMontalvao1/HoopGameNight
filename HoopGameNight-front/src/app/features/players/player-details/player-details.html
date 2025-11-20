@@ -1,0 +1,132 @@
+<div class="player-details-page">
+  <div class="player-details-container">
+    <!-- Back Button -->
+    <button class="back-btn" (click)="goBack()">
+    <span class="material-icons">arrow_back</span>
+    Voltar para Jogadores
+  </button>
+
+  <!-- Loading -->
+  @if (playersService.isLoading()) {
+    <div class="loading-container">
+      <div class="loading-spinner"></div>
+      <p>Carregando informações do jogador...</p>
+    </div>
+  }
+
+  <!-- Error -->
+  @if (playersService.error()) {
+    <div class="error-container">
+      <span class="material-icons">error_outline</span>
+      <p>{{ playersService.error() }}</p>
+      <button (click)="goBack()">Voltar</button>
+    </div>
+  }
+
+  <!-- Player Details -->
+  @if (playersService.selectedPlayer(); as player) {
+    <div class="player-profile">
+      <!-- Header with photo -->
+      <div class="profile-header">
+        <div class="player-photo">
+          <img
+            [src]="getPlayerPhotoUrl()"
+            [alt]="player.fullName"
+            (error)="onImageError($event)"
+          />
+        </div>
+
+        <div class="player-main-info">
+          <h1 class="player-name">{{ player.fullName }}</h1>
+          <div class="player-position-badge">{{ player.position }}</div>
+          <p class="player-position-full">{{ player.positionDisplay }}</p>
+        </div>
+      </div>
+
+      <!-- Info Cards -->
+      <div class="info-cards">
+        <!-- Physical Info -->
+        <div class="info-card">
+          <h3>
+            <span class="material-icons">straighten</span>
+            Informações Físicas
+          </h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">Altura</span>
+              <span class="value">{{ player.height }}</span>
+            </div>
+            <div class="info-item">
+              <span class="label">Peso</span>
+              <span class="value">{{ player.weight }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Info -->
+        <div class="info-card clickable" (click)="viewTeam(player.team.abbreviation)">
+          <h3>
+            <span class="material-icons">groups</span>
+            Time Atual
+          </h3>
+          <div class="team-info">
+            <img
+              [src]="getTeamLogoUrl()"
+              [alt]="player.team.name"
+              class="team-logo"
+              (error)="onTeamLogoError($event)"
+            />
+            <div class="team-details">
+              <span class="team-name">{{ player.team.displayName }}</span>
+              <span class="team-abbr">{{ player.team.abbreviation }}</span>
+            </div>
+            <span class="material-icons view-icon">chevron_right</span>
+          </div>
+        </div>
+
+        <!-- IDs Info -->
+        <div class="info-card">
+          <h3>
+            <span class="material-icons">badge</span>
+            Identificadores
+          </h3>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">ID Interno</span>
+              <span class="value">{{ player.id }}</span>
+            </div>
+            @if (player.espnId) {
+              <div class="info-item">
+                <span class="label">ESPN ID</span>
+                <span class="value">{{ player.espnId }}</span>
+              </div>
+            }
+            <div class="info-item">
+              <span class="label">External ID</span>
+              <span class="value">{{ player.externalId }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button class="action-btn primary" (click)="viewTeam(player.team.abbreviation)">
+          <span class="material-icons">sports_basketball</span>
+          Ver Time Completo
+        </button>
+      </div>
+    </div>
+  }
+
+    <!-- Not Found -->
+    @if (!playersService.isLoading() && !playersService.selectedPlayer() && !playersService.error()) {
+      <div class="not-found">
+        <span class="material-icons">person_off</span>
+        <h2>Jogador não encontrado</h2>
+        <p>O jogador solicitado não foi encontrado no sistema.</p>
+        <button (click)="goBack()">Voltar para Jogadores</button>
+      </div>
+    }
+  </div>
+</div>

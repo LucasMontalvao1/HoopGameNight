@@ -8,7 +8,6 @@ using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Core.Models.Entities;
 using HoopGameNight.Core.Services;
 using HoopGameNight.Tests.Helpers;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -22,32 +21,37 @@ namespace HoopGameNight.Tests.Unit.Core.Services
     public class PlayerServiceTests : IDisposable
     {
         private readonly Mock<IPlayerRepository> _mockPlayerRepository;
+        private readonly Mock<ITeamRepository> _mockTeamRepository;
+        private readonly Mock<IEspnApiService> _mockEspnService;
         private readonly Mock<IMapper> _mockMapper;
+        private readonly Mock<ICacheService> _mockCacheService;
         private readonly Mock<ILogger<PlayerService>> _mockLogger;
-        private readonly IMemoryCache _memoryCache;
         private readonly PlayerService _playerService;
 
         public PlayerServiceTests()
         {
             _mockPlayerRepository = new Mock<IPlayerRepository>();
+            _mockTeamRepository = new Mock<ITeamRepository>();
+            _mockEspnService = new Mock<IEspnApiService>();
             _mockMapper = new Mock<IMapper>();
+            _mockCacheService = new Mock<ICacheService>();
             _mockLogger = new Mock<ILogger<PlayerService>>();
-            _memoryCache = new MemoryCache(new MemoryCacheOptions());
 
-            var mockEspnService = new Mock<IEspnApiService>();
+            // Cache sempre retorna miss por padrão (configurações específicas nos testes)
 
             _playerService = new PlayerService(
                 _mockPlayerRepository.Object,
-                mockEspnService.Object,
+                _mockTeamRepository.Object,
+                _mockEspnService.Object,
                 _mockMapper.Object,
-                _memoryCache,
+                _mockCacheService.Object,
                 _mockLogger.Object
             );
         }
 
         public void Dispose()
         {
-            _memoryCache?.Dispose();
+            // Nada para limpar
         }
 
         #region Testes de Busca de Jogadores
@@ -455,17 +459,6 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         #endregion
 
         #region Métodos Auxiliares
-
-        /// <summary>
-        /// Limpa o cache de memória
-        /// </summary>
-        private void LimparCache()
-        {
-            if (_memoryCache is MemoryCache memoryCache)
-            {
-                memoryCache.Compact(1.0);
-            }
-        }
 
         #endregion
     }

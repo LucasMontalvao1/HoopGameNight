@@ -1,58 +1,59 @@
-﻿using HoopGameNight.Api.Constants;
+using HoopGameNight.Api.Constants;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Api.Controllers.V1
 {
+    /// <summary>
+    /// Controller para gerenciamento de jogadores da NBA
+    /// </summary>
     [Route(ApiConstants.Routes.PLAYERS)]
     public class PlayersController : BaseApiController
     {
         private readonly IPlayerService _playerService;
-        private readonly IMemoryCache _cache;
 
         public PlayersController(
             IPlayerService playerService,
-            IMemoryCache cache,
             ILogger<PlayersController> logger) : base(logger)
         {
             _playerService = playerService;
-            _cache = cache;
         }
 
         /// <summary>
         /// Buscar jogadores com filtros
         /// </summary>
-        /// <param name="request">Parâmetros de busca</param>
+        /// <param name="request">Parâmetros de busca (nome, time ou posição)</param>
         /// <returns>Lista paginada de jogadores</returns>
         [HttpGet(RouteConstants.Players.SEARCH)]
         [ProducesResponseType(typeof(PaginatedResponse<PlayerResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<PaginatedResponse<PlayerResponse>>> SearchPlayers([FromQuery] SearchPlayerRequest request)
+        public async Task<ActionResult<PaginatedResponse<PlayerResponse>>> SearchPlayers(
+            [FromQuery] SearchPlayerRequest request)
         {
-            try
+            if (!request.IsValid())
             {
-                if (!request.IsValid())
-                {
-                    var errorResponse = ApiResponse<object>.ErrorResult("Parâmetros de pesquisa inválidos. Informe o termo de pesquisa, ID da equipe ou posição.");
-                    return BadRequest(errorResponse);
-                }
-
-                Logger.LogInformation("Procurando jogadores com critérios: {@Request}", request);
-
-                var (players, totalCount) = await _playerService.SearchPlayersAsync(request);
-
-                Logger.LogInformation("Foram encontrados {PlayerCount} jogadores (total: {TotalCount})", players.Count, totalCount);
-                return OkPaginated(players, request.Page, request.PageSize, totalCount, "Jogadores recuperados com sucesso");
+                var errorResponse = ApiResponse<object>.ErrorResult(
+                    "Parâmetros de pesquisa inválidos. Informe o termo de pesquisa, ID da equipe ou posição.");
+                return BadRequest(errorResponse);
             }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao pesquisar jogadores com o critério: {@Request}", request);
-                throw;
-            }
+
+            Logger.LogInformation("Buscando jogadores com critérios: {@Request}", request);
+
+            var (players, totalCount) = await _playerService.SearchPlayersAsync(request);
+
+            Logger.LogInformation(
+                "Encontrados {PlayerCount} jogadores (total: {TotalCount})",
+                players.Count,
+                totalCount);
+
+            return OkPaginated(
+                players,
+                request.Page,
+                request.PageSize,
+                totalCount,
+                "Jogadores recuperados com sucesso");
         }
 
         /// <summary>
@@ -65,45 +66,29 @@ namespace HoopGameNight.Api.Controllers.V1
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         public async Task<ActionResult<ApiResponse<PlayerResponse>>> GetPlayerById(int id)
         {
-            try
+            return await ExecuteAsync(async () =>
             {
                 Logger.LogInformation("Buscando jogador com ID: {PlayerId}", id);
-
-                var cacheKey = string.Format(ApiConstants.CacheKeys.PLAYER_BY_ID, id);
-
-                if (_cache.TryGetValue(cacheKey, out PlayerResponse? cachedPlayer))
-                {
-                    Logger.LogDebug("Retornando jogador em cache: {PlayerId}", id);
-                    return Ok(cachedPlayer!, "Jogador recuperado com sucesso (armazenado em cache)");
-                }
 
                 var player = await _playerService.GetPlayerByIdAsync(id);
 
                 if (player == null)
                 {
                     Logger.LogWarning("Jogador não encontrado com ID: {PlayerId}", id);
-                    var errorResponse = ApiResponse<PlayerResponse>.ErrorResult($"Jogador com ID {id} não encontrado");
-                    return NotFound(errorResponse);
+                    return NotFound<PlayerResponse>($"Jogador com ID {id} não encontrado");
                 }
-
-                _cache.Set(cacheKey, player, TimeSpan.FromHours(1));
 
                 Logger.LogInformation("Jogador encontrado: {PlayerName}", player.FullName);
                 return Ok(player, "Jogador recuperado com sucesso");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao buscar jogador com ID: {PlayerId}", id);
-                throw;
-            }
+            });
         }
 
         /// <summary>
         /// Buscar jogadores por time
         /// </summary>
         /// <param name="teamId">ID do time</param>
-        /// <param name="page">Página</param>
-        /// <param name="pageSize">Tamanho da página</param>
+        /// <param name="page">Página (padrão: 1)</param>
+        /// <param name="pageSize">Tamanho da página (padrão: 25, máximo: 100)</param>
         /// <returns>Lista paginada de jogadores do time</returns>
         [HttpGet(RouteConstants.Players.GET_BY_TEAM)]
         [ProducesResponseType(typeof(PaginatedResponse<PlayerResponse>), StatusCodes.Status200OK)]
@@ -113,59 +98,124 @@ namespace HoopGameNight.Api.Controllers.V1
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 25)
         {
-            try
+            if (!IsValidPagination(page, pageSize, out var errorMessage))
             {
-                if (page < 1 || pageSize < 1 || pageSize > 100)
-                {
-                    var errorResponse = ApiResponse<object>.ErrorResult("Parâmetros de paginação inválidos");
-                    return BadRequest(errorResponse);
-                }
-
-                Logger.LogInformation("Buscando jogadores para o time: {TeamId}", teamId);
-
-                var (players, totalCount) = await _playerService.GetPlayersByTeamAsync(teamId, page, pageSize);
-
-                Logger.LogInformation("Foram encontrados {PlayerCount} jogadores para a equipe {TeamId}", players.Count, teamId);
-                return OkPaginated(players, page, pageSize, totalCount, $"Jogadores da equipe {teamId} recuperados com sucesso");
+                var errorResponse = ApiResponse<object>.ErrorResult(errorMessage!);
+                return BadRequest(errorResponse);
             }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Erro ao buscar jogadores para o time: {TeamId}", teamId);
-                throw;
-            }
+
+            Logger.LogInformation("Buscando jogadores para o time: {TeamId}", teamId);
+
+            var (players, totalCount) = await _playerService.GetPlayersByTeamAsync(teamId, page, pageSize);
+
+            Logger.LogInformation(
+                "Encontrados {PlayerCount} jogadores para a equipe {TeamId}",
+                players.Count,
+                teamId);
+
+            return OkPaginated(
+                players,
+                page,
+                pageSize,
+                totalCount,
+                $"Jogadores da equipe {teamId} recuperados com sucesso");
         }
 
         /// <summary>
-        /// Sincronizar jogadores por termo de busca
+        /// Listar todos os jogadores (sem filtro)
         /// </summary>
-        /// <param name="search">Termo de busca (opcional)</param>
-        /// <returns>Resultado da sincronização</returns>
-        [HttpPost("sync")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<object>>> SyncPlayers([FromQuery] string? search = null)
+        /// <param name="page">Página (padrão: 1)</param>
+        /// <param name="pageSize">Tamanho da página (padrão: 20, máximo: 100)</param>
+        /// <returns>Lista paginada de todos os jogadores</returns>
+        [HttpGet]
+        [ProducesResponseType(typeof(PaginatedResponse<PlayerResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<PaginatedResponse<PlayerResponse>>> GetAllPlayers(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
-            try
+            if (!IsValidPagination(page, pageSize, out var errorMessage))
             {
-                var searchTerm = search ?? "a";
-                Logger.LogInformation("Iniciando a sincronização manual de jogadores com a pesquisa: {Search}", searchTerm);
-
-                await _playerService.SyncPlayersAsync(searchTerm);
-
-                var result = (object)new
-                {
-                    message = "Jogadores sincronizados com sucesso",
-                    searchTerm = searchTerm,
-                    timestamp = DateTime.UtcNow
-                };
-
-                Logger.LogInformation("Sincronização manual de jogadores concluída");
-                return Ok(result, "Jogadores sincronizados com sucesso");
+                var errorResponse = ApiResponse<object>.ErrorResult(errorMessage!);
+                return BadRequest(errorResponse);
             }
-            catch (Exception ex)
+
+            Logger.LogInformation("Listando todos os jogadores - Página: {Page}, Tamanho: {PageSize}", page, pageSize);
+
+            var (players, totalCount) = await _playerService.GetAllPlayersAsync(page, pageSize);
+
+            Logger.LogInformation(
+                "Encontrados {PlayerCount} jogadores (total: {TotalCount})",
+                players.Count,
+                totalCount);
+
+            return OkPaginated(
+                players,
+                page,
+                pageSize,
+                totalCount,
+                "Jogadores recuperados com sucesso");
+        }
+
+        /// <summary>
+        /// Buscar jogadores por posição
+        /// </summary>
+        /// <param name="position">Posição (PG, SG, SF, PF, C)</param>
+        /// <param name="page">Página</param>
+        /// <param name="pageSize">Tamanho da página</param>
+        /// <returns>Lista paginada de jogadores da posição</returns>
+        [HttpGet("position/{position}")]
+        [ProducesResponseType(typeof(PaginatedResponse<PlayerResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<PaginatedResponse<PlayerResponse>>> GetPlayersByPosition(
+            string position,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 25)
+        {
+            if (!IsValidPagination(page, pageSize, out var errorMessage))
             {
-                Logger.LogError(ex, "Erro durante a sincronização manual dos jogadores");
-                throw;
+                var errorResponse = ApiResponse<object>.ErrorResult(errorMessage!);
+                return BadRequest(errorResponse);
             }
+
+            var validPositions = new[] { "PG", "SG", "SF", "PF", "C", "G", "F" };
+            if (!validPositions.Contains(position.ToUpper()))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult(
+                    $"Posição inválida. Use: {string.Join(", ", validPositions)}"));
+            }
+
+            Logger.LogInformation("Buscando jogadores por posição: {Position}, Page: {Page}, PageSize: {PageSize}",
+                position, page, pageSize);
+
+            var request = new SearchPlayerRequest
+            {
+                Position = position.ToUpper(),
+                Page = page,
+                PageSize = pageSize
+            };
+
+            var (players, totalCount) = await _playerService.SearchPlayersAsync(request);
+
+            Logger.LogInformation(
+                "Encontrados {PlayerCount} jogadores na posição {Position} (total: {TotalCount})",
+                players.Count,
+                position,
+                totalCount);
+
+            // Debug: mostrar posições dos jogadores retornados
+            if (players.Any())
+            {
+                var positions = players.Select(p => p.Position).Distinct();
+                Logger.LogInformation("Posições retornadas: {Positions}", string.Join(", ", positions));
+            }
+
+            return OkPaginated(
+                players,
+                page,
+                pageSize,
+                totalCount,
+                $"Jogadores da posição {position} recuperados com sucesso");
         }
     }
 }

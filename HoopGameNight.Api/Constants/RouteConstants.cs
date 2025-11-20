@@ -37,6 +37,19 @@
             public const string SYNC_STATUS = "sync/status";
         }
 
+        public static class PlayerStats
+        {
+            public const string GET_STATS = "{playerId:int}";
+            public const string GET_SEASON = "{playerId:int}/season/{season:int}";
+            public const string GET_ALL_SEASONS = "{playerId:int}/seasons";
+            public const string GET_CAREER = "{playerId:int}/career";
+            public const string GET_RECENT_GAMES = "{playerId:int}/recent-games";
+            public const string GET_GAME_STATS = "{playerId:int}/games/{gameId:int}";
+            public const string COMPARE = "compare/{player1Id:int}/{player2Id:int}";
+            public const string LEADERS = "leaders";
+            public const string UPDATE_CAREER = "{playerId:int}/career/update";
+        }
+
         public static class Sync
         {
             public const string ALL = "all";
