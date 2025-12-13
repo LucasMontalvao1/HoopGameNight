@@ -111,7 +111,6 @@ namespace HoopGameNight.Infrastructure.Data
                 useCommand.CommandText = $"USE `{schemaName}`";
                 await useCommand.ExecuteNonQueryAsync();
 
-                // Tentar executar o script InitDatabase se existir 
                 try
                 {
                     var initScript = await _sqlLoader.LoadSqlAsync("Database", "InitDatabase");
@@ -173,7 +172,7 @@ namespace HoopGameNight.Infrastructure.Data
 
             var triggers = new[]
             {
-                ("Statistics/Triggers", "trg_player_game_stats_after_insert"),
+                ("Statistics/Triggers", "trg_player_season_stats_before_insert"),
                 ("Statistics/Triggers", "trg_player_season_stats_before_update")
             };
 
@@ -205,34 +204,10 @@ namespace HoopGameNight.Infrastructure.Data
         {
             _logger.LogInformation("Criando views do banco de dados...");
 
-            var views = new[]
-            {
-                ("Statistics/Views", "vw_players_current_season"),
-                ("Statistics/Views", "vw_scoring_leaders")
-            };
 
-            foreach (var (folder, viewName) in views)
-            {
-                try
-                {
-                    await DropViewIfExistsAsync(viewName);
+            _logger.LogInformation("Nenhuma view para criar (views foram removidas para simplificação)");
 
-                    var viewSql = await _sqlLoader.LoadSqlAsync(folder, viewName);
-                    if (string.IsNullOrEmpty(viewSql))
-                    {
-                        _logger.LogWarning("Script de view não encontrado: {Folder}/{ViewName}", folder, viewName);
-                        continue;
-                    }
-
-                    await _queryExecutor.ExecuteAsync(viewSql);
-                    _logger.LogInformation("View {ViewName} criada com sucesso", viewName);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Falha ao criar view {ViewName}", viewName);
-                    throw;
-                }
-            }
+            await Task.CompletedTask;
         }
 
         private async Task DropTriggerIfExistsAsync(string triggerName)

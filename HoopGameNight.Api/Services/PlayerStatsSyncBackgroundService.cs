@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using HoopGameNight.Api.Options;
 using HoopGameNight.Core.Enums;
+using HoopGameNight.Core.Helpers;
 
 namespace HoopGameNight.Api.Services
 {
@@ -117,7 +118,7 @@ namespace HoopGameNight.Api.Services
                     try
                     {
                         await syncService.SyncPlayerRecentGamesAsync(player.Id, 5);
-                        var currentSeason = DateTime.Now.Year;
+                        var currentSeason = NbaSeasonHelper.GetCurrentSeason();
                         await syncService.SyncPlayerSeasonStatsAsync(player.Id, currentSeason);
                         await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
                     }

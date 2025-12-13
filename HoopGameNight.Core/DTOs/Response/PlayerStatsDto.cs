@@ -35,18 +35,50 @@
         public string TeamName { get; set; } = string.Empty;
         public int GamesPlayed { get; set; }
         public int GamesStarted { get; set; }
+
+        // Médias por jogo
         public decimal PPG { get; set; }
         public decimal RPG { get; set; }
         public decimal APG { get; set; }
         public decimal SPG { get; set; }
         public decimal BPG { get; set; }
         public decimal MPG { get; set; }
+
+        // Porcentagens
         public decimal FGPercentage { get; set; }
         public decimal ThreePointPercentage { get; set; }
         public decimal FTPercentage { get; set; }
+
+        // Totais da temporada
         public int TotalPoints { get; set; }
         public int TotalRebounds { get; set; }
         public int TotalAssists { get; set; }
+
+        // Dados brutos de arremessos (para exibir X/Y)
+        public int FieldGoalsMade { get; set; }
+        public int FieldGoalsAttempted { get; set; }
+        public int ThreePointersMade { get; set; }
+        public int ThreePointersAttempted { get; set; }
+        public int FreeThrowsMade { get; set; }
+        public int FreeThrowsAttempted { get; set; }
+
+        // Rebotes detalhados
+        public int OffensiveRebounds { get; set; }
+        public int DefensiveRebounds { get; set; }
+
+        // Outras estatísticas totais
+        public int Steals { get; set; }
+        public int Blocks { get; set; }
+        public int Turnovers { get; set; }
+        public int PersonalFouls { get; set; }
+        public decimal MinutesPlayed { get; set; }
+        public int Points { get; set; }
+
+        // Aliases para compatibilidade com frontend (camelCase via JSON)
+        public decimal AvgPoints => PPG;
+        public decimal AvgRebounds => RPG;
+        public decimal AvgAssists => APG;
+        public decimal AvgMinutes => MPG;
     }
 
     public class PlayerCareerStatsResponse

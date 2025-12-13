@@ -56,6 +56,10 @@
 			<Link>Sql\%(RecursiveDir)%(Filename)%(Extension)</Link>
 		</Content>
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Remove="Configurations\ExternalApiConfiguration.cs" />
+	</ItemGroup>
 	<ItemGroup>
 	  <Folder Include="logs\" />
 	</ItemGroup>

@@ -17,9 +17,6 @@ namespace HoopGameNight.Api.Controllers
             Logger = logger;
         }
 
-        /// <summary>
-        /// Executa operação assíncrona com tratamento de erro e logging automático
-        /// </summary>
         protected async Task<ActionResult<ApiResponse<T>>> ExecuteAsync<T>(
             Func<Task<ActionResult<ApiResponse<T>>>> operation,
             [System.Runtime.CompilerServices.CallerMemberName] string operationName = "")

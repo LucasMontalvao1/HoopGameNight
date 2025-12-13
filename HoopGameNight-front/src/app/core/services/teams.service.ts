@@ -53,7 +53,7 @@ export class TeamsService {
   );
 
   private readonly NBA_TEAMS = new Set([
-    'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GS',
+    'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GS', 'GWS',
     'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NO', 'NY',
     'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SA', 'TOR', 'UTAH', 'WSH'
   ]);
@@ -101,7 +101,7 @@ export class TeamsService {
       const isValidNBA = this.NBA_TEAMS.has(upperAbbr);
       
       if (!isValidNBA) {
-        console.log(`🚫 Time não-NBA filtrado: ${team.abbreviation} - ${team.displayName || team.name}`);
+        console.log(`Time não-NBA filtrado: ${team.abbreviation} - ${team.displayName || team.name}`);
       }
       
       return isValidNBA;

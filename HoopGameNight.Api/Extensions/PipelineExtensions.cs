@@ -412,8 +412,7 @@ namespace HoopGameNight.Api.Extensions
             Log.Information("║ • Connection: {Connection,-43} ║", "Configured");
             Log.Information("╠══════════════════════════════════════════════════════════╣");
             Log.Information("║ EXTERNAL APIS:                                           ║");
-            Log.Information("║ • ESPN API: {ESPN,-45} ║", "✅ Configured (Free)");
-            Log.Information("║ • NBA Stats API: {NBAStats,-38} ║", "✅ Ready for future");
+            Log.Information("║ • ESPN API: {ESPN,-45} ║", "Configured (Free)");
             Log.Information("╠══════════════════════════════════════════════════════════╣");
             Log.Information("║ STATUS: {Status,-48} ║", "ONLINEEEE");
             Log.Information("╚══════════════════════════════════════════════════════════╝");

@@ -1,5 +1,6 @@
 ﻿using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Services;
+using HoopGameNight.Core.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HoopGameNight.Api.Controllers.V1
@@ -112,9 +113,8 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             return await ExecuteAsync(async () =>
             {
-                var currentYear = DateTime.Now.Year;
-                if (season < 2000 || season > currentYear + 1)
-                    return BadRequest<object>($"Temporada inválida. Deve estar entre 2000 e {currentYear + 1}");
+                if (!NbaSeasonHelper.IsValidSeason(season))
+                    return BadRequest<object>("Temporada inválida");
 
                 var success = await _syncService.SyncAllPlayersSeasonStatsAsync(season);
 
@@ -160,8 +160,8 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             return await ExecuteAsync(async () =>
             {
-                var currentYear = DateTime.Now.Year;
-                var syncedSeasons = await _syncService.SyncPlayerCareerHistoryAsync(playerId, currentYear - 4, currentYear);
+                var currentSeason = NbaSeasonHelper.GetCurrentSeason();
+                var syncedSeasons = await _syncService.SyncPlayerCareerHistoryAsync(playerId, currentSeason - 4, currentSeason);
 
                 var careerUpdated = await _statsService.UpdatePlayerCareerStatsAsync(playerId);
 
@@ -192,15 +192,15 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             return await ExecuteAsync(async () =>
             {
-                var currentYear = DateTime.Now.Year;
+                var currentSeason = NbaSeasonHelper.GetCurrentSeason();
                 var start = startYear ?? 2003;
-                var end = endYear ?? currentYear;
+                var end = endYear ?? currentSeason;
 
                 if (start > end)
                     return BadRequest<object>("O ano inicial não pode ser maior que o ano final");
 
-                if (end > currentYear + 1)
-                    return BadRequest<object>($"O ano final não pode ser maior que {currentYear + 1}");
+                if (!NbaSeasonHelper.IsValidSeason(end))
+                    return BadRequest<object>("Temporada final inválida");
 
                 var syncedSeasons = await _syncService.SyncPlayerCareerHistoryAsync(playerId, start, end);
 

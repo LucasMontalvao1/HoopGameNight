@@ -1,6 +1,5 @@
 ﻿using HoopGameNight.Api.Configurations;
 using HoopGameNight.Api.Constants;
-using HoopGameNight.Api.Controllers.V1.Admin;
 using HoopGameNight.Api.Filters;
 using HoopGameNight.Api.HealthChecks;
 using HoopGameNight.Api.Mappings;
@@ -131,10 +130,6 @@ namespace HoopGameNight.Api.Extensions
             services.Configure<ApiConfiguration>(
                 configuration.GetSection("ApiSettings"));
 
-            // External APIs Configuration
-            services.Configure<ExternalApiConfiguration>(
-                configuration.GetSection("ExternalApis"));
-
             // CORS Configuration
             services.Configure<CorsConfiguration>(
                 configuration.GetSection("Cors"));
@@ -199,9 +194,6 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPlayerStatsService, PlayerStatsService>();
-            // OBSOLETO: PlayerStatsSyncService deletado - stats de jogadores serão implementados futuramente
-            // services.AddScoped<IPlayerStatsSyncService, PlayerStatsSyncService>();
-            services.AddSingleton<ISyncHealthService, SyncHealthService>();
 
             return services;
         }
@@ -474,7 +466,7 @@ namespace HoopGameNight.Api.Extensions
                     Description = "Endpoints de monitoramento e health checks"
                 });
 
-                // FIX: Simplified schema naming for generics
+                // Simplified schema naming for generics
                 c.CustomSchemaIds(type =>
                 {
                     if (type.IsGenericType)
@@ -505,7 +497,6 @@ namespace HoopGameNight.Api.Extensions
                         return $"{name}Of{argNames}";
                     }
 
-                    // Non-generic types - use simple name without namespace
                     return type.Name;
                 });
 
@@ -528,7 +519,7 @@ namespace HoopGameNight.Api.Extensions
                 // Add operation filter to simplify responses
                 c.OperationFilter<SimplifyResponsesOperationFilter>();
 
-                // Add JWT Authentication (quando implementar)
+                // Add JWT Authentication 
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
