@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Core.DTOs.External
+﻿using System;
+
+namespace HoopGameNight.Core.DTOs.External
 {
     /// <summary>
     /// DTO para dados da ESPN API

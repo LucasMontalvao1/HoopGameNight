@@ -18,6 +18,9 @@ namespace HoopGameNight.Tests.Helpers
         public Mock<IMapper> MockMapper { get; }
         public Mock<ILogger<GameService>> MockLogger { get; }
         public Mock<ICacheService> MockCacheService { get; }
+        public Mock<IGameStatsService> MockGameStatsService { get; }
+        public Mock<ITeamService> MockTeamService { get; }
+
         public GameService GameService { get; }
 
         public GameServiceTestFixture()
@@ -28,6 +31,9 @@ namespace HoopGameNight.Tests.Helpers
             MockMapper = MockSetupHelper.CreateMapperMock();
             MockLogger = MockSetupHelper.CreateLoggerMock<GameService>();
             MockCacheService = MockSetupHelper.CreateCacheServiceMock();
+            MockGameStatsService = new Mock<IGameStatsService>();
+            MockTeamService = new Mock<ITeamService>();
+
 
             GameService = new GameService(
                 MockGameRepository.Object,
@@ -35,8 +41,11 @@ namespace HoopGameNight.Tests.Helpers
                 MockEspnApiService.Object,
                 MockMapper.Object,
                 MockCacheService.Object,
+                MockGameStatsService.Object,
+                MockTeamService.Object,
                 MockLogger.Object
             );
+
         }
 
         public void Dispose()
@@ -47,7 +56,7 @@ namespace HoopGameNight.Tests.Helpers
         #region Métodos Adicionados para os Testes
 
         /// <summary>
-        /// Reseta todos os mocks para estado inicial
+        /// Reinicializa o estado interno de todos os Mocks configurados na Fixture.
         /// </summary>
         public void ResetarMocks()
         {
@@ -62,7 +71,7 @@ namespace HoopGameNight.Tests.Helpers
         }
 
         /// <summary>
-        /// Limpa o cache de memória
+        /// Invalida o comportamento do Mock de cache para simular uma limpeza de estado.
         /// </summary>
         public void LimparCache()
         {
@@ -71,7 +80,7 @@ namespace HoopGameNight.Tests.Helpers
         }
 
         /// <summary>
-        /// Configura comportamento padrão dos mocks para evitar null reference exceptions
+        /// Configura os retornos padrão dos Mocks para evitar exceções de referência nula durante o setup dos testes.
         /// </summary>
         private void ConfigurarComportamentoPadrao()
         {
@@ -88,12 +97,6 @@ namespace HoopGameNight.Tests.Helpers
             MockTeamRepository
                 .Setup(x => x.GetByExternalIdAsync(It.IsAny<int>()))
                 .ReturnsAsync((Team?)null);
-
-            // BallDontLieService - comportamento padrão
-            // REMOVIDO: BallDontLie DTOs deletados - método comentado em IBallDontLieService
-            // MockBallDontLieService
-            //     .Setup(x => x.GetTodaysGamesAsync())
-            //     .ReturnsAsync(new List<Core.DTOs.External.BallDontLie.BallDontLieGameDto>());
 
             // Mapper - comportamento padrão
             MockMapper

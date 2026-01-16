@@ -1,5 +1,5 @@
 ﻿INSERT INTO player_season_stats (
-    player_id, season, team_id, games_played, games_started,
+    player_id, season, season_type_id, team_id, games_played, games_started,
     minutes_played, points, field_goals_made, field_goals_attempted,
     three_pointers_made, three_pointers_attempted,
     free_throws_made, free_throws_attempted,
@@ -9,7 +9,7 @@
     field_goal_percentage, three_point_percentage, free_throw_percentage,
     created_at, updated_at
 ) VALUES (
-    @PlayerId, @Season, @TeamId, @GamesPlayed, @GamesStarted,
+    @PlayerId, @Season, @SeasonTypeId, @TeamId, @GamesPlayed, @GamesStarted,
     @MinutesPlayed, @Points, @FieldGoalsMade, @FieldGoalsAttempted,
     @ThreePointersMade, @ThreePointersAttempted,
     @FreeThrowsMade, @FreeThrowsAttempted,
@@ -46,4 +46,4 @@
     three_point_percentage = VALUES(three_point_percentage),
     free_throw_percentage = VALUES(free_throw_percentage),
     updated_at = NOW();
-SELECT id FROM player_season_stats WHERE player_id = @PlayerId AND season = @Season;
+SELECT id FROM player_season_stats WHERE player_id = @PlayerId AND season = @Season AND season_type_id = @SeasonTypeId AND (team_id = @TeamId OR (@TeamId IS NULL AND team_id IS NULL));

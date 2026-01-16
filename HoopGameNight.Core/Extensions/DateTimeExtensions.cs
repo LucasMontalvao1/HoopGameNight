@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Core.Extensions
+﻿using System;
+
+namespace HoopGameNight.Core.Extensions
 {
     public static class DateTimeExtensions
     {

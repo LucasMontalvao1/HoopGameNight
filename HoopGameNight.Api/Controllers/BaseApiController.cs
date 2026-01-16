@@ -1,4 +1,10 @@
-﻿using HoopGameNight.Core.DTOs.Response;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using HoopGameNight.Core.DTOs.Response;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 
@@ -56,7 +62,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Retorna resposta de sucesso com dados
+        /// Encapsula os dados em um objeto <see cref="ApiResponse{T}"/> com status HTTP 200 (OK).
         /// </summary>
         protected new ActionResult<ApiResponse<T>> Ok<T>(T data, string message = "Success")
         {
@@ -66,7 +72,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Retorna resposta de erro bad request
+        /// Retorna um erro de validação ou regra de negócio com status HTTP 400 (Bad Request).
         /// </summary>
         protected new ActionResult<ApiResponse<T>> BadRequest<T>(string message)
         {
@@ -76,7 +82,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Retorna resposta de não encontrado
+        /// Indica que o recurso solicitado não foi encontrado, retornando status HTTP 404 (Not Found).
         /// </summary>
         protected new ActionResult<ApiResponse<T>> NotFound<T>(string message)
         {
@@ -86,7 +92,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Retorna resposta paginada
+        /// Formata a resposta para coleções paginadas, incluindo metadados nos headers da resposta HTTP.
         /// </summary>
         protected ActionResult<PaginatedResponse<T>> OkPaginated<T>(
             IEnumerable<T> data,
@@ -106,7 +112,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Valida parâmetros de paginação
+        /// Valida se os parâmetros de paginação (página e tamanho) estão dentro dos limites aceitáveis.
         /// </summary>
         protected bool IsValidPagination(int page, int pageSize, out string? errorMessage)
         {
@@ -128,7 +134,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Obtém IP do cliente
+        /// Tenta extrair o endereço IP original do cliente, considerando headers de proxy (X-Real-IP / X-Forwarded-For).
         /// </summary>
         protected string GetClientIpAddress()
         {
@@ -139,7 +145,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Adiciona cache headers na resposta
+        /// Adiciona headers de controle de cache (Cache-Control e Expires) à resposta HTTP.
         /// </summary>
         protected void SetCacheHeaders(int seconds)
         {

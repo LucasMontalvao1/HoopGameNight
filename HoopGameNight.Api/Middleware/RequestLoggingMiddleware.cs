@@ -1,4 +1,8 @@
+using System;
+using System.Threading.Tasks;
 using System.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Api.Middleware
 {

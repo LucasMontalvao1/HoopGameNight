@@ -364,3 +364,10 @@ FodyWeavers.xsd
 
 # Environment variables - SECURITY
 .env
+
+# Build logs and temporary files - Added 2026-01-12
+*build*.txt
+*build*.log
+msbuild.log
+raw_*.json
+nul

@@ -1,4 +1,8 @@
-﻿using HoopGameNight.Core.Enums;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Interfaces.Infrastructure;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Models.Entities;
@@ -145,7 +149,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             {
                 Logger.LogDebug("Deleting team with ID: {TeamId}", id);
 
-                // Verificar se o time existe antes de tentar deletar
                 var existingTeam = await GetByIdAsync(id);
                 if (existingTeam == null)
                 {

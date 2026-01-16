@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Api.Options
+﻿using System.Collections.Generic;
+
+namespace HoopGameNight.Api.Options
 {
     public class RateLimitOptions
     {

@@ -1,96 +1,116 @@
-using HoopGameNight.Api.Constants;
-using HoopGameNight.Core.DTOs.Request;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using HoopGameNight.Api.Controllers;
+using HoopGameNight.Core.DTOs.External.ESPN;
 using HoopGameNight.Core.DTOs.Response;
-using HoopGameNight.Core.Helpers;
 using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace HoopGameNight.Api.Controllers.V1
 {
-    /// <summary>
-    /// Controller para estatísticas detalhadas de jogadores da NBA
-    /// </summary>
-    [Route(ApiConstants.Routes.PLAYERSTATS)]
-    [ApiExplorerSettings(GroupName = "PlayerStats")]
+    [ApiController]
+    [Route("api/v1/playerstats")]
     public class PlayerStatsController : BaseApiController
     {
         private readonly IPlayerStatsService _playerStatsService;
 
-        public PlayerStatsController(
-            IPlayerStatsService playerStatsService,
-            ILogger<PlayerStatsController> logger) : base(logger)
+        public PlayerStatsController(IPlayerStatsService playerStatsService, ILogger<PlayerStatsController> logger) 
+            : base(logger)
         {
             _playerStatsService = playerStatsService;
         }
 
-
-        /// <summary>
-        /// Buscar estatísticas de uma temporada específica
-        /// </summary>
-        /// <param name="playerId">ID do jogador</param>
-        /// <param name="season">Ano da temporada (ex: 2024)</param>
-        /// <returns>Estatísticas da temporada</returns>
-        [HttpGet(RouteConstants.PlayerStats.GET_SEASON)]
+        [HttpGet("{playerId}/season/{season}")]
         [ProducesResponseType(typeof(ApiResponse<PlayerSeasonStatsResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<ApiResponse<PlayerSeasonStatsResponse>>> GetPlayerSeasonStats(
-            int playerId,
-            int season)
+        public async Task<ActionResult<ApiResponse<PlayerSeasonStatsResponse>>> GetPlayerSeasonStats(int playerId, int season)
         {
-            return await ExecuteAsync(async () =>
+            return await ExecuteAsync<PlayerSeasonStatsResponse>(async () =>
             {
-                Logger.LogWarning("CONTROLLER: GET /playerstats/{PlayerId}/season/{Season}", playerId, season);
-
                 var stats = await _playerStatsService.GetPlayerSeasonStatsAsync(playerId, season);
-
-                if (stats == null)
-                {
-                    Logger.LogError("CONTROLLER: Stats não encontradas - retornando 404");
-                    return NotFound<PlayerSeasonStatsResponse>(
-                        $"Temporada {season} não tem estatísticas do jogador {playerId}");
-                }
-
-                Logger.LogWarning("CONTROLLER: Retornando stats - PPG={PPG}, RPG={RPG}, APG={APG}",
-                    stats.PPG, stats.RPG, stats.APG);
-
-                return Ok(stats, "Estatísticas por temporada recuperadas com sucesso");
+                if (stats == null) return NotFound<PlayerSeasonStatsResponse>("Estatísticas da temporada não encontradas ou jogador inexistente.");
+                return Ok(stats);
             });
         }
 
-        /// <summary>
-        /// Buscar todas as temporadas de um jogador
-        /// </summary>
-        /// <param name="playerId">ID do jogador</param>
-        /// <returns>Lista de todas as temporadas</returns>
-        [HttpGet(RouteConstants.PlayerStats.GET_ALL_SEASONS)]
-        [ProducesResponseType(typeof(ApiResponse<List<PlayerSeasonStatsResponse>>), StatusCodes.Status200OK)]
+        [HttpGet("{playerId}/game/{gameId}")]
+        [ProducesResponseType(typeof(ApiResponse<PlayerGameStatsDetailedResponse>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<ApiResponse<List<PlayerSeasonStatsResponse>>>> GetPlayerAllSeasonStats(
-            int playerId)
+        public async Task<ActionResult<ApiResponse<PlayerGameStatsDetailedResponse>>> GetPlayerGameStats(int playerId, int gameId)
         {
-            return await ExecuteAsync(async () =>
+            return await ExecuteAsync<PlayerGameStatsDetailedResponse>(async () =>
             {
-                Logger.LogWarning("CONTROLLER: GET /playerstats/{PlayerId}/seasons", playerId);
-
-                var allSeasons = await _playerStatsService.GetPlayerAllSeasonsAsync(playerId);
-
-                if (!allSeasons.Any())
-                {
-                    Logger.LogError("CONTROLLER: Nenhuma temporada encontrada - retornando 404");
-                    return NotFound<List<PlayerSeasonStatsResponse>>(
-                        $"Nenhuma estatística de temporada encontrada para o jogador {playerId}");
-                }
-
-                Logger.LogWarning("CONTROLLER: Retornando {Count} temporadas", allSeasons.Count);
-
-                return Ok(allSeasons, "Todas as temporadas recuperadas com sucesso");
+                var stats = await _playerStatsService.GetPlayerGameStatsAsync(playerId, gameId);
+                if (stats == null) return NotFound<PlayerGameStatsDetailedResponse>("Estatísticas do jogo não encontradas.");
+                return Ok(stats);
             });
         }
 
+        [HttpGet("{playerId}/recent")]
+        [ProducesResponseType(typeof(ApiResponse<IEnumerable<PlayerGameStatsDetailedResponse>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<IEnumerable<PlayerGameStatsDetailedResponse>>>> GetRecentGames(int playerId, [FromQuery] int limit = 5)
+        {
+            return await ExecuteAsync<IEnumerable<PlayerGameStatsDetailedResponse>>(async () =>
+            {
+                var stats = await _playerStatsService.GetPlayerRecentGamesAsync(playerId, limit);
+                return Ok(stats);
+            });
+        }
 
+        // === DIRECT ESPN ENDPOINTS (CACHE -> ESPN) ===
 
+        [HttpGet("{playerId}/gamelog")]
+        [ProducesResponseType(typeof(ApiResponse<PlayerGamelogResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<PlayerGamelogResponse>>> GetPlayerGamelog(int playerId)
+        {
+            return await ExecuteAsync<PlayerGamelogResponse>(async () =>
+            {
+                var data = await _playerStatsService.GetPlayerGamelogFromEspnAsync(playerId);
+                if (data == null) return NotFound<PlayerGamelogResponse>("Gamelog não encontrado.");
+                return Ok(data);
+            });
+        }
 
+        [HttpGet("{playerId}/splits")]
+        [ProducesResponseType(typeof(ApiResponse<PlayerSplitsResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<PlayerSplitsResponse>>> GetPlayerSplits(int playerId)
+        {
+            return await ExecuteAsync<PlayerSplitsResponse>(async () =>
+            {
+                var data = await _playerStatsService.GetPlayerSplitsFromEspnAsync(playerId);
+                if (data == null) return NotFound<PlayerSplitsResponse>("Splits não encontrados.");
+                return Ok(data);
+            });
+        }
 
+        [HttpGet("external/{playerId}/game/{gameId}")]
+        public async Task<ActionResult<ApiResponse<object>>> GetPlayerGameStatsDirect(int playerId, int gameId)
+        {
+            return await ExecuteAsync<object>(async () =>
+            {
+                var data = await _playerStatsService.GetPlayerGameStatsDirectAsync(playerId, gameId);
+                if (data == null) return NotFound<object>("Dados externos não encontrados.");
+                return Ok(data);
+            });
+        }
 
+        [HttpGet("{playerId}/career")]
+        [ProducesResponseType(typeof(ApiResponse<PlayerCareerResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<ApiResponse<PlayerCareerResponse>>> GetPlayerCareer(int playerId)
+        {
+            return await ExecuteAsync<PlayerCareerResponse>(async () =>
+            {
+                var data = await _playerStatsService.GetPlayerCareerStatsFromEspnAsync(playerId);
+                if (data == null) return NotFound<PlayerCareerResponse>("Estatísticas de carreira não encontradas.");
+                return Ok(data);
+            });
+        }
     }
 }

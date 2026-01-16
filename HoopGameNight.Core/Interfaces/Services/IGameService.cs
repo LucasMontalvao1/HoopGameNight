@@ -1,5 +1,9 @@
-﻿using HoopGameNight.Core.DTOs.Request;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
+using HoopGameNight.Core.DTOs.External.ESPN;
 
 namespace HoopGameNight.Core.Interfaces.Services
 {
@@ -64,5 +68,15 @@ namespace HoopGameNight.Core.Interfaces.Services
         /// Sincroniza jogos futuros da ESPN e salva no banco
         /// </summary>
         Task<int> SyncFutureGamesAsync(int days = 30);
+
+        // Métodos para Estatísticas e Líderes
+        Task<EspnBoxscoreDto?> GetGameBoxscoreAsync(int gameId);
+        Task<GameLeadersResponse?> GetGameLeadersAsync(int gameId);
+        Task<TeamSeasonLeadersResponse?> GetTeamLeadersAsync(int teamId);
+
+        /// <summary>
+        /// Sincroniza um jogo específico pelo ID da ESPN
+        /// </summary>
+        Task<int> SyncGameByIdAsync(string gameId);
     }
 }

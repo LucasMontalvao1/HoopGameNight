@@ -1,4 +1,9 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Caching.Memory;
 using System.Collections.Concurrent;
 
 namespace HoopGameNight.Infrastructure.Services
@@ -39,17 +44,17 @@ namespace HoopGameNight.Infrastructure.Services
                 RecordsProcessed = recordsProcessed ?? 0
             };
 
-            // Atualizar métricas globais
+            // Incrementa contadores e métricas de tempo no objeto singleton global
             UpdateMetrics(_globalMetrics, syncEvent);
 
-            // Atualizar métricas por tipo
+            // Registra ou atualiza as métricas específicas para o tipo de operação (ex: 'TeamsSync')
             var typeMetrics = _metricsByType.GetOrAdd(syncType, _ => new SyncMetrics { Type = syncType });
             UpdateMetrics(typeMetrics, syncEvent);
 
-            // Verificar alertas
+            // Avalia o resultado contra regras de alerta (falhas consecutivas, performance lenta, etc)
             CheckForAlerts(syncEvent);
 
-            // Salvar no cache
+            // Serializa e persiste o estado atual das métricas no IMemoryCache
             SaveMetricsToCache();
         }
 
@@ -89,7 +94,7 @@ namespace HoopGameNight.Infrastructure.Services
 
         public List<SyncAlert> GetAlerts()
         {
-            // Limpar alertas antigos (mais de 24h)
+            // Remove alertas cujo timestamp seja superior a 24 horas (TTL de alertas em memória)
             _alerts.RemoveAll(a => a.Timestamp < DateTime.UtcNow.AddHours(-24));
             return _alerts.ToList();
         }
@@ -113,18 +118,18 @@ namespace HoopGameNight.Infrastructure.Services
                 metrics.LastFailureTime = syncEvent.Timestamp;
             }
 
-            // Resetar falhas consecutivas em caso de sucesso
+            // Em caso de êxito na operação, zera o contador de falhas consecutivas do monitoramento
             if (syncEvent.Success)
             {
                 metrics.ConsecutiveFailures = 0;
             }
 
-            // Calcular média de duração
+            // Calcula a média móvel simples baseada no histórico de eventos registrados
             metrics.AverageDuration = TimeSpan.FromMilliseconds(
                 metrics.Events.Average(e => e.Duration.TotalMilliseconds)
             );
 
-            // Atualizar min/max duração
+            // Atualiza os valores extremos (Min/Max) observados durante o ciclo de vida do serviço
             if (metrics.MinDuration == TimeSpan.Zero || syncEvent.Duration < metrics.MinDuration)
                 metrics.MinDuration = syncEvent.Duration;
 
@@ -133,7 +138,7 @@ namespace HoopGameNight.Infrastructure.Services
 
             metrics.LastSyncTime = syncEvent.Timestamp;
 
-            // Manter apenas últimos 100 eventos
+            // Mantém um buffer circular limitado aos últimos 100 eventos para evitar consumo excessivo de memória
             if (metrics.Events.Count > 100)
             {
                 metrics.Events = metrics.Events
@@ -145,7 +150,7 @@ namespace HoopGameNight.Infrastructure.Services
 
         private void CheckForAlerts(SyncEvent syncEvent)
         {
-            // Alerta de falha
+            // Regra: Qualquer falha individual de sincronização gera um alerta de severidade 'Warning'
             if (!syncEvent.Success)
             {
                 _alerts.Add(new SyncAlert
@@ -158,7 +163,7 @@ namespace HoopGameNight.Infrastructure.Services
                 });
             }
 
-            // Alerta de performance
+            // Regra: Operações que excedam 5 minutos são marcadas como gargalos de performance
             if (syncEvent.Duration > TimeSpan.FromMinutes(5))
             {
                 _alerts.Add(new SyncAlert
@@ -171,7 +176,7 @@ namespace HoopGameNight.Infrastructure.Services
                 });
             }
 
-            // Alerta de falhas consecutivas
+            // Regra: Três ou mais erros sucessivos elevam a severidade do alerta para 'Critical'
             var typeMetrics = GetMetricsByType(syncEvent.Type);
             if (typeMetrics.ConsecutiveFailures >= 3)
             {

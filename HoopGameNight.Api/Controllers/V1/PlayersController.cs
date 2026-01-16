@@ -1,3 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 using HoopGameNight.Api.Constants;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
@@ -178,11 +184,24 @@ namespace HoopGameNight.Api.Controllers.V1
                 return BadRequest(errorResponse);
             }
 
-            var validPositions = new[] { "PG", "SG", "SF", "PF", "C", "G", "F" };
-            if (!validPositions.Contains(position.ToUpper()))
+            var positionsInfo = new[]
             {
+                new { Sigla = "PG", Ingles = "Point Guard", Portugues = "Armador" },
+                new { Sigla = "SG", Ingles = "Shooting Guard", Portugues = "Ala-Armador" },
+                new { Sigla = "SF", Ingles = "Small Forward", Portugues = "Ala" },
+                new { Sigla = "PF", Ingles = "Power Forward", Portugues = "Ala-Pivô" },
+                new { Sigla = "C",  Ingles = "Center", Portugues = "Pivô" },
+                new { Sigla = "G",  Ingles = "Guard", Portugues = "Armador/Genérico" },
+                new { Sigla = "F",  Ingles = "Forward", Portugues = "Ala/Genérico" }
+            };
+
+            var selectedPosition = positionsInfo.FirstOrDefault(p => p.Sigla.Equals(position?.ToUpper()));
+
+            if (selectedPosition == null)
+            {
+                var validSiglas = string.Join(", ", positionsInfo.Select(p => p.Sigla));
                 return BadRequest(ApiResponse<object>.ErrorResult(
-                    $"Posição inválida. Use: {string.Join(", ", validPositions)}"));
+                    $"Posição inválida. Use: {validSiglas}"));
             }
 
             Logger.LogInformation("Buscando jogadores por posição: {Position}, Page: {Page}, PageSize: {PageSize}",

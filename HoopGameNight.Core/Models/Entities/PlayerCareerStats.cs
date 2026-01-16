@@ -1,4 +1,6 @@
 
+using System;
+
 namespace HoopGameNight.Core.Models.Entities
 {
     public class PlayerCareerStats : BaseEntity

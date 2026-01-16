@@ -1,4 +1,8 @@
-﻿using AutoMapper;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using AutoMapper;
 using HoopGameNight.Core.Configuration;
 using HoopGameNight.Core.Constants;
 using HoopGameNight.Core.DTOs.Response;
@@ -175,7 +179,7 @@ namespace HoopGameNight.Core.Services
                             var newTeam = MapEspnTeamToEntity(espnTeam);
                             await _teamRepository.InsertAsync(newTeam);
                             syncCount++;
-                            _logger.LogInformation("✅ Time inserido: {Abbreviation} - {DisplayName}", espnTeam.Abbreviation, espnTeam.DisplayName);
+                            _logger.LogInformation("Time inserido: {Abbreviation} - {DisplayName}", espnTeam.Abbreviation, espnTeam.DisplayName);
                         }
                         else
                         {
@@ -188,7 +192,7 @@ namespace HoopGameNight.Core.Services
 
                             await _teamRepository.UpdateAsync(existingTeam);
                             updateCount++;
-                            _logger.LogDebug("🔄 Time atualizado: {Abbreviation}", espnTeam.Abbreviation);
+                            _logger.LogDebug("Time atualizado: {Abbreviation}", espnTeam.Abbreviation);
                         }
                     }
                     catch (Exception ex)
@@ -199,7 +203,7 @@ namespace HoopGameNight.Core.Services
 
                 await _cacheService.RemoveAsync(CacheKeys.ALL_TEAMS);
 
-                _logger.LogInformation("✅ Sincronização concluída: {New} novos, {Updated} atualizados", syncCount, updateCount);
+                _logger.LogInformation("Sincronização concluída: {New} novos, {Updated} atualizados", syncCount, updateCount);
             }
             catch (Exception ex)
             {

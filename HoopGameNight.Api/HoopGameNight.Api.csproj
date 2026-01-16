@@ -60,6 +60,11 @@
 	<ItemGroup>
 	  <Compile Remove="Configurations\ExternalApiConfiguration.cs" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Remove="..\HoopGameNight.Infrastructure\Sql\Statistics\Triggers\trg_player_season_stats_before_insert.sql" />
+	  <Content Remove="..\HoopGameNight.Infrastructure\Sql\Statistics\Triggers\trg_player_season_stats_before_update.sql" />
+	</ItemGroup>
 	<ItemGroup>
 	  <Folder Include="logs\" />
 	</ItemGroup>

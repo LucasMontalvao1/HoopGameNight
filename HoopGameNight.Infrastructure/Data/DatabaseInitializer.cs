@@ -1,4 +1,8 @@
-﻿using HoopGameNight.Core.Interfaces.Infrastructure;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using HoopGameNight.Core.Interfaces.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -168,46 +172,48 @@ namespace HoopGameNight.Infrastructure.Data
 
         private async Task CreateTriggersAsync()
         {
-            _logger.LogInformation("Criando triggers do banco de dados...");
-
-            var triggers = new[]
-            {
-                ("Statistics/Triggers", "trg_player_season_stats_before_insert"),
-                ("Statistics/Triggers", "trg_player_season_stats_before_update")
-            };
-
-            foreach (var (folder, triggerName) in triggers)
-            {
-                try
-                {
-                    await DropTriggerIfExistsAsync(triggerName);
-
-                    var triggerSql = await _sqlLoader.LoadSqlAsync(folder, triggerName);
-                    if (string.IsNullOrEmpty(triggerSql))
-                    {
-                        _logger.LogWarning("Script de trigger não encontrado: {Folder}/{TriggerName}", folder, triggerName);
-                        continue;
-                    }
-
-                    await _queryExecutor.ExecuteAsync(triggerSql);
-                    _logger.LogInformation("Trigger {TriggerName} criada com sucesso", triggerName);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Falha ao criar trigger {TriggerName}", triggerName);
-                    throw;
-                }
-            }
+            _logger.LogInformation("Triggers não são mais necessários (stats calculadas via VIEW)");
+            
+            // REMOVIDO: Triggers de season stats não são mais necessários
+            // A VIEW vw_player_season_stats_calculated calcula tudo em tempo real
+            // a partir dos dados de player_game_stats
+            
+            await Task.CompletedTask;
         }
 
         private async Task CreateViewsAsync()
         {
             _logger.LogInformation("Criando views do banco de dados...");
 
+            try
+            {
+                // VIEW 1: Estatísticas detalhadas por jogo
+                await DropViewIfExistsAsync("vw_player_game_stats_detailed");
+                var createGameStatsViewSql = await _sqlLoader.LoadSqlAsync("Database", "CreateViews");
+                if (!string.IsNullOrEmpty(createGameStatsViewSql))
+                {
+                    await _queryExecutor.ExecuteAsync(createGameStatsViewSql);
+                    _logger.LogInformation("VIEW vw_player_game_stats_detailed criada com sucesso");
+                }
 
-            _logger.LogInformation("Nenhuma view para criar (views foram removidas para simplificação)");
-
-            await Task.CompletedTask;
+                // VIEW 2: Estatísticas por temporada (calculadas)
+                await DropViewIfExistsAsync("vw_player_season_stats_calculated");
+                var createSeasonStatsViewSql = await _sqlLoader.LoadSqlAsync("Database", "CreateSeasonStatsView");
+                if (!string.IsNullOrEmpty(createSeasonStatsViewSql))
+                {
+                    await _queryExecutor.ExecuteAsync(createSeasonStatsViewSql);
+                    _logger.LogInformation("VIEW vw_player_season_stats_calculated criada com sucesso");
+                }
+                else
+                {
+                    _logger.LogWarning("Script CreateSeasonStatsView.sql não encontrado");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao criar views do banco de dados");
+                throw;
+            }
         }
 
         private async Task DropTriggerIfExistsAsync(string triggerName)

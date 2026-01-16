@@ -1,4 +1,8 @@
-﻿using Dapper;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Dapper;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Interfaces.Infrastructure;
@@ -77,7 +81,9 @@ namespace HoopGameNight.Infrastructure.Repositories
             {
                 TeamId = teamId,
                 StartDate = startDate,
-                EndDate = endDate
+                EndDate = endDate,
+                Offset = 0,
+                PageSize = 1000 // Limite seguro para trazer todos os jogos da temporada
             };
 
             var games = await ExecuteQueryWithTeamsAsync(sql, parameters);

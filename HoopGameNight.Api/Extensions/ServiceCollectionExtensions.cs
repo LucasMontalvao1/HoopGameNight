@@ -1,4 +1,11 @@
-﻿using HoopGameNight.Api.Configurations;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Http;
+using Asp.Versioning;
+using HoopGameNight.Api.Configurations;
 using HoopGameNight.Api.Constants;
 using HoopGameNight.Api.Filters;
 using HoopGameNight.Api.HealthChecks;
@@ -9,23 +16,24 @@ using HoopGameNight.Core.Interfaces.Infrastructure;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Core.Services;
+using HoopGameNight.Core.Services.AI;
 using HoopGameNight.Infrastructure.Data;
 using HoopGameNight.Infrastructure.ExternalServices;
+using HoopGameNight.Infrastructure.HealthChecks;
 using HoopGameNight.Infrastructure.Repositories;
 using HoopGameNight.Infrastructure.Services;
-using Asp.Versioning;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using MySqlConnector;
 using Polly;
 using Polly.Extensions.Http;
+using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Data;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Swashbuckle.AspNetCore.SwaggerGen;
-using Microsoft.OpenApi.Any;
 
 namespace HoopGameNight.Api.Extensions
 {
@@ -55,6 +63,9 @@ namespace HoopGameNight.Api.Extensions
 
             // 4. Business Services
             services.AddBusinessServices();
+            
+            // Registro explícito do serviço de sincronização
+            services.AddScoped<HoopGameNight.Core.Interfaces.Services.IPlayerStatsSyncService, HoopGameNight.Core.Services.PlayerStatsSyncService>();
 
             // 5. External Services & HTTP Clients
             services.AddExternalServices(configuration);
@@ -146,6 +157,9 @@ namespace HoopGameNight.Api.Extensions
             services.Configure<SyncOptions>(
                 configuration.GetSection("Sync"));
 
+            services.Configure<PlayerStatsSyncOptions>(
+                configuration.GetSection("Sync:PlayerStats"));
+
             // Rate Limit Options
             services.Configure<RateLimitOptions>(
                 configuration.GetSection("RateLimit"));
@@ -175,6 +189,17 @@ namespace HoopGameNight.Api.Extensions
             services.AddSingleton<ISqlLoader, SqlLoader>();
             services.AddScoped<DatabaseInitializer>();
 
+            services.AddSingleton<NbaPromptBuilder>();
+            services.AddScoped<INbaAiService, NbaAiService>();
+
+            services.AddHttpClient<OllamaClient>(client =>
+            {
+                var ollamaUrl = Environment.GetEnvironmentVariable("OLLAMA_URL") ?? "http://localhost:11434";
+                Console.WriteLine("Ollama iniciado");
+                client.BaseAddress = new Uri(ollamaUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            });
+
             // Repositories
             services.AddScoped<IGameRepository, GameRepository>();
             services.AddScoped<ITeamRepository, TeamRepository>();
@@ -194,6 +219,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPlayerStatsService, PlayerStatsService>();
+            services.AddScoped<IGameStatsService, GameStatsService>();
 
             return services;
         }
@@ -412,7 +438,10 @@ namespace HoopGameNight.Api.Extensions
                     tags: new[] { "external", "api" })
                 .AddCheck<EspnApiHealthCheck>(
                     "espn-api",
-                    tags: new[] { "external", "api", "nba-schedule" });
+                    tags: new[] { "external", "api", "nba-schedule" })
+                .AddCheck<OllamaHealthCheck>(
+                    "ollama",
+                    tags: new[] { "ai", "external" });
 
             // Metrics service
             services.AddSingleton<ISyncMetricsService, SyncMetricsService>();

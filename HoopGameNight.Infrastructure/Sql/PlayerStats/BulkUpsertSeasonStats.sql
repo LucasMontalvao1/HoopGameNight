@@ -1,5 +1,5 @@
 ﻿INSERT INTO PlayerSeasonStats (
-    PlayerId, Season, TeamId, GamesPlayed, GamesStarted,
+    PlayerId, Season, SeasonTypeId, TeamId, GamesPlayed, GamesStarted,
     MinutesPlayed, Points, FieldGoalsMade, FieldGoalsAttempted,
     FieldGoalPercentage, ThreePointersMade, ThreePointersAttempted,
     ThreePointPercentage, FreeThrowsMade, FreeThrowsAttempted,

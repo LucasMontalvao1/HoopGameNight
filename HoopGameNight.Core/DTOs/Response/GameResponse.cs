@@ -1,8 +1,11 @@
-﻿namespace HoopGameNight.Core.DTOs.Response
+﻿using System;
+
+namespace HoopGameNight.Core.DTOs.Response
 {
     public class GameResponse
     {
         public int Id { get; set; }
+        public string ExternalId { get; set; } = string.Empty;
         public DateTime Date { get; set; }
         public DateTime DateTime { get; set; }
         public TeamSummaryResponse HomeTeam { get; set; } = new();

@@ -1,4 +1,11 @@
-﻿using HoopGameNight.Api.Constants;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using HoopGameNight.Api.Constants;
+using HoopGameNight.Core.DTOs.External.ESPN;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Services;
@@ -687,16 +694,22 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
-    }
-
-    public class ExternalGameDto
-    {
-        public int Id { get; set; }
-        public string Date { get; set; } = string.Empty;
-        public string HomeTeam { get; set; } = string.Empty;
-        public string VisitorTeam { get; set; } = string.Empty;
-        public string? Status { get; set; }
-        public int? HomeScore { get; set; }
-        public int? VisitorScore { get; set; }
+        [HttpGet("{id}/boxscore")]
+        [ProducesResponseType(typeof(ApiResponse<EspnBoxscoreDto>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<EspnBoxscoreDto>>> GetGameBoxscore(int id)
+        {
+            try
+            {
+                Logger.LogInformation("Buscando boxscore para o jogo {GameId}", id);
+                var boxscore = await _gameService.GetGameBoxscoreAsync(id);
+                if (boxscore == null) return NotFound(ApiResponse<EspnBoxscoreDto>.ErrorResult("Boxscore não encontrado"));
+                return Ok(boxscore, "Boxscore recuperado com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar boxscore para o jogo {GameId}", id);
+                throw;
+            }
+        }
     }
 }

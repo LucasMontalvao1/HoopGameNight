@@ -1,5 +1,7 @@
 ﻿using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Models.Entities;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace HoopGameNight.Core.Interfaces.Repositories
 {

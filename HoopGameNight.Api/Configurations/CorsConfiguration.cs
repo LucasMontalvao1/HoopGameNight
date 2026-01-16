@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Api.Configurations
+﻿using System;
+
+namespace HoopGameNight.Api.Configurations
 {
     public class CorsConfiguration
     {

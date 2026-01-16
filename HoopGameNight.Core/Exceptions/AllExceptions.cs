@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Core.Exceptions
+﻿using System;
+
+namespace HoopGameNight.Core.Exceptions
 {
     public class BusinessException : Exception
     {

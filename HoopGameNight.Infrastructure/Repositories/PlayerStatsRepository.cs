@@ -1,4 +1,8 @@
-﻿using Dapper;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Dapper;
 using HoopGameNight.Core.Interfaces.Infrastructure;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Models.Entities;
@@ -29,6 +33,13 @@ namespace HoopGameNight.Infrastructure.Repositories
         {
             var sql = await LoadSqlAsync("GetSeasonStats");
             return await ExecuteQuerySingleOrDefaultAsync<PlayerSeasonStats>(sql, new { PlayerId = playerId, Season = season });
+        }
+
+        // ===== NOVO: Buscar season stats da VIEW calculada =====
+        public async Task<Core.DTOs.Response.PlayerSeasonStatsResponse?> GetSeasonStatsFromViewAsync(int playerId, int season)
+        {
+            var sql = await LoadSqlAsync("GetSeasonStatsFromView");
+            return await ExecuteQuerySingleOrDefaultAsync<Core.DTOs.Response.PlayerSeasonStatsResponse>(sql, new { PlayerId = playerId, Season = season });
         }
 
         public async Task<IEnumerable<PlayerSeasonStats>> GetAllSeasonStatsAsync(int playerId)
@@ -163,6 +174,45 @@ namespace HoopGameNight.Infrastructure.Repositories
             var sql = await LoadSqlAsync("UpdateLastSyncDate");
             var result = await ExecuteAsync(sql, new { PlayerId = playerId, SyncDate = syncDate });
             return result > 0;
+        }
+
+        // ===== NOVOS MÉTODOS: Estatísticas Detalhadas por Jogo (usando VIEW) =====
+
+        public async Task<Core.DTOs.Response.PlayerGameStatsDetailedResponse?> GetPlayerGameStatsDetailedAsync(int playerId, int gameId)
+        {
+            var sql = await LoadSqlAsync("GetPlayerGameStatsDetailed");
+            return await ExecuteQuerySingleOrDefaultAsync<Core.DTOs.Response.PlayerGameStatsDetailedResponse>(sql, new { PlayerId = playerId, GameId = gameId });
+        }
+
+        public async Task<IEnumerable<Core.DTOs.Response.PlayerGameStatsDetailedResponse>> GetPlayerRecentGamesDetailedAsync(int playerId, int limit)
+        {
+            var sql = await LoadSqlAsync("GetPlayerRecentGamesDetailed");
+            return await ExecuteQueryAsync<Core.DTOs.Response.PlayerGameStatsDetailedResponse>(sql, new { PlayerId = playerId, Limit = limit });
+        }
+
+        public async Task<IEnumerable<Core.DTOs.Response.PlayerGameStatsDetailedResponse>> GetPlayerAllGamesDetailedAsync(int playerId, int page, int pageSize)
+        {
+            var offset = (page - 1) * pageSize;
+            var sql = await LoadSqlAsync("GetPlayerAllGamesDetailed");
+            return await ExecuteQueryAsync<Core.DTOs.Response.PlayerGameStatsDetailedResponse>(sql, new { PlayerId = playerId, PageSize = pageSize, Offset = offset });
+        }
+
+        public async Task<int> GetPlayerGamesCountAsync(int playerId)
+        {
+            var sql = await LoadSqlAsync("GetPlayerAllGamesCount");
+            return await ExecuteScalarAsync<int>(sql, new { PlayerId = playerId });
+        }
+
+        public async Task<IEnumerable<Core.DTOs.Response.PlayerGameStatsDetailedResponse>> GetGamePlayerStatsDetailedAsync(int gameId)
+        {
+            var sql = await LoadSqlAsync("GetGamePlayerStatsDetailed");
+            return await ExecuteQueryAsync<Core.DTOs.Response.PlayerGameStatsDetailedResponse>(sql, new { GameId = gameId });
+        }
+
+        public async Task AggregateSeasonStatsAsync(int playerId, int season, int seasonTypeId)
+        {
+            var sql = await LoadSqlAsync("AggregateSeasonStats");
+            await ExecuteAsync(sql, new { PlayerId = playerId, Season = season, SeasonTypeId = seasonTypeId });
         }
     }
 }

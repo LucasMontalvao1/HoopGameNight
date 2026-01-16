@@ -1,4 +1,7 @@
-﻿namespace HoopGameNight.Core.Interfaces.Infrastructure
+﻿using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace HoopGameNight.Core.Interfaces.Infrastructure
 {
     public interface ISqlLoader
     {

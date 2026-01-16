@@ -1,4 +1,6 @@
 ﻿using HoopGameNight.Core.Enums;
+using System;
+using System.Collections.Generic;
 
 namespace HoopGameNight.Core.Models.Entities
 {

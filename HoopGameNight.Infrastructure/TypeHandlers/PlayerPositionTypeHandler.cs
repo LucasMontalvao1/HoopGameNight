@@ -1,11 +1,12 @@
+using System;
+using System.Data;
 using Dapper;
 using HoopGameNight.Core.Enums;
-using System.Data;
 
 namespace HoopGameNight.Infrastructure.TypeHandlers
 {
     /// <summary>
-    /// TypeHandler para converter string do banco MySQL ENUM para PlayerPosition C# enum
+    /// TypeHandler do Dapper para conversão entre o tipo ENUM (string) do MySQL e o enum <see cref="PlayerPosition"/>.
     /// </summary>
     public class PlayerPositionTypeHandler : SqlMapper.TypeHandler<PlayerPosition?>
     {
@@ -18,7 +19,7 @@ namespace HoopGameNight.Infrastructure.TypeHandlers
             if (string.IsNullOrWhiteSpace(stringValue))
                 return null;
 
-            // Tentar fazer parse da string para enum
+            // Realiza o parse da string para o tipo enum ignorando diferenciação de maiúsculas/minúsculas
             if (Enum.TryParse<PlayerPosition>(stringValue, ignoreCase: true, out var position))
             {
                 return position;
@@ -42,7 +43,7 @@ namespace HoopGameNight.Infrastructure.TypeHandlers
     }
 
     /// <summary>
-    /// TypeHandler para PlayerPosition não nullable (para casos onde é obrigatório)
+    /// TypeHandler do Dapper para PlayerPosition não-anulável, utilizado em campos obrigatórios do esquema.
     /// </summary>
     public class PlayerPositionNonNullableTypeHandler : SqlMapper.TypeHandler<PlayerPosition>
     {

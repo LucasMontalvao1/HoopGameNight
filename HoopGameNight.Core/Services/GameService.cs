@@ -4,12 +4,18 @@ using HoopGameNight.Core.Constants;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.DTOs.External;
+using HoopGameNight.Core.DTOs.External.ESPN;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Core.Exceptions;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Core.Models.Entities;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace HoopGameNight.Core.Services
 {
@@ -20,6 +26,8 @@ namespace HoopGameNight.Core.Services
         private readonly IEspnApiService _espnService;
         private readonly IMapper _mapper;
         private readonly ICacheService _cacheService;
+        private readonly IGameStatsService _gameStatsService;
+        private readonly ITeamService _teamService;
         private readonly ILogger<GameService> _logger;
 
         public GameService(
@@ -28,6 +36,8 @@ namespace HoopGameNight.Core.Services
             IEspnApiService espnService,
             IMapper mapper,
             ICacheService cacheService,
+            IGameStatsService gameStatsService,
+            ITeamService teamService,
             ILogger<GameService> logger)
         {
             _gameRepository = gameRepository;
@@ -35,13 +45,15 @@ namespace HoopGameNight.Core.Services
             _espnService = espnService;
             _mapper = mapper;
             _cacheService = cacheService;
+            _gameStatsService = gameStatsService;
+            _teamService = teamService;
             _logger = logger;
         }
 
         #region Métodos Principais
 
         /// <summary>
-        /// Busca jogos de hoje com cache (Redis → Memory → Banco)
+        /// Obtém a lista de confrontos programados para a data atual, aplicando camadas de cache (Redis e In-Memory).
         /// </summary>
         public async Task<List<GameResponse>> GetTodayGamesAsync()
         {
@@ -68,7 +80,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Busca jogos por data específica (Redis → Banco → ESPN)
+        /// Recupera jogos para uma data específica, consultando cache, banco de dados e fallback para a API ESPN.
         /// </summary>
         public async Task<List<GameResponse>> GetGamesByDateAsync(DateTime date)
         {
@@ -152,12 +164,67 @@ namespace HoopGameNight.Core.Services
             return game != null ? _mapper.Map<GameResponse>(game) : null;
         }
 
+        public async Task<EspnBoxscoreDto?> GetGameBoxscoreAsync(int gameId)
+        {
+            var game = await _gameRepository.GetByIdAsync(gameId);
+            if (string.IsNullOrEmpty(game?.ExternalId)) return null;
+
+            var cacheKey = $"boxscore_{gameId}";
+            var cached = await _cacheService.GetAsync<EspnBoxscoreDto>(cacheKey);
+            if (cached != null) return cached;
+
+            var boxscore = await _espnService.GetGameBoxscoreAsync(game.ExternalId!);
+            if (boxscore != null)
+            {
+                await _cacheService.SetAsync(cacheKey, boxscore, TimeSpan.FromMinutes(5));
+            }
+            return boxscore;
+        }
+
+        public async Task<GameLeadersResponse?> GetGameLeadersAsync(int gameId)
+        {
+            // Delegate to GameStatsService which has the mapping logic
+            return await _gameStatsService.GetGameLeadersAsync(gameId);
+        }
+
+        public async Task<TeamSeasonLeadersResponse?> GetTeamLeadersAsync(int teamId)
+        {
+            try
+            {
+                var team = await _teamRepository.GetByIdAsync(teamId);
+                if (team == null)
+                {
+                    _logger.LogWarning("Team {TeamId} not found", teamId);
+                    return null;
+                }
+
+                var cacheKey = $"team_leaders_{teamId}";
+                var cached = await _cacheService.GetAsync<TeamSeasonLeadersResponse>(cacheKey);
+                if (cached != null) return cached;
+
+                var espnData = await _espnService.GetTeamLeadersAsync(team.ExternalId.ToString());
+                if (espnData == null) return null;
+
+                var response = MapEspnTeamLeadersToResponse(espnData, teamId, team.Name);
+                if (response != null)
+                {
+                    await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromMinutes(60));
+                }
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting team leaders for team {TeamId}", teamId);
+                return null;
+            }
+        }
+
         #endregion
 
         #region Método Principal - Múltiplos Times com Suporte a Jogos Futuros
 
         /// <summary>
-        /// Busca jogos de múltiplos times com suporte completo para datas futuras
+        /// Recupera o cronograma completo para múltiplas equipes em um intervalo de datas, consolidando dados históricos e futuros.
         /// </summary>
         public async Task<MultipleTeamsGamesResponse> GetGamesForMultipleTeamsAsync(GetMultipleTeamsGamesRequest request)
         {
@@ -264,7 +331,7 @@ namespace HoopGameNight.Core.Services
         #region Métodos de Conveniência
 
         /// <summary>
-        /// Busca próximos jogos de um time (com cache Redis)
+        /// Recupera os próximos confrontos de uma equipe específica em um intervalo de dias definido.
         /// </summary>
         public async Task<List<GameResponse>> GetUpcomingGamesForTeamAsync(int teamId, int days = 7)
         {
@@ -512,15 +579,182 @@ namespace HoopGameNight.Core.Services
                 // 4. Invalidar cache
                 await InvalidateCacheForDate(date);
 
-                _logger.LogInformation("✅ Sincronização concluída para {Date}: {New} novos, {Updated} atualizados",
+                _logger.LogInformation("Sincronização concluída para {Date}: {New} novos, {Updated} atualizados",
                     date.ToShortDateString(), syncCount, updateCount);
 
                 return syncCount + updateCount;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Erro crítico ao sincronizar jogos para {Date}", date);
+                _logger.LogError(ex, "Erro inesperado ao sincronizar jogos para {Date}", date);
                 return syncCount + updateCount; 
+            }
+        }
+
+        public async Task<int> SyncGameByIdAsync(string gameId)
+        {
+            try
+            {
+                _logger.LogInformation("Sincronizando jogo individual ESPN ID: {GameId}", gameId);
+
+                var detail = await _espnService.GetGameEventAsync(gameId);
+                if (detail?.Header == null)
+                {
+                    _logger.LogWarning("Jogo {GameId} não encontrado na ESPN.", gameId);
+                    return 0;
+                }
+
+                var gameDate = DateTime.TryParse(detail.Header.Date, out var dt) ? dt : DateTime.MinValue;
+                var season = detail.Header.Season?.Year ?? GetSeasonYear(gameDate);
+                
+                string? homeEspnId = null, homeAbbr = null;
+                string? awayEspnId = null, awayAbbr = null;
+                int? homeScore = null, awayScore = null;
+
+                var coreEvent = await _espnService.GetCoreEventAsync(gameId);
+                if (coreEvent?.Competitions != null && coreEvent.Competitions.Any())
+                {
+                    var comp = coreEvent.Competitions.First();
+                    var homeComp = comp.Competitors?.FirstOrDefault(c => c.HomeAway == "home");
+                    var awayComp = comp.Competitors?.FirstOrDefault(c => c.HomeAway == "away");
+
+                    if (homeComp != null && awayComp != null)
+                    {
+                        // Função local para lidar com score polimórfico (string, number ou object)
+                        int? ParseScore(JsonElement? scoreElement)
+                        {
+                            if (scoreElement == null || scoreElement.Value.ValueKind == JsonValueKind.Null || scoreElement.Value.ValueKind == JsonValueKind.Undefined)
+                                return null;
+
+                            if (scoreElement.Value.ValueKind == JsonValueKind.Number)
+                                return scoreElement.Value.GetInt32();
+
+                            if (scoreElement.Value.ValueKind == JsonValueKind.String)
+                            {
+                                var str = scoreElement.Value.GetString();
+                                return int.TryParse(str, out var val) ? val : null;
+                            }
+
+                            if (scoreElement.Value.ValueKind == JsonValueKind.Object)
+                            {
+                                if (scoreElement.Value.TryGetProperty("value", out var valProp))
+                                {
+                                    if (valProp.ValueKind == JsonValueKind.Number)
+                                        return valProp.GetInt32();
+                                    if (valProp.ValueKind == JsonValueKind.String)
+                                        return int.TryParse(valProp.GetString(), out var val) ? val : null;
+                                }
+                            }
+
+                            return null;
+                        }
+
+                        homeEspnId = homeComp.Team?.Id;
+                        homeAbbr = homeComp.Team?.Abbreviation;
+                        homeScore = ParseScore(homeComp.Score);
+
+                        awayEspnId = awayComp.Team?.Id;
+                        awayAbbr = awayComp.Team?.Abbreviation;
+                        awayScore = ParseScore(awayComp.Score);
+                    }
+                }
+
+                // FALLBACK: Se falhar via CoreEvent, tentar via Boxscore (Away @ Home standard)
+                if ((string.IsNullOrEmpty(homeAbbr) || string.IsNullOrEmpty(awayAbbr)) && detail?.Boxscore?.Teams != null && detail.Boxscore.Teams.Count >= 2)
+                {
+                    _logger.LogInformation("CoreEvent incompleto. Tentando fallback via Boxscore para Game {GameId}", gameId);
+                    
+                    var awayTeam = detail.Boxscore.Teams[0].Team;
+                    var homeTeam = detail.Boxscore.Teams[1].Team;
+
+                    if (awayTeam != null && homeTeam != null)
+                    {
+                        if (string.IsNullOrEmpty(awayEspnId)) awayEspnId = awayTeam.Id;
+                        if (string.IsNullOrEmpty(awayAbbr)) awayAbbr = awayTeam.Abbreviation;
+                        
+                        if (string.IsNullOrEmpty(homeEspnId)) homeEspnId = homeTeam.Id;
+                        if (string.IsNullOrEmpty(homeAbbr)) homeAbbr = homeTeam.Abbreviation;
+
+                        // Tentar obter score do header se disponível, já que BoxscoreTeamDto não tem score direto simples
+                        // Se detail.Status tiver score... mas detail.Status é EspnGameStatusDto
+                    }
+                }
+
+                if (string.IsNullOrEmpty(homeAbbr) || string.IsNullOrEmpty(awayAbbr))
+                {
+                    _logger.LogInformation("Gamelog Sync: Abbreviatura ausente, tentando determinar times via ESPN ID: {HomeId} / {AwayId}", homeEspnId, awayEspnId);
+                }
+
+                if (string.IsNullOrEmpty(homeEspnId) || string.IsNullOrEmpty(awayEspnId))
+                {
+                    _logger.LogWarning("Não foi possível determinar os times para o jogo {GameId} - Dados insuficientes na ESPN.", gameId);
+                    return 0;
+                }
+
+                var homeTeamId = await MapEspnTeamToSystemIdAsync(homeEspnId, homeAbbr ?? "");
+                var visitorTeamId = await MapEspnTeamToSystemIdAsync(awayEspnId, awayAbbr ?? "");
+
+                if (homeTeamId == 0 || visitorTeamId == 0)
+                {
+                    _logger.LogWarning("Times do jogo {GameId} não mapeados ({Away}@{Home})", awayAbbr, homeAbbr);
+                    return 0;
+                }
+
+                var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate.Date);
+                var existingGame = existingGames.FirstOrDefault(g =>
+                    g.HomeTeamId == homeTeamId &&
+                    g.VisitorTeamId == visitorTeamId &&
+                    g.Date.Date == gameDate.Date);
+
+                var status = detail.Status != null ? MapGameStatus(detail.Status.State ?? "") : GameStatus.Scheduled;
+
+                if (existingGame == null)
+                {
+                    var newGame = new Game
+                    {
+                        ExternalId = gameId,
+                        Date = gameDate.Date,
+                        DateTime = gameDate,
+                        HomeTeamId = homeTeamId,
+                        VisitorTeamId = visitorTeamId,
+                        HomeTeamScore = homeScore,
+                        VisitorTeamScore = awayScore,
+                        Status = status,
+                        Period = detail.Status?.Period,
+                        TimeRemaining = detail.Status?.DisplayClock,
+                        PostSeason = detail.Header.Season?.Type == 3,
+                        Season = season,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _gameRepository.InsertAsync(newGame);
+                    _logger.LogInformation("Jogo {GameId} inserido com sucesso via sync individual.", gameId);
+                    return 1;
+                }
+                else
+                {
+                    var hasChanges = false;
+                    if (existingGame.HomeTeamScore != homeScore) { existingGame.HomeTeamScore = homeScore; hasChanges = true; }
+                    if (existingGame.VisitorTeamScore != awayScore) { existingGame.VisitorTeamScore = awayScore; hasChanges = true; }
+                    if (existingGame.Status != status) { existingGame.Status = status; hasChanges = true; }
+                    if (existingGame.Period != detail.Status?.Period) { existingGame.Period = detail.Status?.Period; hasChanges = true; }
+                    if (existingGame.TimeRemaining != detail.Status?.DisplayClock) { existingGame.TimeRemaining = detail.Status?.DisplayClock; hasChanges = true; }
+
+                    if (hasChanges)
+                    {
+                        existingGame.DateTime = gameDate;
+                        existingGame.UpdatedAt = DateTime.UtcNow;
+                        await _gameRepository.UpdateAsync(existingGame);
+                        _logger.LogInformation("Jogo {GameId} atualizado via sync individual.", gameId);
+                    }
+                    return 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao sincronizar jogo individual {GameId}", gameId);
+                return 0;
             }
         }
 
@@ -546,7 +780,7 @@ namespace HoopGameNight.Core.Services
             if (espnGame.HomeTeamScore.HasValue && espnGame.AwayTeamScore.HasValue &&
                 espnGame.Date < DateTime.Now.AddHours(-2))
             {
-                _logger.LogDebug("🏁 Forcing Final status - game has scores ({Away}-{Home}) and date is in the past ({Date})",
+                _logger.LogDebug("Forçando status Final: Jogo com score presente e data retroativa ({Date})",
                     espnGame.AwayTeamScore, espnGame.HomeTeamScore, espnGame.Date);
                 return GameStatus.Final;
             }
@@ -646,7 +880,9 @@ namespace HoopGameNight.Core.Services
         /// </summary>
         private int GetSeasonYear(DateTime date)
         {
-            return date.Month >= 10 ? date.Year : date.Year - 1;
+            // NBA seasons are identified by the year they end (e.g., 2024-25 is Season 2025)
+            // Season starts in October
+            return date.Month >= 10 ? date.Year + 1 : date.Year;
         }
 
         /// <summary>
@@ -884,26 +1120,119 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
+        /// Mapeia ESPN Team Leaders para TeamSeasonLeadersResponse simplificado
+        /// </summary>
+        private TeamSeasonLeadersResponse? MapEspnTeamLeadersToResponse(EspnTeamLeadersDto espnData, int teamId, string teamName)
+        {
+            try
+            {
+                var response = new TeamSeasonLeadersResponse
+                {
+                    TeamId = teamId,
+                    TeamName = teamName,
+                    Season = DateTime.Now.Year
+                };
+
+                if (espnData?.Categories == null) return response;
+
+                foreach (var category in espnData.Categories)
+                {
+                    if (category?.Leaders == null || !category.Leaders.Any()) continue;
+
+                    var categoryName = category.Name?.ToLowerInvariant() ?? category.DisplayName?.ToLowerInvariant() ?? "";
+                    var topLeader = category.Leaders.FirstOrDefault();
+                    if (topLeader?.Athlete == null) continue;
+
+                    try
+                    {
+                        var espnPlayerId = topLeader.Athlete.Ref?.Split('/').LastOrDefault();
+                        if (string.IsNullOrEmpty(espnPlayerId)) continue;
+
+                        var statLeader = new StatLeader
+                        {
+                            PlayerId = 0, // Will be mapped if needed
+                            PlayerName = "Unknown",
+                            Team = teamName,
+                            Value = decimal.TryParse(topLeader.DisplayValue, out var val) ? val : 0,
+                            GamesPlayed = 0
+                        };
+
+                        // Assign to appropriate category
+                        if (categoryName.Contains("point") || categoryName.Contains("scoring"))
+                            response.PointsLeader = statLeader;
+                        else if (categoryName.Contains("rebound"))
+                            response.ReboundsLeader = statLeader;
+                        else if (categoryName.Contains("assist"))
+                            response.AssistsLeader = statLeader;
+                        else if (categoryName.Contains("steal"))
+                            response.StealsLeader = statLeader;
+                        else if (categoryName.Contains("block"))
+                            response.BlocksLeader = statLeader;
+                        else if (categoryName.Contains("field goal") && categoryName.Contains("percent"))
+                            response.FGPercentageLeader = statLeader;
+                        else if (categoryName.Contains("three point") && categoryName.Contains("percent"))
+                            response.ThreePointPercentageLeader = statLeader;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Error parsing team leader for team {TeamId}", teamId);
+                    }
+                }
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error mapping team leaders for team {TeamId}", teamId);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Mapeia time da ESPN para ID do sistema usando ABREVIAÇÃO
         /// </summary>
         private async Task<int> MapEspnTeamToSystemIdAsync(string espnTeamId, string espnAbbreviation)
         {
-            if (string.IsNullOrEmpty(espnAbbreviation))
+            if (string.IsNullOrEmpty(espnTeamId) && string.IsNullOrEmpty(espnAbbreviation))
             {
-                _logger.LogWarning("ESPN Abbreviation is null/empty for team ID: {EspnTeamId}", espnTeamId);
+                _logger.LogWarning("ESPN Team ID and Abbreviation are both null/empty.");
                 return 0;
             }
 
-            var team = await _teamRepository.GetByAbbreviationAsync(espnAbbreviation);
-
-            if (team != null)
+            // 1. Tentar por External ID (mais preciso)
+            if (int.TryParse(espnTeamId, out var extId))
             {
-                _logger.LogTrace("Mapped {Abbr} → System ID {Id}", espnAbbreviation, team.Id);
-                return team.Id;
+                var teamById = await _teamRepository.GetByExternalIdAsync(extId);
+                if (teamById != null) return teamById.Id;
+            }
+
+            // 2. Tentar por Abreviatura
+            if (!string.IsNullOrEmpty(espnAbbreviation))
+            {
+                var teamByAbbr = await _teamRepository.GetByAbbreviationAsync(espnAbbreviation);
+                if (teamByAbbr != null) return teamByAbbr.Id;
+            }
+
+            // 3. Proactive Sync: Se não encontrou, sincroniza times e tenta de novo
+            _logger.LogInformation("Time {EspnId} ({Abbr}) não encontrado. Sincronizando times...", espnTeamId, espnAbbreviation);
+            await _teamService.SyncAllTeamsAsync();
+
+            // Retry 1: External ID
+            if (int.TryParse(espnTeamId, out var extIdRetry))
+            {
+                var teamById = await _teamRepository.GetByExternalIdAsync(extIdRetry);
+                if (teamById != null) return teamById.Id;
+            }
+
+            // Retry 2: Abbreviation
+            if (!string.IsNullOrEmpty(espnAbbreviation))
+            {
+                var teamByAbbr = await _teamRepository.GetByAbbreviationAsync(espnAbbreviation);
+                if (teamByAbbr != null) return teamByAbbr.Id;
             }
 
             _logger.LogWarning(
-                "Team not found in database | ESPN Abbr: {Abbr}, ESPN ID: {EspnId}",
+                "Team not found in database even after sync | ESPN Abbr: {Abbr}, ESPN ID: {EspnId}",
                 espnAbbreviation, espnTeamId);
             return 0;
         }

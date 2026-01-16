@@ -1,4 +1,7 @@
-﻿namespace HoopGameNight.Core.DTOs.Response
+﻿using System;
+using System.Collections.Generic;
+
+namespace HoopGameNight.Core.DTOs.Response
 {
     public class PlayerDetailedResponse
     {
@@ -32,6 +35,10 @@
     public class PlayerSeasonStatsResponse
     {
         public int Season { get; set; }
+        public string SeasonName { get; set; } = string.Empty;
+        public int SeasonType { get; set; } = 2; // 2 = Regular Season
+        public bool IsPlayoffs => SeasonType == 3;
+        public int? TeamId { get; set; }
         public string TeamName { get; set; } = string.Empty;
         public int GamesPlayed { get; set; }
         public int GamesStarted { get; set; }
@@ -90,8 +97,23 @@
         public decimal CareerRPG { get; set; }
         public decimal CareerAPG { get; set; }
         public decimal CareerFGPercentage { get; set; }
+        
+        /// <summary>
+        /// Highest points scored in a single SEASON (not a single game).
+        /// Represents the best season total across the player's career.
+        /// </summary>
         public int CareerHighPoints { get; set; }
+        
+        /// <summary>
+        /// Highest rebounds in a single SEASON (not a single game).
+        /// Represents the best season total across the player's career.
+        /// </summary>
         public int CareerHighRebounds { get; set; }
+        
+        /// <summary>
+        /// Highest assists in a single SEASON (not a single game).
+        /// Represents the best season total across the player's career.
+        /// </summary>
         public int CareerHighAssists { get; set; }
     }
 

@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using HoopGameNight.Core.Configuration;
 using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.Extensions.Caching.Distributed;
@@ -9,8 +13,8 @@ using System.Threading;
 namespace HoopGameNight.Infrastructure.Services
 {
     /// <summary>
-    /// Implementação de cache em camadas (Redis → Memory → Database)
-    /// Centraliza toda a lógica de cache do sistema
+    /// Fornece uma abstração de cache em múltiplas camadas (Redis como distribuído e IMemoryCache como local).
+    /// Gerencia fallbacks e sincronização entre os níveis de persistência temporária.
     /// </summary>
     public class CacheService : ICacheService
     {
@@ -45,7 +49,8 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Busca valor do cache de forma síncrona (apenas Memory Cache)
+        /// Recupera um objeto do cache local (IMemoryCache) de forma síncrona.
+        /// Retorna o valor padrão do tipo caso a chave não seja encontrada ou seja inválida.
         /// </summary>
         public T? Get<T>(string key)
         {
@@ -72,7 +77,8 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Busca valor do cache (Redis → Memory → null)
+        /// Recupera um objeto buscando primeiramente no Redis (se disponível) e utilizando o Memory Cache como fallback secundário.
+        /// Objetos encontrados no Redis são automaticamente replicados para o cache local para otimizar acessos subsequentes.
         /// </summary>
         public async Task<T?> GetAsync<T>(string key)
         {
@@ -125,7 +131,8 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Armazena valor no cache de forma síncrona (apenas Memory Cache)
+        /// Persiste um objeto exclusivamente no cache local (IMemoryCache) de forma síncrona.
+        /// Caso não seja informado expiramento, utiliza o valor configurado em <see cref="CacheDurations.Default"/>.
         /// </summary>
         public void Set<T>(string key, T value, TimeSpan? expiration = null)
         {
@@ -140,7 +147,7 @@ namespace HoopGameNight.Infrastructure.Services
             try
             {
                 _memoryCache.Set(key, value, ttl);
-                _logger.LogDebug("📦 MEMORY SET (sync): {Key} (TTL: {TTL})", key, ttl);
+                _logger.LogDebug("MEMORY SET (sync): {Key} (TTL: {TTL})", key, ttl);
             }
             catch (Exception ex)
             {
@@ -149,7 +156,8 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Armazena valor no cache (Redis + Memory)
+        /// Persiste um objeto de forma assíncrona em ambas as camadas: Redis (distribuído) e Memory Cache (local).
+        /// Garante a consistência entre os níveis de cache configurados.
         /// </summary>
         public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
         {
@@ -188,12 +196,11 @@ namespace HoopGameNight.Infrastructure.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao salvar no cache: {Key}", key);
-                // Não lança exceção - graceful degradation
             }
         }
 
         /// <summary>
-        /// Remove valor do cache de forma síncrona
+        /// Remove uma entrada específica do cache local (IMemoryCache) de forma síncrona.
         /// </summary>
         public void Remove(string key)
         {
@@ -203,7 +210,7 @@ namespace HoopGameNight.Infrastructure.Services
             try
             {
                 _memoryCache.Remove(key);
-                _logger.LogDebug("🗑MEMORY REMOVE (sync): {Key}", key);
+                _logger.LogDebug("MEMORY REMOVE (sync): {Key}", key);
             }
             catch (Exception ex)
             {
@@ -212,7 +219,7 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Remove valor do cache
+        /// Invalida uma entrada de cache em todas as camadas disponíveis (Redis e Memory Cache).
         /// </summary>
         public async Task RemoveAsync(string key)
         {
@@ -239,15 +246,15 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Remove chaves por padrão (ex: "games:*")
-        /// NOTA: Funcionalidade limitada sem Redis Server commands
+        /// Remove múltiplas entradas de cache baseadas em um padrão (ex: "games:*").
+        /// NOTA: Esta operação tem suporte limitado através da interface IDistributedCache padrão.
         /// </summary>
         public async Task RemoveByPatternAsync(string pattern)
         {
             if (string.IsNullOrWhiteSpace(pattern))
                 throw new ArgumentException("Pattern cannot be null or empty", nameof(pattern));
 
-            _logger.LogWarning("⚠RemoveByPatternAsync('{Pattern}') requer Redis Server commands (KEYS/SCAN). " +
+            _logger.LogWarning("RemoveByPatternAsync('{Pattern}') requer Redis Server commands (KEYS/SCAN). " +
                                "Funcionalidade limitada com IDistributedCache. " +
                                "Considere implementar usando StackExchange.Redis diretamente.", pattern);
 
@@ -256,7 +263,7 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Verifica se chave existe no cache (síncrono)
+        /// Verifica a existência de uma chave no cache local (IMemoryCache).
         /// </summary>
         public bool Exists(string key)
         {
@@ -275,7 +282,7 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Verifica se chave existe no cache
+        /// Verifica a existência de uma chave consultando primeiramente o Redis e, em seguida, o Memory Cache local.
         /// </summary>
         public async Task<bool> ExistsAsync(string key)
         {
@@ -303,13 +310,14 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Limpa todo o cache (apenas Memory Cache)
+        /// Tenta realizar a limpeza total do cache local. 
+        /// Nota: IMemoryCache não fornece um método nativo para FlushAll; considere utilizar invalidação por padrão.
         /// </summary>
         public void Clear()
         {
             try
             {
-                _logger.LogWarning("⚠️ Clear() chamado mas IMemoryCache não suporta limpeza total. " +
+                _logger.LogWarning("Clear() chamado mas IMemoryCache não suporta limpeza total. " +
                                    "Use RemoveByPatternAsync para invalidações específicas.");
             }
             catch (Exception ex)
@@ -319,16 +327,16 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Invalida chaves por padrão (síncrono)
+        /// Aciona a invalidação de chaves por padrão de forma síncrona.
         /// </summary>
         public void InvalidatePattern(string pattern)
         {
-            _logger.LogWarning("⚠️ InvalidatePattern('{Pattern}') requer Redis Server commands. " +
+            _logger.LogWarning("InvalidatePattern('{Pattern}') requer Redis Server commands " +
                                "Use RemoveByPatternAsync para funcionalidade assíncrona.", pattern);
         }
 
         /// <summary>
-        /// Obtém estatísticas do cache (síncrono)
+        /// Retorna métricas consolidadas de acessos (Hits/Misses) acumuladas desde a inicialização do serviço.
         /// </summary>
         public CacheStatistics GetStatistics()
         {
@@ -347,7 +355,7 @@ namespace HoopGameNight.Infrastructure.Services
         }
 
         /// <summary>
-        /// Obtém estatísticas do cache
+        /// Retorna métricas de performance do cache de forma assíncrona.
         /// </summary>
         public Task<CacheStatistics> GetStatisticsAsync()
         {

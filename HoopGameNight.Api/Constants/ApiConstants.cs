@@ -9,6 +9,7 @@
         public static class Routes
         {
             public const string GAMES = $"{API_PREFIX}/{API_VERSION}/games";
+            public const string GAMESSTATS = $"{API_PREFIX}/{API_VERSION}/gamesstats";
             public const string TEAMS = $"{API_PREFIX}/{API_VERSION}/teams";
             public const string PLAYERS = $"{API_PREFIX}/{API_VERSION}/players";
             public const string SYNC = $"{API_PREFIX}/{API_VERSION}/sync";

@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Core.DTOs.Response
+﻿using System;
+
+namespace HoopGameNight.Core.DTOs.Response
 {
     public class ApiResponse<T>
     {

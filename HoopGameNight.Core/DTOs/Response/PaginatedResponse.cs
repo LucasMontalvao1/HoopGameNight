@@ -1,4 +1,7 @@
-﻿namespace HoopGameNight.Core.DTOs.Response
+﻿using System;
+using System.Collections.Generic;
+
+namespace HoopGameNight.Core.DTOs.Response
 {
     public class PaginatedResponse<T> : ApiResponse<List<T>>
     {

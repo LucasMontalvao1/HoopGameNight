@@ -1,10 +1,13 @@
 
+using System;
+
 namespace HoopGameNight.Core.Models.Entities
 {
     public class PlayerSeasonStats : BaseEntity
     {
         public int PlayerId { get; set; }
         public int Season { get; set; }
+        public int SeasonTypeId { get; set; } = 2; // 2 = Regular Season
         public int? TeamId { get; set; }
         public int GamesPlayed { get; set; }
         public int GamesStarted { get; set; }

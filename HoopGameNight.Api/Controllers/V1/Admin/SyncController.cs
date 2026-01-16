@@ -1,4 +1,10 @@
-﻿using HoopGameNight.Api.Constants;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using HoopGameNight.Api.Constants;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Infrastructure.Services;
@@ -7,7 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace HoopGameNight.Api.Controllers.V1.Admin
 {
     /// <summary>
-    /// Operações de sincronização e monitoramento
+    /// Gerencia as operações de sincronização de dados (times e jogos) e fornece métricas de saúde do sistema.
     /// </summary>
     [Route(ApiConstants.Routes.SYNC)]
     [ApiExplorerSettings(GroupName = "Admin")]
@@ -35,7 +41,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Sincronizar dados essenciais
+        /// Sincroniza dados fundamentais para o funcionamento do sistema (Times e Jogos de hoje).
         /// </summary>
         [HttpPost("essential")]
         [ProducesResponseType(typeof(ApiResponse<SyncResult>), StatusCodes.Status200OK)]
@@ -100,7 +106,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Dashboard com status do sistema
+        /// Retorna um panorama geral da saúde do sistema, incluindo status de cache e métricas de sincronização.
         /// </summary>
         [HttpGet("dashboard")]
         [ProducesResponseType(typeof(ApiResponse<SyncDashboard>), StatusCodes.Status200OK)]
@@ -144,7 +150,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Limpar cache do sistema
+        /// Invalida o cache do sistema, podendo ser total ou por um padrão específico de chave.
         /// </summary>
         [HttpPost("cache/clear")]
         [ProducesResponseType(typeof(ApiResponse<CacheClearResult>), StatusCodes.Status200OK)]
@@ -180,7 +186,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Health check das APIs externas
+        /// Realiza o check de conectividade com os provedores de dados externos (atualmente focado na ESPN).
         /// </summary>
         [HttpGet("health/external")]
         [ProducesResponseType(typeof(ApiResponse<ExternalApiHealth>), StatusCodes.Status200OK)]
@@ -201,7 +207,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Status de sincronização
+        /// Retorna o status detalhado da última sincronização por entidade (Times/Jogos).
         /// </summary>
         [HttpGet("status")]
         [ProducesResponseType(typeof(ApiResponse<SyncStatusResponse>), StatusCodes.Status200OK)]
@@ -263,7 +269,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Sincronizar jogos futuros (próximos 10 dias)
+        /// Sincroniza o calendário de jogos futuros para o intervalo de dias especificado.
         /// </summary>
         [HttpPost("future-games")]
         [ProducesResponseType(typeof(ApiResponse<FutureGamesSyncResult>), StatusCodes.Status200OK)]
@@ -383,7 +389,6 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
 
     public class ExternalApiHealth
     {
-        // REMOVIDO: BallDontLie property - API deprecated
         public string Message { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
     }

@@ -1,4 +1,6 @@
-﻿namespace HoopGameNight.Core.Models.Entities
+﻿using System;
+
+namespace HoopGameNight.Core.Models.Entities
 {
     public abstract class BaseEntity
     {

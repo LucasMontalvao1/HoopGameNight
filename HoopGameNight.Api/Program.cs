@@ -1,4 +1,5 @@
-﻿using HoopGameNight.Api.Extensions;
+﻿using System;
+using HoopGameNight.Api.Extensions;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Infrastructure.TypeHandlers;
 using Serilog;
