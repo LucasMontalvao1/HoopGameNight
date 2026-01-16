@@ -43,7 +43,9 @@ try
 
     // Configurar Serilog do appsettings.json
     builder.Host.UseSerilog((context, configuration) =>
-        configuration.ReadFrom.Configuration(context.Configuration));
+        configuration
+            .ReadFrom.Configuration(context.Configuration)
+            .Enrich.FromLogContext());
 
     // ===== ADICIONAROS SERVIÇOS =====
     builder.Services.AddHoopGameNightServices(builder.Configuration);

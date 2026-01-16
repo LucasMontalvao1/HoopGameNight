@@ -20,6 +20,11 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<List<GameResponse>> GetGamesByDateAsync(DateTime date);
 
         /// <summary>
+        /// Busca jogos em um intervalo de datas (otimizado para evitar N+1)
+        /// </summary>
+        Task<List<GameResponse>> GetGamesByDateRangeAsync(DateTime startDate, DateTime endDate);
+
+        /// <summary>
         /// Busca jogos com paginação e filtros
         /// </summary>
         Task<(List<GameResponse> Games, int TotalCount)> GetGamesAsync(GetGamesRequest request);

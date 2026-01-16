@@ -51,7 +51,10 @@ namespace HoopGameNight.Api.Extensions
             // 1. Exception Handler (ASP.NET Core 8+) 
             app.UseExceptionHandler();
 
-            // 2. Request Logging (sempre ativo)
+            // 2. Correlation ID (para rastreamento)
+            app.UseMiddleware<CorrelationIdMiddleware>();
+
+            // 3. Request Logging (sempre ativo)
             app.UseMiddleware<RequestLoggingMiddleware>();
 
             // 3. Security Headers

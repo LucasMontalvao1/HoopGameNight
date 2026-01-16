@@ -68,49 +68,78 @@ namespace HoopGameNight.Api.Services
             try
             {
                 using var scope = _serviceProvider.CreateScope();
-
-                var teamService = scope.ServiceProvider.GetRequiredService<ITeamService>();
-                var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
-
-                _logger.LogInformation("Starting {SyncType} data synchronization (#{Counter})",
-                    syncType, _syncCounter);
-
-                var teams = await teamService.GetAllTeamsAsync();
-                if (teams.Count < 30)
+                var lockFactory = scope.ServiceProvider.GetService<RedLockNet.IDistributedLockFactory>();
+                
+                // Se o factory estiver disponível, tentamos obter o lock
+                if (lockFactory != null)
                 {
-                    _logger.LogWarning("Syncing teams ({Count} found, expected 30)", teams.Count);
-                    await teamService.SyncAllTeamsAsync();
+                    var resource = "lock:espn:data_sync";
+                    var expiry = TimeSpan.FromMinutes(10);
+                    var wait = TimeSpan.FromSeconds(10);
+                    var retry = TimeSpan.FromSeconds(1);
+
+                    using (var redLock = await lockFactory.CreateLockAsync(resource, expiry, wait, retry))
+                    {
+                        if (!redLock.IsAcquired)
+                        {
+                            _logger.LogWarning("Não foi possível adquirir lock para sincronização: {Resource}. Outra instância deve estar rodando.", resource);
+                            return false;
+                        }
+
+                        _logger.LogInformation("Lock adquirido: {Resource}. Iniciando sincronização.", resource);
+                        return await ExecuteSyncLogicAsync(scope, syncType);
+                    }
                 }
 
-                if (_syncCounter == 1 || _syncCounter % 12 == 0) 
-                {
-                    _logger.LogInformation("Syncing yesterday's games");
-                    await gameService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
-                }
-
-                _logger.LogInformation("Syncing today's games");
-                await gameService.SyncTodayGamesAsync();
-                if (_syncCounter == 1 || _syncCounter % 4 == 0) 
-                {
-                    _logger.LogInformation("Syncing future games (next 7 days)");
-                    await gameService.SyncFutureGamesAsync(days: 7);
-                }
-
-                var todayGames = await gameService.GetTodayGamesAsync();
-                var liveGames = todayGames.Count(g => g.IsLive);
-                var hasLiveGames = liveGames > 0;
-
-                _logger.LogInformation(
-                    "{SyncType} sync completed | Today: {TotalGames} jogos, Live: {LiveGames}",
-                    syncType, todayGames.Count, liveGames);
-
-                return hasLiveGames;
+                // Fallback se Redis/RedLock não estiver configurado
+                return await ExecuteSyncLogicAsync(scope, syncType);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during {SyncType} data synchronization", syncType);
                 return false;
             }
+        }
+
+        private async Task<bool> ExecuteSyncLogicAsync(IServiceScope scope, string syncType)
+        {
+            var teamService = scope.ServiceProvider.GetRequiredService<ITeamService>();
+            var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
+
+            _logger.LogInformation("Starting {SyncType} data synchronization (#{Counter})",
+                syncType, _syncCounter);
+
+            var teams = await teamService.GetAllTeamsAsync();
+            if (teams.Count < 30)
+            {
+                _logger.LogWarning("Syncing teams ({Count} found, expected 30)", teams.Count);
+                await teamService.SyncAllTeamsAsync();
+            }
+
+            if (_syncCounter == 1 || _syncCounter % 12 == 0)
+            {
+                _logger.LogInformation("Syncing yesterday's games");
+                await gameService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
+            }
+
+            _logger.LogInformation("Syncing today's games");
+            await gameService.SyncTodayGamesAsync();
+            
+            if (_syncCounter == 1 || _syncCounter % 4 == 0)
+            {
+                _logger.LogInformation("Syncing future games (next 7 days)");
+                await gameService.SyncFutureGamesAsync(days: 7);
+            }
+
+            var todayGames = await gameService.GetTodayGamesAsync();
+            var liveGames = todayGames.Count(g => g.IsLive);
+            var hasLiveGames = liveGames > 0;
+
+            _logger.LogInformation(
+                "{SyncType} sync completed | Today: {TotalGames} jogos, Live: {LiveGames}",
+                syncType, todayGames.Count, liveGames);
+
+            return hasLiveGames;
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken)

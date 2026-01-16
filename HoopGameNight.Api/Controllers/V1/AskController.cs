@@ -55,6 +55,7 @@ namespace HoopGameNight.Api.Controllers
         /// - Informações sobre lesões/transferências
         /// </remarks>
         [HttpPost]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("AskPolicy")]
         [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]

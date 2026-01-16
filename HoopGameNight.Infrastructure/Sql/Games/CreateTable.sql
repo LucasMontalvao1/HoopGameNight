@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS games (
     INDEX idx_games_status (status),
     INDEX idx_games_season (season),
     INDEX idx_games_team_date (home_team_id, date),
-    INDEX idx_games_visitor_date (visitor_team_id, date)
+    INDEX idx_games_visitor_date (visitor_team_id, date),
+    INDEX idx_games_date_status (date, status)
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Jogos da NBA - ESPN API';

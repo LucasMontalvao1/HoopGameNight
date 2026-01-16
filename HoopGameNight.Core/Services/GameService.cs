@@ -136,6 +136,23 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
+        /// Busca jogos em um intervalo de datas (otimizado para evitar N+1)
+        /// </summary>
+        public async Task<List<GameResponse>> GetGamesByDateRangeAsync(DateTime startDate, DateTime endDate)
+        {
+            _logger.LogInformation("GET GAMES RANGE: Buscando jogos entre {Start} e {End}",
+                startDate.ToString("yyyy-MM-dd"), endDate.ToString("yyyy-MM-dd"));
+
+            // 1. Buscar do banco (Query única)
+            var gamesFromDb = await _gameRepository.GetByDateRangeAsync(startDate, endDate);
+            var response = _mapper.Map<List<GameResponse>>(gamesFromDb.ToList());
+
+            _logger.LogInformation("BANCO RANGE: Encontrou {Count} jogos no intervalo", response.Count);
+
+            return response;
+        }
+
+        /// <summary>
         /// Busca jogos com filtros e paginação
         /// </summary>
         public async Task<(List<GameResponse> Games, int TotalCount)> GetGamesAsync(GetGamesRequest request)
@@ -780,7 +797,7 @@ namespace HoopGameNight.Core.Services
             if (espnGame.HomeTeamScore.HasValue && espnGame.AwayTeamScore.HasValue &&
                 espnGame.Date < DateTime.Now.AddHours(-2))
             {
-                _logger.LogDebug("Forçando status Final: Jogo com score presente e data retroativa ({Date})",
+                _logger.LogDebug("Forçando status Final: Jogo com score presente ({Away} x {Home}) e data retroativa ({Date})",
                     espnGame.AwayTeamScore, espnGame.HomeTeamScore, espnGame.Date);
                 return GameStatus.Final;
             }

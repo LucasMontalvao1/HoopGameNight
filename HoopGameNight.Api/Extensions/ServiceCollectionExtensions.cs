@@ -28,6 +28,10 @@ using Microsoft.OpenApi.Models;
 using MySqlConnector;
 using Polly;
 using Polly.Extensions.Http;
+using RedLockNet;
+using RedLockNet.SERedis;
+using RedLockNet.SERedis.Configuration;
+using StackExchange.Redis;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Data;
 using System.Reflection;
@@ -195,10 +199,11 @@ namespace HoopGameNight.Api.Extensions
             services.AddHttpClient<OllamaClient>(client =>
             {
                 var ollamaUrl = Environment.GetEnvironmentVariable("OLLAMA_URL") ?? "http://localhost:11434";
-                Console.WriteLine("Ollama iniciado");
                 client.BaseAddress = new Uri(ollamaUrl);
-                client.Timeout = TimeSpan.FromMinutes(2);
-            });
+                client.Timeout = TimeSpan.FromMinutes(3); // Aumentado para lidar com modelos maiores
+            })
+            .AddPolicyHandler(GetOllamaRetryPolicy())
+            .AddPolicyHandler(GetOllamaCircuitBreakerPolicy());
 
             // Repositories
             services.AddScoped<IGameRepository, GameRepository>();
@@ -271,6 +276,29 @@ namespace HoopGameNight.Api.Extensions
                     durationOfBreak: TimeSpan.FromSeconds(30));
         }
 
+        private static IAsyncPolicy<HttpResponseMessage> GetOllamaRetryPolicy()
+        {
+            return HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .Or<TaskCanceledException>() // Handle timeouts as retriable
+                .WaitAndRetryAsync(
+                    3,
+                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    onRetry: (outcome, timespan, retryCount, context) =>
+                    {
+                        Console.WriteLine($"Ollama Retry {retryCount} after {timespan.TotalMilliseconds}ms due to failure");
+                    });
+        }
+
+        private static IAsyncPolicy<HttpResponseMessage> GetOllamaCircuitBreakerPolicy()
+        {
+            return HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .CircuitBreakerAsync(
+                    handledEventsAllowedBeforeBreaking: 3,
+                    durationOfBreak: TimeSpan.FromSeconds(60));
+        }
+
         #endregion
 
         #region Caching
@@ -302,6 +330,14 @@ namespace HoopGameNight.Api.Extensions
                 // Registrar configurações do Redis
                 services.Configure<Core.Configuration.RedisSettings>(
                     configuration.GetSection("Redis"));
+
+                // RedLock - Bloqueio distribuído
+                var multiplexer = ConnectionMultiplexer.Connect(redisSettings.ConnectionString);
+                services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+                services.AddSingleton<IDistributedLockFactory>(RedLockFactory.Create(new List<RedLockMultiplexer>
+                {
+                    new RedLockMultiplexer(multiplexer)
+                }));
             }
 
             services.AddSingleton<ICacheService, CacheService>();
@@ -364,6 +400,7 @@ namespace HoopGameNight.Api.Extensions
 
             services.AddRateLimiter(options =>
             {
+                // Global Limiter
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                     RateLimitPartition.GetFixedWindowLimiter(
                         partitionKey: GetRateLimitKey(context),
@@ -375,17 +412,29 @@ namespace HoopGameNight.Api.Extensions
                             Window = TimeSpan.FromMinutes(rateLimitOptions.WindowMinutes)
                         }));
 
+                // Strict Policy for AI Ask Endpoint
+                options.AddPolicy("AskPolicy", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: GetRateLimitKey(context),
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 5,    // 5 perguntas por minuto (exemplo estrito)
+                            QueueLimit = 2,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+
                 options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
                 options.OnRejected = async (context, token) =>
                 {
-                    context.HttpContext.Response.Headers.Add("X-Rate-Limit-Retry-After",
-                        TimeSpan.FromMinutes(rateLimitOptions.WindowMinutes).TotalSeconds.ToString());
-
+                    context.HttpContext.Response.Headers.Add("X-Rate-Limit-Retry-After", "60");
+                    
                     await context.HttpContext.Response.WriteAsJsonAsync(new
                     {
                         error = "Rate limit exceeded",
-                        retryAfter = TimeSpan.FromMinutes(rateLimitOptions.WindowMinutes).TotalSeconds
+                        message = "Você fez muitas perguntas rapidamente. Aguarde um momento.",
+                        retryAfter = 60
                     }, cancellationToken: token);
                 };
             });

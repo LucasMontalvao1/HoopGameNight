@@ -7,6 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json;
+using System.IO;
 
 namespace HoopGameNight.Core.Services.AI
 {
@@ -19,99 +21,8 @@ namespace HoopGameNight.Core.Services.AI
         private readonly ICacheService _cacheService;
         private readonly ILogger<NbaAiService> _logger;
 
-        // Mapeamento completo de times
-        private static readonly Dictionary<string, string> TeamKeywords = new()
-        {
-            // Lakers
-            {"lakers", "LAL"}, {"lal", "LAL"}, {"la lakers", "LAL"}, {"los angeles lakers", "LAL"},
-            
-            // Warriors
-            {"warriors", "GSW"}, {"gsw", "GSW"}, {"golden", "GSW"}, {"golden state", "GSW"},
-            
-            // Celtics
-            {"celtics", "BOS"}, {"bos", "BOS"}, {"boston", "BOS"},
-            
-            // Heat
-            {"heat", "MIA"}, {"mia", "MIA"}, {"miami", "MIA"},
-            
-            // Bucks
-            {"bucks", "MIL"}, {"mil", "MIL"}, {"milwaukee", "MIL"},
-            
-            // Nets
-            {"nets", "BKN"}, {"bkn", "BKN"}, {"brooklyn", "BKN"},
-            
-            // Bulls
-            {"bulls", "CHI"}, {"chi", "CHI"}, {"chicago", "CHI"},
-            
-            // Knicks
-            {"knicks", "NYK"}, {"nyk", "NYK"}, {"new york", "NYK"}, {"ny", "NYK"},
-            
-            // 76ers
-            {"sixers", "PHI"}, {"76ers", "PHI"}, {"phi", "PHI"}, {"philadelphia", "PHI"},
-            
-            // Mavericks
-            {"mavericks", "DAL"}, {"mavs", "DAL"}, {"dal", "DAL"}, {"dallas", "DAL"},
-            
-            // Clippers
-            {"clippers", "LAC"}, {"lac", "LAC"},
-            
-            // Suns
-            {"suns", "PHX"}, {"phx", "PHX"}, {"phoenix", "PHX"},
-            
-            // Nuggets
-            {"nuggets", "DEN"}, {"den", "DEN"}, {"denver", "DEN"},
-            
-            // Grizzlies
-            {"grizzlies", "MEM"}, {"mem", "MEM"}, {"memphis", "MEM"},
-            
-            // Rockets
-            {"rockets", "HOU"}, {"hou", "HOU"}, {"houston", "HOU"},
-            
-            // Spurs
-            {"spurs", "SAS"}, {"sas", "SAS"}, {"sa", "SAS"}, {"san antonio", "SAS"},
-            
-            // Pelicans
-            {"pelicans", "NOP"}, {"nop", "NOP"}, {"no", "NOP"}, {"new orleans", "NOP"},
-            
-            // Jazz
-            {"jazz", "UTA"}, {"uta", "UTA"}, {"utah", "UTA"},
-            
-            // Kings
-            {"kings", "SAC"}, {"sac", "SAC"}, {"sacramento", "SAC"},
-            
-            // Blazers
-            {"blazers", "POR"}, {"por", "POR"}, {"portland", "POR"},
-            
-            // Timberwolves
-            {"timberwolves", "MIN"}, {"wolves", "MIN"}, {"min", "MIN"}, {"minnesota", "MIN"},
-            
-            // Thunder
-            {"thunder", "OKC"}, {"okc", "OKC"}, {"oklahoma", "OKC"},
-            
-            // Cavaliers
-            {"cavaliers", "CLE"}, {"cavs", "CLE"}, {"cle", "CLE"}, {"cleveland", "CLE"},
-            
-            // Raptors
-            {"raptors", "TOR"}, {"tor", "TOR"}, {"toronto", "TOR"},
-            
-            // Pacers
-            {"pacers", "IND"}, {"ind", "IND"}, {"indiana", "IND"},
-            
-            // Hornets
-            {"hornets", "CHA"}, {"cha", "CHA"}, {"charlotte", "CHA"},
-            
-            // Pistons
-            {"pistons", "DET"}, {"det", "DET"}, {"detroit", "DET"},
-            
-            // Magic
-            {"magic", "ORL"}, {"orl", "ORL"}, {"orlando", "ORL"},
-            
-            // Hawks
-            {"hawks", "ATL"}, {"atl", "ATL"}, {"atlanta", "ATL"},
-            
-            // Wizards
-            {"wizards", "WAS"}, {"was", "WAS"}, {"wsh", "WAS"}, {"washington", "WAS"}
-        };
+        // Mapeamento dinâmico de times (carregado via JSON)
+        private readonly Dictionary<string, string> _teamKeywords = new();
 
         public NbaAiService(
             IGameService gameService,
@@ -127,6 +38,42 @@ namespace HoopGameNight.Core.Services.AI
             _ollamaClient = ollamaClient;
             _cacheService = cacheService;
             _logger = logger;
+
+            LoadTeamKeywords();
+        }
+
+        private void LoadTeamKeywords()
+        {
+            try
+            {
+                var filePath = Path.Combine(AppContext.BaseDirectory, "Resources", "teams_keywords.json");
+                if (!File.Exists(filePath))
+                {
+                    // Fallback para localização relativa (ex: dev environment)
+                    filePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "HoopGameNight.Core", "Resources", "teams_keywords.json");
+                }
+
+                if (File.Exists(filePath))
+                {
+                    var json = File.ReadAllText(filePath);
+                    var keywords = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                    if (keywords != null)
+                    {
+                        foreach (var kvp in keywords)
+                            _teamKeywords[kvp.Key] = kvp.Value;
+                        
+                        _logger.LogInformation("Carregados {Count} palavras-chave de times do JSON", _teamKeywords.Count);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Arquivo de keywords não encontrado em: {Path}", filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao carregar keywords do JSON");
+            }
         }
 
         public async Task<AskResponse> AskAsync(AskRequest request)
@@ -213,33 +160,23 @@ namespace HoopGameNight.Core.Services.AI
 
             var allGames = new List<GameResponse>();
 
-            // 3. Buscar jogos
+            // 3. Buscar jogos (Otimizado com Date Range)
+            var rangeGames = await _gameService.GetGamesByDateRangeAsync(startDate, endDate);
+
             if (teamIds.Any())
             {
-                // Buscar apenas jogos dos times detectados
+                // Filtrar apenas jogos dos times detectados
                 foreach (var teamId in teamIds)
                 {
-                    var currentDate = startDate;
-                    while (currentDate <= endDate)
-                    {
-                        var dayGames = await _gameService.GetGamesByDateAsync(currentDate);
-                        var teamGames = dayGames.Where(g =>
-                            g.HomeTeam.Id == teamId || g.VisitorTeam.Id == teamId);
-                        allGames.AddRange(teamGames);
-                        currentDate = currentDate.AddDays(1);
-                    }
+                    var teamGames = rangeGames.Where(g =>
+                        g.HomeTeam.Id == teamId || g.VisitorTeam.Id == teamId);
+                    allGames.AddRange(teamGames);
                 }
             }
             else
             {
-                // Buscar todos os jogos do período
-                var currentDate = startDate;
-                while (currentDate <= endDate)
-                {
-                    var dayGames = await _gameService.GetGamesByDateAsync(currentDate);
-                    allGames.AddRange(dayGames);
-                    currentDate = currentDate.AddDays(1);
-                }
+                // Usar todos os jogos do período
+                allGames.AddRange(rangeGames);
             }
 
             // 4. Remover duplicatas e limitar
@@ -311,7 +248,7 @@ namespace HoopGameNight.Core.Services.AI
             var teamIds = new List<int>();
             var teamNames = new List<string>();
 
-            foreach (var (keyword, abbr) in TeamKeywords)
+            foreach (var (keyword, abbr) in _teamKeywords)
             {
                 if (question.Contains(keyword))
                 {
