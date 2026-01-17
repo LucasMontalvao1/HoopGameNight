@@ -45,4 +45,10 @@
     <ProjectReference Include="..\HoopGameNight.Infrastructure\HoopGameNight.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Resources\*.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

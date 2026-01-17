@@ -41,6 +41,7 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public string? Id { get; set; }
         public string? Date { get; set; }
         public List<EspnCompetitorDto>? Competitors { get; set; }
+        public EspnGameStatusDto? Status { get; set; }
     }
 
     public class EspnCompetitorDto
@@ -139,6 +140,18 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public string? Detail { get; set; }
         public int Period { get; set; }
         public string? DisplayClock { get; set; }
+        public EspnStatusTypeDto? Type { get; set; }
+    }
+
+    public class EspnStatusTypeDto
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? State { get; set; }
+        public bool Completed { get; set; }
+        public string? Description { get; set; }
+        public string? Detail { get; set; }
+        public string? ShortDetail { get; set; }
     }
 
     public class EspnGameRosterDto

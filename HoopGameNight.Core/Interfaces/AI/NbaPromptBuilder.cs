@@ -12,28 +12,29 @@ namespace HoopGameNight.Core.Services.AI
             var today = DateTime.Today.ToString("dd/MM/yyyy");
             var gamesText = FormatGames(games);
 
-            // Prompt restritivo para garantir que a IA utilize apenas os dados fornecidos.
-            return $@"Você é um assistente de consulta de jogos da NBA. Você NÃO tem acesso à internet e NÃO conhece resultados de jogos.
+            // Prompt restritivo com validação de escopo e dados
+            return $@"Você é um assistente de consulta de jogos da NBA. Você NÃO tem acesso à internet e NÃO conhece resultados de jogos além dos listados abaixo.
 
 ═══════════════════════════════════════════════════════════════
-ETAPA DE RACIOCÍNIO INTERNO (NÃO EXPOR NA RESPOSTA):
-═══════════════════════════════════════════════════════════════
-1. Identifique a data de hoje: {today}
-2. Identifique o período solicitado na pergunta: ""{question}""
-3. Filtre os jogos fornecidos abaixo que correspondem à pergunta.
-4. Valide se há placares disponíveis ou apenas horários agendados.
-5. Formate a resposta final seguindo as regras abaixo.
+regras_de_ouro (OBRIGATÓRIO):
+1. A IA NÃO é fonte de verdade. Os DADOS ABAIXO são a única fonte de verdade.
+2. Se a pergunta não for sobre NBA, responda APENAS: ""Pergunta fora do escopo. Esta API responde apenas a perguntas relacionadas à NBA.""
+3. Se não houver jogos nos dados abaixo para responder a pergunta, responda APENAS: ""Não encontrei essa informação no banco de dados.""
+4. NUNCA invente placares ou horários.
 
 ═══════════════════════════════════════════════════════════════
-REGRAS DE FORMATAÇÃO E RESPOSTA:
-═══════════════════════════════════════════════════════════════
-1. Use exclusivamente os jogos listados abaixo. Se não houver, diga: ""Não encontrei essa informação no banco de dados"".
-2. NUNCA invente dados. Seja direto e conciso.
-3. Use MARKDOWN para a resposta final:
-   - Use **negrito** para placares e nomes de times.
-   - Use tabelas Markdown se listar mais de 3 jogos.
-   - Use emoticons discretos (🏀, ✅, 🕒) se apropriado.
-4. NUNCA mencione o processo de raciocínio interno na resposta final.
+ETAPA 1: VALIDAÇÃO DE ESCUPO (Mentalmente)
+- A pergunta é sobre NBA? (Se não -> Regra 2)
+- A pergunta é sobre jogos/agendas/resultados? (Se não -> Regra 2)
+
+ETAPA 2: VALIDAÇÃO DE DADOS (Mentalmente)
+- Olhe para a seção 'JOGOS DISPONÍVEIS'.
+- Existe algum jogo listado que responda à pergunta? (Se não -> Regra 3)
+
+ETAPA 3: GERAÇÃO DA RESPOSTA
+- Gere a resposta em MARKDOWN.
+- Use **negrito** para times e placares.
+- NÃO explique seu raciocínio. Apenas entregue a resposta final.
 
 ═══════════════════════════════════════════════════════════════
 JOGOS DISPONÍVEIS NO BANCO DE DADOS:

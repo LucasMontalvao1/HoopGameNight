@@ -120,22 +120,34 @@ namespace HoopGameNight.Core.Services
             catch (TaskCanceledException)
             {
                 _logger.LogError("Timeout ao chamar Ollama ({Timeout}s)", _httpClient.Timeout.TotalSeconds);
-                return "Timeout. Tente uma pergunta mais simples.";
+                return "A IA demorou muito para responder. Tente uma pergunta mais simples.";
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "Erro de conexão com Ollama");
-                return "Não foi possível conectar ao Ollama.\n\nVerifique:\n1. ollama serve está rodando?\n2. OLLAMA_URL está correto no .env?";
+                _logger.LogWarning(ex, "Erro de conexão com Ollama (Possivelmente offline)");
+                return "A IA está indisponível no momento (Serviço Offline). Mas seus dados estão seguros.";
+            }
+            catch (System.Net.Sockets.SocketException ex)
+            {
+                _logger.LogWarning(ex, "Erro de socket com Ollama");
+                return "Não foi possível conectar ao serviço de IA. (Conexão Recusada)";
             }
             catch (JsonException ex)
             {
                 _logger.LogError(ex, "Erro ao processar JSON");
-                return "Erro ao processar JSON do Ollama.";
+                return "Erro interno ao processar resposta da IA.";
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro inesperado");
-                return "Erro inesperado. Verifique os logs.";
+                // Tratamento específico para Circuit Breaker sem referência direta ao Polly
+                if (ex.GetType().FullName?.Contains("BrokenCircuitException") == true)
+                {
+                    _logger.LogWarning("Circuit Breaker aberto: Ollama indisponível temporariamente.");
+                    return "A IA está indisponível no momento devido a falhas consecutivas. Tente novamente em alguns instantes. (Circuit Open)";
+                }
+
+                _logger.LogError(ex, "Erro inesperado no cliente Ollama");
+                return "Ocorreu um erro inesperado ao consultar a IA.";
             }
         }
 

@@ -73,3 +73,6 @@ finally
     Log.Information("Desligando Hoop Game Night API");
     await Log.CloseAndFlushAsync();
 }
+
+// Necessário para testes de integração com WebApplicationFactory
+public partial class Program { }

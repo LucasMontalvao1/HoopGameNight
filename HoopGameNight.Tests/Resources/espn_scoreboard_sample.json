@@ -1,0 +1,237 @@
+{
+    "leagues": [
+        {
+            "id": "46",
+            "uid": "s:40~l:46",
+            "name": "National Basketball Association",
+            "abbreviation": "NBA",
+            "slug": "nba",
+            "season": {
+                "year": 2024,
+                "startDate": "2023-10-24T07:00Z",
+                "endDate": "2024-06-25T06:59Z",
+                "displayName": "2023-24",
+                "type": {
+                    "id": "2",
+                    "type": 2,
+                    "name": "Regular Season",
+                    "abbreviation": "reg"
+                }
+            },
+            "logos": [
+                {
+                    "href": "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
+                    "width": 500,
+                    "height": 500,
+                    "alt": "NBA",
+                    "rel": [
+                        "full",
+                        "default"
+                    ],
+                    "lastUpdated": "2019-05-08T16:04Z"
+                }
+            ],
+            "calendarType": "day",
+            "calendarIsWhitelist": true,
+            "calendarStartDate": "2023-10-24T07:00Z",
+            "calendarEndDate": "2024-06-25T06:59Z",
+            "calendar": [
+                "2023-10-24T07:00Z",
+                "2023-10-25T07:00Z"
+            ]
+        }
+    ],
+    "season": {
+        "type": 2,
+        "year": 2024
+    },
+    "day": {
+        "date": "2024-02-01"
+    },
+    "events": [
+        {
+            "id": "401585312",
+            "uid": "s:40~l:46~e:401585312",
+            "date": "2024-02-02T00:30:00Z",
+            "name": "Los Angeles Lakers at Boston Celtics",
+            "shortName": "LAL @ BOS",
+            "season": {
+                "year": 2024,
+                "type": 2,
+                "slug": "regular-season"
+            },
+            "competitions": [
+                {
+                    "id": "401585312",
+                    "uid": "s:40~l:46~e:401585312~c:401585312",
+                    "date": "2024-02-02T00:30:00Z",
+                    "attendance": 19156,
+                    "type": {
+                        "id": "1",
+                        "abbreviation": "STD"
+                    },
+                    "timeValid": true,
+                    "neutralSite": false,
+                    "conferenceCompetition": false,
+                    "playByPlayAvailable": true,
+                    "recent": false,
+                    "venue": {
+                        "id": "66",
+                        "fullName": "TD Garden",
+                        "address": {
+                            "city": "Boston",
+                            "state": "MA"
+                        },
+                        "capacity": 18624,
+                        "indoor": true
+                    },
+                    "competitors": [
+                        {
+                            "id": "2",
+                            "uid": "s:40~l:46~t:2",
+                            "type": "team",
+                            "order": 0,
+                            "homeAway": "home",
+                            "winner": false,
+                            "team": {
+                                "id": "2",
+                                "uid": "s:40~l:46~t:2",
+                                "location": "Boston",
+                                "name": "Celtics",
+                                "abbreviation": "BOS",
+                                "displayName": "Boston Celtics",
+                                "shortDisplayName": "Celtics",
+                                "color": "006532",
+                                "alternateColor": "f1f2f3",
+                                "isActive": true,
+                                "venue": {
+                                    "id": "66"
+                                },
+                                "links": [
+                                    {
+                                        "rel": [
+                                            "clubhouse",
+                                            "desktop",
+                                            "team"
+                                        ],
+                                        "href": "https://www.espn.com/nba/team/_/name/bos/boston-celtics",
+                                        "text": "Clubhouse",
+                                        "isExternal": false,
+                                        "isPremium": false
+                                    }
+                                ],
+                                "logo": "https://a.espncdn.com/i/teamlogos/nba/500/bos.png"
+                            },
+                            "score": "105",
+                            "linescore": [
+                                {
+                                    "value": 25
+                                },
+                                {
+                                    "value": 20
+                                },
+                                {
+                                    "value": 30
+                                },
+                                {
+                                    "value": 30
+                                }
+                            ],
+                            "statistics": [],
+                            "leaders": [
+                                {
+                                    "name": "points",
+                                    "displayName": "Points",
+                                    "shortDisplayName": "Pts",
+                                    "abbreviation": "Pts",
+                                    "leaders": [
+                                        {
+                                            "displayValue": "32",
+                                            "value": 32,
+                                            "athlete": {
+                                                "id": "123456",
+                                                "fullName": "Jayson Tatum",
+                                                "displayName": "Jayson Tatum",
+                                                "shortName": "J. Tatum"
+                                            },
+                                            "team": {
+                                                "id": "2"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "13",
+                            "uid": "s:40~l:46~t:13",
+                            "type": "team",
+                            "order": 1,
+                            "homeAway": "away",
+                            "winner": true,
+                            "team": {
+                                "id": "13",
+                                "uid": "s:40~l:46~t:13",
+                                "location": "Los Angeles",
+                                "name": "Lakers",
+                                "abbreviation": "LAL",
+                                "displayName": "Los Angeles Lakers",
+                                "shortDisplayName": "Lakers",
+                                "color": "542582",
+                                "alternateColor": "fdb927",
+                                "isActive": true,
+                                "venue": {
+                                    "id": "123"
+                                },
+                                "logo": "https://a.espncdn.com/i/teamlogos/nba/500/lal.png"
+                            },
+                            "score": "114",
+                            "linescore": [
+                                {
+                                    "value": 30
+                                },
+                                {
+                                    "value": 30
+                                },
+                                {
+                                    "value": 30
+                                },
+                                {
+                                    "value": 24
+                                }
+                            ]
+                        }
+                    ],
+                    "status": {
+                        "clock": 0,
+                        "displayClock": "0.0",
+                        "period": 4,
+                        "type": {
+                            "id": "3",
+                            "name": "STATUS_FINAL",
+                            "state": "post",
+                            "completed": true,
+                            "description": "Final",
+                            "detail": "Final",
+                            "shortDetail": "Final"
+                        }
+                    }
+                }
+            ],
+            "status": {
+                "clock": 0,
+                "displayClock": "0.0",
+                "period": 4,
+                "type": {
+                    "id": "3",
+                    "name": "STATUS_FINAL",
+                    "state": "post",
+                    "completed": true,
+                    "description": "Final",
+                    "detail": "Final",
+                    "shortDetail": "Final"
+                }
+            }
+        }
+    ]
+}
