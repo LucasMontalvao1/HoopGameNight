@@ -52,7 +52,7 @@ namespace HoopGameNight.Infrastructure.HealthChecks
 
                 _logger.LogWarning("Ollama não está disponível");
 
-                return HealthCheckResult.Unhealthy(
+                return HealthCheckResult.Degraded(
                     "Ollama não está disponível. Verifique se está rodando.",
                     null,
                     new Dictionary<string, object>
@@ -62,41 +62,12 @@ namespace HoopGameNight.Infrastructure.HealthChecks
                     }
                 );
             }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogError(ex, "Erro de conexão com Ollama");
-
-                return HealthCheckResult.Unhealthy(
-                    "Não foi possível conectar ao Ollama",
-                    ex,
-                    new Dictionary<string, object>
-                    {
-                        { "status", "connection_failed" },
-                        { "error", ex.Message },
-                        { "solution", "Verifique se Ollama está rodando em http://localhost:11434" }
-                    }
-                );
-            }
-            catch (TaskCanceledException ex)
-            {
-                _logger.LogError(ex, "Timeout ao verificar Ollama");
-
-                return HealthCheckResult.Unhealthy(
-                    "⏱Timeout ao conectar com Ollama",
-                    ex,
-                    new Dictionary<string, object>
-                    {
-                        { "status", "timeout" },
-                        { "error", "Ollama não respondeu a tempo" }
-                    }
-                );
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro inesperado ao verificar Ollama");
+                _logger.LogWarning(ex, "Erro ao verificar Ollama (reportando como Degraded)");
 
-                return HealthCheckResult.Unhealthy(
-                    "Erro inesperado ao verificar Ollama",
+                return HealthCheckResult.Degraded(
+                    "Erro ao verificar Ollama",
                     ex,
                     new Dictionary<string, object>
                     {
