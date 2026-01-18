@@ -117,33 +117,16 @@ namespace HoopGameNight.Core.Services
 
                 return result.Response.Trim();
             }
-            catch (TaskCanceledException)
+            catch (Exception ex) 
             {
-                _logger.LogError("Timeout ao chamar Ollama ({Timeout}s)", _httpClient.Timeout.TotalSeconds);
-                return "A IA demorou muito para responder. Tente uma pergunta mais simples.";
-            }
-            catch (HttpRequestException ex)
-            {
-                _logger.LogWarning(ex, "Erro de conexão com Ollama (Possivelmente offline)");
-                return "A IA está indisponível no momento (Serviço Offline). Mas seus dados estão seguros.";
-            }
-            catch (System.Net.Sockets.SocketException ex)
-            {
-                _logger.LogWarning(ex, "Erro de socket com Ollama");
-                return "Não foi possível conectar ao serviço de IA. (Conexão Recusada)";
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogError(ex, "Erro ao processar JSON");
-                return "Erro interno ao processar resposta da IA.";
-            }
-            catch (Exception ex)
-            {
-                // Tratamento específico para Circuit Breaker sem referência direta ao Polly
-                if (ex.GetType().FullName?.Contains("BrokenCircuitException") == true)
+                // Com o FallbackPolicy no HttpClient, a maioria dos erros de conexão/circuito
+                // agora retornam 503 ServiceUnavailable em vez de lançar exceção.
+                // Este catch captura apenas erros inesperados de serialização ou lógica.
+                
+                if (ex is TaskCanceledException)
                 {
-                    _logger.LogWarning("Circuit Breaker aberto: Ollama indisponível temporariamente.");
-                    return "A IA está indisponível no momento devido a falhas consecutivas. Tente novamente em alguns instantes. (Circuit Open)";
+                    _logger.LogWarning("Timeout ao chamar Ollama ({Timeout}s)", _httpClient.Timeout.TotalSeconds);
+                    return "A IA demorou muito para responder. Tente uma pergunta mais simples.";
                 }
 
                 _logger.LogError(ex, "Erro inesperado no cliente Ollama");
@@ -155,12 +138,15 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync("/api/tags");
+                // Usar um timeout bem curto para health check
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                var response = await _httpClient.GetAsync("/api/tags", cts.Token);
                 return response.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Ollama indisponível");
+                // A maioria das falhas de rede/circuito agora são 503 via FallbackPolicy
+                _logger.LogWarning("Ollama não respondeu (possivelmente offline ou circuito aberto)");
                 return false;
             }
         }

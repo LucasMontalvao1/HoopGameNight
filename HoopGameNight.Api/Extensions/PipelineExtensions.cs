@@ -10,11 +10,14 @@ using HoopGameNight.Api.Middleware;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Infrastructure.Data;
 using HoopGameNight.Infrastructure.Services;
+using HoopGameNight.Infrastructure.Jobs;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Serilog;
 using System.Diagnostics;
 using System.Text.Json;
+using Hangfire;
+using HoopGameNight.Api.Filters;
 
 namespace HoopGameNight.Api.Extensions
 {
@@ -38,7 +41,19 @@ namespace HoopGameNight.Api.Extensions
             // 3. Configure Endpoints
             app.ConfigureEndpoints();
 
-            // 4. Log Startup Information
+            // 4. Configure Hangfire Dashboard
+            app.UseHangfireDashboard("/hangfire", new DashboardOptions
+            {
+                Authorization = new[] { new HangfireAuthorizationFilter(app.Configuration) },
+                DashboardTitle = "Hoop Game Night - Job Dashboard",
+                AppPath = "/",
+                StatsPollingInterval = 5000
+            });
+
+            // 5. Register Recurring Jobs
+            app.RegisterSyncJobs();
+
+            // 6. Log Startup Information
             app.LogStartupInformation();
 
             return app;
@@ -398,7 +413,8 @@ namespace HoopGameNight.Api.Extensions
         private static void LogStartupInformation(this WebApplication app)
         {
             var env = app.Environment;
-            var urls = string.Join(", ", app.Urls);
+            var urlsList = app.Urls.Any() ? string.Join(", ", app.Urls) : app.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5214";
+            var urls = urlsList;
             var config = app.Configuration;
 
             Log.Information("╔══════════════════════════════════════════════════════════╗");
@@ -416,6 +432,7 @@ namespace HoopGameNight.Api.Extensions
             Log.Information("║ • Rate Limiting: {RateLimitEnabled,-40} ║", "Enabled");
             Log.Information("║ • CORS Policy: {CorsPolicy,-42} ║", env.IsDevelopment() ? "Development" : "Production");
             Log.Information("║ • Background Sync: {SyncEnabled,-38} ║", config.GetValue<bool>("Sync:EnableAutoSync") ? "Enabled" : "Disabled");
+            Log.Information("║ • Hangfire Dashboard: {HangfireEnabled,-34} ║", "/hangfire");
             Log.Information("╠══════════════════════════════════════════════════════════╣");
             Log.Information("║ DATABASE:                                                ║");
             Log.Information("║ • Provider: {Provider,-45} ║", "MySQL");
@@ -429,11 +446,14 @@ namespace HoopGameNight.Api.Extensions
 
             if (env.IsDevelopment())
             {
+                var firstUrl = app.Urls.FirstOrDefault() ?? "http://localhost:5214"; // Fallback para desenvolvimento
+
                 Log.Information("");
                 Log.Information("Links:");
-                Log.Information("   • Swagger UI: {SwaggerUrl}", $"{urls.Split(',')[0]}/");
-                Log.Information("   • Health Check: {HealthUrl}", $"{urls.Split(',')[0]}/health");
-                Log.Information("   • API Metrics: {MetricsUrl}", $"{urls.Split(',')[0]}/api/metrics");
+                Log.Information("   • Swagger UI: {SwaggerUrl}", $"{firstUrl}/");
+                Log.Information("   • Hangfire: {HangfireUrl}", $"{firstUrl}/hangfire");
+                Log.Information("   • Health Check: {HealthUrl}", $"{firstUrl}/health");
+                Log.Information("   • API Metrics: {MetricsUrl}", $"{firstUrl}/api/metrics");
             }
         }
 
@@ -454,5 +474,38 @@ namespace HoopGameNight.Api.Extensions
         }
 
         #endregion
+
+        private static void RegisterSyncJobs(this WebApplication app)
+        {
+            try
+            {
+                using (var scope = app.Services.CreateScope())
+                {
+                    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+
+                    // Job de sincronização de jogos (A cada 10 minutos)
+                    recurringJobManager.AddOrUpdate<SyncJobs>(
+                        "sync-games",
+                        job => job.SyncGamesAsync(),
+                        "0 */6 * * *",
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
+                    );
+
+                    // Job de estatísticas de jogadores (A cada 30 minutos)
+                    recurringJobManager.AddOrUpdate<SyncJobs>(
+                        "sync-player-stats",
+                        job => job.SyncPlayerStatsAsync(),
+                        "0 */12 * * *",
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "stats" }
+                    );
+
+                    Log.Information("Hangfire Recurring Jobs registrados com sucesso.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Erro ao registrar Hangfire Recurring Jobs");
+            }
+        }
     }
 }

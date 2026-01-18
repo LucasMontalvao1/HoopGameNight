@@ -22,6 +22,7 @@ using HoopGameNight.Infrastructure.ExternalServices;
 using HoopGameNight.Infrastructure.HealthChecks;
 using HoopGameNight.Infrastructure.Repositories;
 using HoopGameNight.Infrastructure.Services;
+using HoopGameNight.Infrastructure.Jobs;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
@@ -38,6 +39,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Hangfire;
+using Hangfire.MySql;
 
 namespace HoopGameNight.Api.Extensions
 {
@@ -86,10 +89,14 @@ namespace HoopGameNight.Api.Extensions
             // 9. API Documentation (Swagger/OpenAPI)
             services.AddApiDocumentation(configuration);
 
-            // 10. Background Services
-            services.AddBackgroundServices();
+            // 10. Background Services - Desabilitado em favor do Hangfire
+            // services.AddBackgroundServices();
 
-            // 11. API Versioning
+            // 11. Hangfire Infrastructure
+            services.AddHangfireInfrastructure(configuration);
+            services.AddScoped<SyncJobs>();
+
+            // 12. API Versioning
             services.AddApiVersioning();
 
             return services;
@@ -200,8 +207,9 @@ namespace HoopGameNight.Api.Extensions
             {
                 var ollamaUrl = Environment.GetEnvironmentVariable("OLLAMA_URL") ?? "http://localhost:11434";
                 client.BaseAddress = new Uri(ollamaUrl);
-                client.Timeout = TimeSpan.FromMinutes(3); // Aumentado para lidar com modelos maiores
+                client.Timeout = TimeSpan.FromMinutes(3); 
             })
+            .AddPolicyHandler(GetOllamaFallbackPolicy()) // Fallback para capturar tudo
             .AddPolicyHandler(GetOllamaRetryPolicy())
             .AddPolicyHandler(GetOllamaCircuitBreakerPolicy());
 
@@ -210,6 +218,44 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<ITeamRepository, TeamRepository>();
             services.AddScoped<IPlayerRepository, PlayerRepository>();
             services.AddScoped<IPlayerStatsRepository, PlayerStatsRepository>();
+
+            return services;
+        }
+
+        #endregion
+
+        #region Hangfire Infrastructure
+
+        private static IServiceCollection AddHangfireInfrastructure(
+            this IServiceCollection services,
+            IConfiguration configuration)
+        {
+            var connectionString = configuration.GetConnectionString("MySqlConnection")
+                ?? throw new InvalidOperationException("MySQL connection string not found for Hangfire");
+
+            // Configurar Hangfire com MySQL
+            services.AddHangfire(config => config
+                .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+                .UseSimpleAssemblyNameTypeSerializer()
+                .UseRecommendedSerializerSettings()
+                .UseStorage(new MySqlStorage(connectionString, new MySqlStorageOptions
+                {
+                    TransactionIsolationLevel = System.Transactions.IsolationLevel.ReadCommitted,
+                    QueuePollInterval = TimeSpan.FromSeconds(15),
+                    JobExpirationCheckInterval = TimeSpan.FromHours(1),
+                    CountersAggregateInterval = TimeSpan.FromMinutes(5),
+                    PrepareSchemaIfNecessary = true,
+                    DashboardJobListLimit = 50000,
+                    TransactionTimeout = TimeSpan.FromMinutes(1),
+                    TablesPrefix = "Hangfire_"
+                })));
+
+            // Adicionar o servidor de processamento do Hangfire
+            services.AddHangfireServer(options =>
+            {
+                options.WorkerCount = Environment.ProcessorCount * 5;
+                options.Queues = new[] { "default", "sync", "stats" };
+            });
 
             return services;
         }
@@ -297,6 +343,21 @@ namespace HoopGameNight.Api.Extensions
                 .CircuitBreakerAsync(
                     handledEventsAllowedBeforeBreaking: 3,
                     durationOfBreak: TimeSpan.FromSeconds(60));
+        }
+
+        private static IAsyncPolicy<HttpResponseMessage> GetOllamaFallbackPolicy()
+        {
+            return Policy<HttpResponseMessage>
+                .Handle<Exception>() // Captura BrokenCircuitException e outras
+                .FallbackAsync(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+                {
+                    Content = new StringContent("Ollama Service Unavailable (Circuit Open or Connection Failed)")
+                }, onFallbackAsync: (outcome, context) =>
+                {
+                    // Apenas logamos que o fallback foi ativado
+                    Console.WriteLine("Ollama Fallback activated due to: " + (outcome.Exception?.Message ?? "Failure"));
+                    return Task.CompletedTask;
+                });
         }
 
         #endregion

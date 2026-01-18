@@ -58,7 +58,12 @@ try
     await app.ConfigureHoopGameNightPipeline();
 
     // ===== EXECUTAR =====
-    Log.Information("Hoop Game Night API rodando em: {Urls}", string.Join(", ", app.Urls));
+    var serverUrls = string.Join(", ", app.Urls);
+    if (string.IsNullOrEmpty(serverUrls))
+    {
+        serverUrls = builder.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5214";
+    }
+    Log.Information("Hoop Game Night API rodando em: {Urls}", serverUrls);
     await app.RunAsync();
 
     return 0;
