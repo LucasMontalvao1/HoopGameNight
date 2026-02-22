@@ -2,9 +2,6 @@
 
 namespace HoopGameNight.Core.DTOs.External
 {
-    /// <summary>
-    /// DTO para dados da ESPN API
-    /// </summary>
     public class EspnGameDto
     {
         public string Id { get; set; } = string.Empty;

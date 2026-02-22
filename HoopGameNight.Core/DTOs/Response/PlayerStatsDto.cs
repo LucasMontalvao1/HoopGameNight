@@ -50,6 +50,8 @@ namespace HoopGameNight.Core.DTOs.Response
         public decimal SPG { get; set; }
         public decimal BPG { get; set; }
         public decimal MPG { get; set; }
+        public decimal TPG { get; set; } // Turnovers Per Game
+        public decimal FPG { get; set; } // Fouls Per Game
 
         // Porcentagens
         public decimal FGPercentage { get; set; }
@@ -86,6 +88,8 @@ namespace HoopGameNight.Core.DTOs.Response
         public decimal AvgRebounds => RPG;
         public decimal AvgAssists => APG;
         public decimal AvgMinutes => MPG;
+        public decimal AvgTurnovers => TPG;
+        public decimal AvgFouls => FPG;
     }
 
     public class PlayerCareerStatsResponse
@@ -169,17 +173,5 @@ namespace HoopGameNight.Core.DTOs.Response
         public string Team { get; set; } = string.Empty;
         public decimal Value { get; set; }
         public int GamesPlayed { get; set; }
-    }
-}
-
-namespace HoopGameNight.Core.DTOs.Request
-{
-    public class PlayerStatsRequest
-    {
-        public int PlayerId { get; set; }
-        public int? Season { get; set; }
-        public int LastGames { get; set; } = 5;
-        public bool IncludeCareer { get; set; } = true;
-        public bool IncludeCurrentSeason { get; set; } = true;
     }
 }

@@ -1,5 +1,5 @@
 export interface HealthCheckResponse {
-  status: string; 
+  status: string;
   timestamp: string;
   duration: number;
   checks: HealthCheckItem[];
@@ -8,7 +8,7 @@ export interface HealthCheckResponse {
 
 export interface HealthCheckItem {
   name: string;
-  status: string; 
+  status: string;
   description: string | null;
   duration: number;
   tags: string[];
@@ -105,7 +105,7 @@ export interface SyncStatusResponse {
 
 export enum GameStatus {
   SCHEDULED = 'Scheduled',
-  LIVE = 'Live', 
+  LIVE = 'Live',
   FINAL = 'Final',
   POSTPONED = 'Postponed',
   CANCELLED = 'Cancelled'
@@ -119,7 +119,7 @@ export interface TeamResponse {
   division: string;
   fullName: string;
   name: string;
-  displayName?: string; 
+  displayName?: string;
 }
 
 export interface GetTeamsRequest {
@@ -175,3 +175,100 @@ export const POSITION_NAMES: Record<PlayerPosition, string> = {
   [PlayerPosition.PF]: 'Power Forward',
   [PlayerPosition.C]: 'Center'
 };
+// Stat Interfaces
+export interface PlayerGameStatsDetailedResponse {
+  id: number;
+  playerId: number;
+  gameId: number;
+  teamId: number;
+  playerFirstName: string;
+  playerLastName: string;
+  playerFullName: string;
+  jerseyNumber?: number;
+  position?: string;
+  gameDate: string;
+  teamAbbreviation: string;
+  teamName: string;
+  teamLogo?: string;
+  opponentAbbreviation: string;
+  opponentName: string;
+  result: string;
+  isHome: boolean;
+  didNotPlay: boolean;
+  isStarter: boolean;
+  minutesPlayed: number;
+  secondsPlayed: number;
+  minutesFormatted: string;
+  points: number;
+  fieldGoalsMade: number;
+  fieldGoalsAttempted: number;
+  fieldGoalsFormatted: string;
+  fieldGoalPercentage: number;
+  threePointersMade: number;
+  threePointersAttempted: number;
+  threePointersFormatted: string;
+  threePointPercentage: number;
+  freeThrowsMade: number;
+  freeThrowsAttempted: number;
+  freeThrowsFormatted: string;
+  freeThrowPercentage: number;
+  offensiveRebounds: number;
+  defensiveRebounds: number;
+  totalRebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  turnovers: number;
+  personalFouls: number;
+  plusMinus: number;
+  doubleDouble: boolean;
+  tripleDouble: boolean;
+}
+
+export interface GamePlayerStatsResponse {
+  gameId: number;
+  gameDate: string;
+  homeTeam: string;
+  visitorTeam: string;
+  homeScore?: number;
+  visitorScore?: number;
+  homeTeamStats: PlayerGameStatsDetailedResponse[];
+  visitorTeamStats: PlayerGameStatsDetailedResponse[];
+}
+
+export interface PlayerRecentGameResponse {
+  gameId: number;
+  gameDate: string;
+  opponent: string;
+  isHome: boolean;
+  result: string;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  minutes: string;
+  fieldGoals: string;
+  threePointers: string;
+  freeThrows: string;
+  plusMinus: number;
+  doubleDouble: boolean;
+  tripleDouble: boolean;
+}
+
+export interface PlayerGamelogResponse {
+  playerId: number;
+  playerName: string;
+  season: number;
+  games: PlayerRecentGameResponse[];
+}
+export interface AskRequest {
+  question: string;
+}
+
+export interface AskResponse {
+  answer: string;
+  gamesAnalyzed: number;
+  fromCache: boolean;
+  timestamp: string;
+}

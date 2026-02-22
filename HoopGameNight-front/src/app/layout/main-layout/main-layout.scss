@@ -5,6 +5,7 @@
 
   .main-content {
     flex: 1;
-    background-color: #f9fafb;
+    background-color: var(--background-primary);
+    transition: background-color var(--transition-normal);
   }
 }

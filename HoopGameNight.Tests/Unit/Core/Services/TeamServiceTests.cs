@@ -90,14 +90,13 @@ namespace HoopGameNight.Tests.Unit.Core.Services
                 .Setup(x => x.GetAllAsync())
                 .ThrowsAsync(new Exception("Falha na conexão com banco de dados"));
 
-            // Act & Assert
-            var exception = await Assert.ThrowsAsync<BusinessException>(
-                () => _teamService.GetAllTeamsAsync());
+            // Act
+            var act = () => _teamService.GetAllTeamsAsync();
 
-            // Verificar a mensagem da BusinessException
+            // Assert
+            var exception = await Assert.ThrowsAsync<BusinessException>(act);
+
             exception.Message.Should().Be("Falha ao recuperar os times");
-
-            // Verificar a exception interna original
             exception.InnerException.Should().NotBeNull();
             exception.InnerException!.Message.Should().Be("Falha na conexão com banco de dados");
         }

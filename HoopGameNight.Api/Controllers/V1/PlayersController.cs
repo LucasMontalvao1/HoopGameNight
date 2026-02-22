@@ -222,13 +222,6 @@ namespace HoopGameNight.Api.Controllers.V1
                 position,
                 totalCount);
 
-            // Debug: mostrar posições dos jogadores retornados
-            if (players.Any())
-            {
-                var positions = players.Select(p => p.Position).Distinct();
-                Logger.LogInformation("Posições retornadas: {Positions}", string.Join(", ", positions));
-            }
-
             return OkPaginated(
                 players,
                 page,

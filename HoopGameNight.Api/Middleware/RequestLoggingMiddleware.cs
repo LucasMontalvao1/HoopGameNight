@@ -55,7 +55,7 @@ namespace HoopGameNight.Api.Middleware
                     "{Method} {Path} failed after {Duration}ms",
                     method, path, stopwatch.ElapsedMilliseconds);
 
-                throw; // Re-throw para GlobalExceptionHandler processar
+                throw; 
             }
         }
 

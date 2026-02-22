@@ -36,6 +36,7 @@ using StackExchange.Redis;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using System.Data;
 using System.Reflection;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -203,13 +204,19 @@ namespace HoopGameNight.Api.Extensions
             services.AddSingleton<NbaPromptBuilder>();
             services.AddScoped<INbaAiService, NbaAiService>();
 
-            services.AddHttpClient<OllamaClient>(client =>
+            services.AddHttpClient<GroqClient>(client =>
             {
-                var ollamaUrl = Environment.GetEnvironmentVariable("OLLAMA_URL") ?? "http://localhost:11434";
-                client.BaseAddress = new Uri(ollamaUrl);
-                client.Timeout = TimeSpan.FromMinutes(3); 
+                var groqUrl = Environment.GetEnvironmentVariable("GROQ_API_URL") ?? "https://api.groq.com/";
+                var apiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
+
+                client.BaseAddress = new Uri(groqUrl);
+                client.Timeout = TimeSpan.FromSeconds(60); 
+                
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                }
             })
-            .AddPolicyHandler(GetOllamaFallbackPolicy()) // Fallback para capturar tudo
             .AddPolicyHandler(GetOllamaRetryPolicy())
             .AddPolicyHandler(GetOllamaCircuitBreakerPolicy());
 
@@ -267,13 +274,16 @@ namespace HoopGameNight.Api.Extensions
         private static IServiceCollection AddBusinessServices(this IServiceCollection services)
         {
             services.AddScoped<IGameService, GameService>();
+            services.AddScoped<IGameSyncService, GameSyncService>();
             services.AddScoped<ITeamService, TeamService>();
             services.AddScoped<IPlayerService, PlayerService>();
             services.AddScoped<IPlayerStatsService, PlayerStatsService>();
             services.AddScoped<IGameStatsService, GameStatsService>();
+            services.AddScoped<IEspnParser, EspnParser>();
 
             return services;
         }
+
 
         #endregion
 
@@ -283,7 +293,6 @@ namespace HoopGameNight.Api.Extensions
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            // ========== ESPN API - FONTE ÚNICA PARA JOGOS E DADOS ==========
             services.AddHttpClient<IEspnApiService, EspnApiService>(client =>
             {
                 client.BaseAddress = new Uri("https://site.api.espn.com/");
@@ -343,21 +352,6 @@ namespace HoopGameNight.Api.Extensions
                 .CircuitBreakerAsync(
                     handledEventsAllowedBeforeBreaking: 3,
                     durationOfBreak: TimeSpan.FromSeconds(60));
-        }
-
-        private static IAsyncPolicy<HttpResponseMessage> GetOllamaFallbackPolicy()
-        {
-            return Policy<HttpResponseMessage>
-                .Handle<Exception>() // Captura BrokenCircuitException e outras
-                .FallbackAsync(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
-                {
-                    Content = new StringContent("Ollama Service Unavailable (Circuit Open or Connection Failed)")
-                }, onFallbackAsync: (outcome, context) =>
-                {
-                    // Apenas logamos que o fallback foi ativado
-                    Console.WriteLine("Ollama Fallback activated due to: " + (outcome.Exception?.Message ?? "Failure"));
-                    return Task.CompletedTask;
-                });
         }
 
         #endregion
@@ -543,14 +537,11 @@ namespace HoopGameNight.Api.Extensions
                 .AddCheck<SyncHealthCheck>(
                     "background-sync",
                     tags: new[] { "background", "sync" })
-                .AddCheck<ExternalApiHealthCheck>(
-                    "external-apis",
-                    tags: new[] { "external", "api" })
                 .AddCheck<EspnApiHealthCheck>(
                     "espn-api",
                     tags: new[] { "external", "api", "nba-schedule" })
-                .AddCheck<OllamaHealthCheck>(
-                    "ollama",
+                .AddCheck<GroqHealthCheck>(
+                    "groq",
                     tags: new[] { "ai", "external" });
 
             // Metrics service
@@ -589,7 +580,6 @@ namespace HoopGameNight.Api.Extensions
                     }
                 });
 
-                // Adicionar documento Admin para endpoints administrativos
                 c.SwaggerDoc("admin", new OpenApiInfo
                 {
                     Title = "Hoop Game Night API - Admin",
@@ -597,7 +587,6 @@ namespace HoopGameNight.Api.Extensions
                     Description = "Endpoints administrativos: Sync, Diagnóstico, Métricas"
                 });
 
-                // Adicionar documento de Monitoramento
                 c.SwaggerDoc("monitoring", new OpenApiInfo
                 {
                     Title = "Hoop Game Night API - Monitoring",
@@ -605,7 +594,6 @@ namespace HoopGameNight.Api.Extensions
                     Description = "Endpoints de monitoramento e health checks"
                 });
 
-                // Simplified schema naming for generics
                 c.CustomSchemaIds(type =>
                 {
                     if (type.IsGenericType)
@@ -613,7 +601,6 @@ namespace HoopGameNight.Api.Extensions
                         var name = type.Name.Split('`')[0];
                         var args = type.GetGenericArguments();
 
-                        // Special handling for ApiResponse<T>
                         if (name == "ApiResponse" && args.Length == 1)
                         {
                             var argType = args[0];
@@ -625,13 +612,11 @@ namespace HoopGameNight.Api.Extensions
                             return $"ApiResponseOf{argType.Name}";
                         }
 
-                        // Special handling for PaginatedResponse<T>
                         if (name == "PaginatedResponse" && args.Length == 1)
                         {
                             return $"PaginatedResponseOf{args[0].Name}";
                         }
 
-                        // Generic handling
                         var argNames = string.Join("And", args.Select(t => t.Name));
                         return $"{name}Of{argNames}";
                     }
@@ -639,7 +624,6 @@ namespace HoopGameNight.Api.Extensions
                     return type.Name;
                 });
 
-                // Add XML comments if available
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 if (File.Exists(xmlPath))
@@ -647,7 +631,6 @@ namespace HoopGameNight.Api.Extensions
                     c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
                 }
 
-                // Simplified example values
                 c.MapType<DateTime>(() => new OpenApiSchema
                 {
                     Type = "string",
@@ -655,10 +638,8 @@ namespace HoopGameNight.Api.Extensions
                     Example = new OpenApiString(DateTime.Today.ToString("yyyy-MM-dd"))
                 });
 
-                // Add operation filter to simplify responses
                 c.OperationFilter<SimplifyResponsesOperationFilter>();
 
-                // Add JWT Authentication 
                 c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
                 {
                     Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
@@ -683,10 +664,8 @@ namespace HoopGameNight.Api.Extensions
                     }
                 });
 
-                // Support for nullable reference types
                 c.SupportNonNullableReferenceTypes();
 
-                // Ignore obsolete
                 c.IgnoreObsoleteActions();
                 c.IgnoreObsoleteProperties();
             });
@@ -736,7 +715,6 @@ namespace HoopGameNight.Api.Extensions
         {
             var errors = new List<string>();
 
-            // Database connection
             if (string.IsNullOrWhiteSpace(configuration.GetConnectionString("MySqlConnection")))
             {
                 errors.Add("MySQL connection string is missing");

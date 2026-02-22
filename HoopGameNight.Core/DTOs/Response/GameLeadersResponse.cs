@@ -3,7 +3,7 @@ using System;
 namespace HoopGameNight.Core.DTOs.Response
 {
     /// <summary>
-    /// Response DTO for game leaders (top performers in a specific game)
+    /// Response DTO for game leaders 
     /// </summary>
     public class GameLeadersResponse
     {

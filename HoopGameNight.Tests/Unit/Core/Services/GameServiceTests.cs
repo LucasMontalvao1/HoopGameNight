@@ -102,19 +102,21 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         /// <summary>
         /// Testa se lança BusinessException quando repositório falha
         /// </summary>
-        [Fact(DisplayName = "Deve lançar Exception quando repositório falha")]
-        public async Task DeveLancarException_QuandoRepositorioFalha()
+        [Fact(DisplayName = "Deve lançar BusinessException quando repositório falha")]
+        public async Task DeveLancarBusinessException_QuandoRepositorioFalha()
         {
-            // Arrange: Configura erro no repositório
+            // Arrange
             _fixture.MockGameRepository
                 .Setup(x => x.GetTodayGamesAsync())
                 .ThrowsAsync(new Exception("Erro no banco de dados"));
 
-            // Act & Assert: Verifica se lança a exceção real
-            var exception = await Assert.ThrowsAsync<Exception>(
+            // Act & Assert
+            var exception = await Assert.ThrowsAsync<BusinessException>(
                 () => _fixture.GameService.GetTodayGamesAsync());
 
-            exception.Message.Should().Be("Erro no banco de dados");
+            exception.Message.Should().Be("Falha ao recuperar jogos de hoje");
+            exception.InnerException.Should().NotBeNull();
+            exception.InnerException!.Message.Should().Be("Erro no banco de dados");
         }
 
         #endregion

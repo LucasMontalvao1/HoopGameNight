@@ -1,108 +1,97 @@
 <div class="players-page">
   <div class="players-container">
     <div class="players-header">
-    <h1>
-      <span class="material-icons">sports_basketball</span>
-      Jogadores NBA
-    </h1>
-    <p class="subtitle">Encontre e explore jogadores da NBA</p>
-  </div>
+      <h1>
+        <span class="material-icons">sports_basketball</span>
+        Jogadores NBA
+      </h1>
+      <p class="subtitle">Encontre e explore jogadores da NBA</p>
+    </div>
 
-  <!-- Search and Filters -->
-  <div class="filters-section">
-    <div class="search-box">
-      <span class="material-icons search-icon">search</span>
-      <input
-        type="text"
-        placeholder="Buscar jogador (ex: LeBron, Curry, Durant...)"
-        [ngModel]="searchInput()"
-        (ngModelChange)="updateSearchInput($event)"
-        (keyup.enter)="onSearch()"
-        class="search-input"
-      />
-      @if (searchInput().length > 0) {
+    <!-- Search and Filters -->
+    <div class="filters-section">
+      <div class="search-box">
+        <span class="material-icons search-icon">search</span>
+        <input type="text" placeholder="Procure seu craque favorito..." [ngModel]="searchInput()"
+          (ngModelChange)="updateSearchInput($event)" (keyup.enter)="onSearch()" class="search-input" />
+        @if (searchInput().length > 0) {
         <button class="clear-btn" (click)="clearFilters()">
           <span class="material-icons">close</span>
         </button>
-      }
-      <button class="search-btn" (click)="onSearch()" [disabled]="searchInput().length < 2">
-        Buscar
-      </button>
-    </div>
-
-    <div class="filter-row">
-      <div class="position-filters">
-        <button
-          class="filter-btn"
-          [class.active]="selectedPositionFilter() === ''"
-          (click)="onPositionFilter('')"
-        >
-          Todos
+        }
+        <button class="search-btn" (click)="onSearch()" [disabled]="searchInput().length < 2">
+          Buscar
         </button>
-        @for (position of positions; track position) {
-          <button
-            class="filter-btn"
-            [class.active]="selectedPositionFilter() === position"
-            (click)="onPositionFilter(position)"
-          >
+      </div>
+
+      <div class="filter-row">
+        <div class="position-filters">
+          <button class="filter-btn" [class.active]="selectedPositionFilter() === ''" (click)="onPositionFilter('')">
+            Todos
+          </button>
+          @for (position of positions; track position) {
+          <button class="filter-btn" [class.active]="selectedPositionFilter() === position"
+            (click)="onPositionFilter(position)">
             {{ position }}
           </button>
-        }
-      </div>
+          }
+        </div>
 
-      <div class="view-toggle">
-        <button
-          class="view-btn"
-          [class.active]="viewMode() === 'grid'"
-          (click)="setViewMode('grid')"
-        >
-          <span class="material-icons">grid_view</span>
-        </button>
-        <button
-          class="view-btn"
-          [class.active]="viewMode() === 'list'"
-          (click)="setViewMode('list')"
-        >
-          <span class="material-icons">view_list</span>
-        </button>
+        <div class="view-toggle">
+          <button class="view-btn" [class.active]="viewMode() === 'grid'" (click)="setViewMode('grid')">
+            <span class="material-icons">grid_view</span>
+          </button>
+          <button class="view-btn" [class.active]="viewMode() === 'list'" (click)="setViewMode('list')">
+            <span class="material-icons">view_list</span>
+          </button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Results Info -->
-  @if (playersService.hasSearchResults()) {
+    <!-- Results Info -->
+    @if (playersService.hasSearchResults()) {
     <div class="results-info">
       <span class="results-count">
-        {{ playersService.pagination().totalCount }} jogadores encontrados
+        {{ playersService.pagination().totalCount }} craques encontrados
       </span>
       @if (playersService.searchQuery()) {
-        <span class="search-term">para "{{ playersService.searchQuery() }}"</span>
+      <span class="search-term">para "{{ playersService.searchQuery() }}"</span>
       }
       @if (playersService.selectedPosition()) {
-        <span class="position-term">- Posição: {{ getPositionName(playersService.selectedPosition()) }}</span>
+      <span class="position-term">- Posição: {{ getPositionName(playersService.selectedPosition()) }}</span>
       }
     </div>
-  }
+    }
 
-  <!-- Loading -->
-  @if (playersService.isLoading()) {
-    <div class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>Carregando jogadores...</p>
+    <!-- Loading -->
+    @if (playersService.isLoading()) {
+    <div class="players-grid" [class.list-view]="viewMode() === 'list'">
+      @for (i of [1,2,3,4,5,6]; track i) {
+      <div class="player-card skeleton-card">
+        <div class="player-card__photo">
+          <app-skeleton-loader width="100%" height="200px" borderRadius="0"></app-skeleton-loader>
+        </div>
+        <div class="player-card__info">
+          <app-skeleton-loader width="80%" height="20px" className="mb-2"></app-skeleton-loader>
+          <app-skeleton-loader width="40%" height="14px" className="mb-4"></app-skeleton-loader>
+          <div class="player-details">
+            <app-skeleton-loader width="30%" height="12px"></app-skeleton-loader>
+            <app-skeleton-loader width="30%" height="12px"></app-skeleton-loader>
+          </div>
+        </div>
+      </div>
+      }
     </div>
-  }
+    }
 
-  <!-- Error -->
-  @if (playersService.error()) {
-    <div class="error-container">
-      <span class="material-icons">error_outline</span>
-      <p>{{ playersService.error() }}</p>
-      <button (click)="clearFilters()">Tentar novamente</button>
-    </div>
-  }
+    <!-- Error -->
+    @if (playersService.error()) {
+    <app-error-view title="Erro ao carregar craques" [message]="playersService.error() || ''" (retry)="clearFilters()">
+    </app-error-view>
+    }
 
-  <!-- Featured Section -->
-  @if (showingFeatured() && !playersService.isLoading()) {
+    <!-- Featured Section -->
+    @if (showingFeatured() && !playersService.isLoading()) {
     <div class="section-header">
       <h2>
         <span class="material-icons">star</span>
@@ -110,86 +99,77 @@
       </h2>
       <p>Explore jogadores de diferentes posições</p>
     </div>
-  }
+    }
 
-  <!-- Players Grid/List -->
-  @if (!playersService.isLoading() && displayPlayers().length > 0) {
+    <!-- Players Grid/List -->
+    @if (!playersService.isLoading() && displayPlayers().length > 0) {
     <div class="players-grid" [class.list-view]="viewMode() === 'list'">
       @for (player of displayPlayers(); track player.id) {
-        <div class="player-card" (click)="selectPlayer(player)">
-          <div class="player-card__photo">
-            <img
-              [src]="getPlayerPhotoUrl(player)"
-              [alt]="player.fullName"
-              (error)="onImageError($event)"
-            />
-            <div class="player-card__position">{{ player.position }}</div>
+      <div class="player-card" (click)="selectPlayer(player)">
+        <div class="player-card__photo">
+          <img [src]="getPlayerPhotoUrl(player)" [alt]="player.fullName" (error)="onImageError($event)" />
+          <div class="player-card__position">{{ player.position }}</div>
+          <button class="favorite-btn" [class.favorite-btn--active]="preferencesStore.isFavoritePlayer(player.id)"
+            (click)="$event.stopPropagation(); preferencesStore.toggleFavoritePlayer(player.id)"
+            [title]="preferencesStore.isFavoritePlayer(player.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'">
+            <span class="material-icons">
+              {{ preferencesStore.isFavoritePlayer(player.id) ? 'favorite' : 'favorite_border' }}
+            </span>
+          </button>
+        </div>
+
+        <div class="player-card__info">
+          <h3 class="player-name">{{ player.fullName }}</h3>
+          <p class="player-position">{{ player.positionDisplay }}</p>
+
+          <div class="player-details">
+            <div class="detail-item">
+              <span class="material-icons">height</span>
+              <span>{{ player.height }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="material-icons">fitness_center</span>
+              <span>{{ player.weight }}</span>
+            </div>
           </div>
 
-          <div class="player-card__info">
-            <h3 class="player-name">{{ player.fullName }}</h3>
-            <p class="player-position">{{ player.positionDisplay }}</p>
-
-            <div class="player-details">
-              <div class="detail-item">
-                <span class="material-icons">height</span>
-                <span>{{ player.height }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="material-icons">fitness_center</span>
-                <span>{{ player.weight }}</span>
-              </div>
-            </div>
-
-            <div class="player-team" (click)="viewTeam($event, player.team.abbreviation)">
-              <img
-                [src]="getTeamLogoUrl(player.team.abbreviation)"
-                [alt]="player.team.name"
-                class="team-logo"
-                (error)="onTeamLogoError($event)"
-              />
-              <span class="team-name">{{ player.team.displayName }}</span>
-            </div>
+          <div class="player-team" (click)="viewTeam($event, player.team.abbreviation)">
+            <img [src]="getTeamLogoUrl(player.team.abbreviation)" [alt]="player.team.name" class="team-logo"
+              (error)="onTeamLogoError($event)" />
+            <span class="team-name">{{ player.team.displayName }}</span>
           </div>
         </div>
+      </div>
       }
     </div>
 
     <!-- Pagination -->
     @if (playersService.hasSearchResults() && playersService.pagination().totalPages > 1) {
-      <div class="pagination">
-        <button
-          class="pagination-btn"
-          [disabled]="!playersService.hasPreviousPage()"
-          (click)="previousPage()"
-        >
-          <span class="material-icons">chevron_left</span>
-          Anterior
-        </button>
+    <div class="pagination">
+      <button class="pagination-btn" [disabled]="!playersService.hasPreviousPage()" (click)="previousPage()">
+        <span class="material-icons">chevron_left</span>
+        Anterior
+      </button>
 
-        <span class="pagination-info">
-          Página {{ playersService.pagination().currentPage }} de {{ playersService.pagination().totalPages }}
-        </span>
+      <span class="pagination-info">
+        Página {{ playersService.pagination().currentPage }} de {{ playersService.pagination().totalPages }}
+      </span>
 
-        <button
-          class="pagination-btn"
-          [disabled]="!playersService.hasMorePages()"
-          (click)="nextPage()"
-        >
-          Próxima
-          <span class="material-icons">chevron_right</span>
-        </button>
-      </div>
+      <button class="pagination-btn" [disabled]="!playersService.hasMorePages()" (click)="nextPage()">
+        Próxima
+        <span class="material-icons">chevron_right</span>
+      </button>
+    </div>
     }
-  }
+    }
 
     <!-- No Results -->
     @if (!playersService.isLoading() && displayPlayers().length === 0 && !playersService.error()) {
-      <div class="no-results">
-        <span class="material-icons">person_search</span>
-        <p>Nenhum jogador encontrado</p>
-        <button (click)="clearFilters()">Limpar filtros</button>
-      </div>
+    <div class="no-results">
+      <span class="material-icons">person_search</span>
+      <p>Nenhum jogador encontrado</p>
+      <button (click)="clearFilters()">Limpar filtros</button>
+    </div>
     }
   </div>
 </div>

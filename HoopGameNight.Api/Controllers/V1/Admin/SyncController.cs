@@ -20,6 +20,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
     public class SyncController : BaseApiController
     {
         private readonly IGameService _gameService;
+        private readonly IGameSyncService _gameSyncService;
         private readonly ITeamService _teamService;
         private readonly ISyncMetricsService _syncMetricsService;
         private readonly ICacheService _cacheService;
@@ -27,6 +28,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
 
         public SyncController(
             IGameService gameService,
+            IGameSyncService gameSyncService,
             ITeamService teamService,
             ISyncMetricsService syncMetricsService,
             ICacheService cacheService,
@@ -34,6 +36,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
             ILogger<SyncController> logger) : base(logger)
         {
             _gameService = gameService;
+            _gameSyncService = gameSyncService;
             _teamService = teamService;
             _syncMetricsService = syncMetricsService;
             _cacheService = cacheService;
@@ -68,7 +71,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
 
                 try
                 {
-                    await _gameService.SyncTodayGamesAsync();
+                    await _gameSyncService.SyncTodayGamesAsync();
                     var games = await _gameService.GetTodayGamesAsync();
                     gamesCount = games.Count;
                     _cacheService.InvalidatePattern(ApiConstants.CacheKeys.GAMES_PATTERN);
@@ -186,7 +189,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         }
 
         /// <summary>
-        /// Realiza o check de conectividade com os provedores de dados externos (atualmente focado na ESPN).
+        /// Realiza o check de conectividade com os provedores de dados externos.
         /// </summary>
         [HttpGet("health/external")]
         [ProducesResponseType(typeof(ApiResponse<ExternalApiHealth>), StatusCodes.Status200OK)]
@@ -288,7 +291,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
 
                 try
                 {
-                    var syncCount = await _gameService.SyncFutureGamesAsync(days);
+                    var syncCount = await _gameSyncService.SyncFutureGamesAsync(days);
 
                     _cacheService.InvalidatePattern(ApiConstants.CacheKeys.GAMES_PATTERN);
 

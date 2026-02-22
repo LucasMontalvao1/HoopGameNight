@@ -1,23 +1,28 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { 
-    path: '', 
-    redirectTo: '/dashboard', 
-    pathMatch: 'full' 
+  {
+    path: '',
+    redirectTo: '/dashboard',
+    pathMatch: 'full'
   },
-  { 
-    path: 'dashboard', 
+  {
+    path: 'dashboard',
     loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
     title: 'Dashboard - HoopGameNight'
   },
-  { 
-    path: 'games', 
+  {
+    path: 'games',
     loadComponent: () => import('./features/games/games').then(m => m.Games),
     title: 'Games - HoopGameNight'
   },
-  { 
-    path: 'api-status', 
+  {
+    path: 'games/:id',
+    loadComponent: () => import('./features/games/game-details/game-details').then(m => m.GameDetails),
+    title: 'Game Details - HoopGameNight'
+  },
+  {
+    path: 'api-status',
     loadComponent: () => import('./features/api-status/api-status').then(m => m.ApiStatus),
     title: 'API Status - HoopGameNight'
   },

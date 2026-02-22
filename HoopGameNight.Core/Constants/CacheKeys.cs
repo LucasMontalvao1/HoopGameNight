@@ -147,5 +147,7 @@ namespace HoopGameNight.Core.Constants
         /// Padrão para invalidar todos os jogadores
         /// </summary>
         public static string AllPlayersPattern => "players:*";
+
+        public static string GamesByDateRange(DateTime start, DateTime end) => $"games_range_{start:yyyyMMdd}_{end:yyyyMMdd}";
     }
 }

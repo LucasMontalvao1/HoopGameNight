@@ -79,30 +79,19 @@ namespace HoopGameNight.Core.Interfaces.Services
     /// </summary>
     public class CacheStatistics
     {
-        // Estatísticas detalhadas por camada
         public long RedisHits { get; set; }
         public long RedisMisses { get; set; }
         public long MemoryHits { get; set; }
         public long MemoryMisses { get; set; }
-
-        // Totais agregados
         public long TotalHits => RedisHits + MemoryHits;
         public long TotalMisses => RedisMisses + MemoryMisses;
         public long TotalRequests => TotalHits + TotalMisses;
-
-        // Estatísticas compatíveis com versão antiga
         public long Hits => TotalHits;
         public long Misses => TotalMisses;
-
-        // Hit rate
         public double HitRate => TotalRequests > 0 ? (double)TotalHits / TotalRequests * 100 : 0;
-
-        // Contadores
         public int MemoryCacheCount { get; set; }
         public int CurrentEntries => MemoryCacheCount;
         public long Evictions { get; set; }
-
-        // Metadados
         public string LastResetTime { get; set; } = DateTime.UtcNow.ToString("O");
     }
 }

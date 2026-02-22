@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using HoopGameNight.Core.Services;
@@ -10,18 +9,18 @@ using Microsoft.Extensions.Logging;
 namespace HoopGameNight.Infrastructure.HealthChecks
 {
     /// <summary>
-    /// Verifica a disponibilidade e integridade do serviço Ollama (IA Local).
+    /// Verifica a disponibilidade e integridade do serviço Groq (IA em Nuvem).
     /// </summary>
-    public class OllamaHealthCheck : IHealthCheck
+    public class GroqHealthCheck : IHealthCheck
     {
-        private readonly OllamaClient _ollamaClient;
-        private readonly ILogger<OllamaHealthCheck> _logger;
+        private readonly GroqClient _groqClient;
+        private readonly ILogger<GroqHealthCheck> _logger;
 
-        public OllamaHealthCheck(
-            OllamaClient ollamaClient,
-            ILogger<OllamaHealthCheck> logger)
+        public GroqHealthCheck(
+            GroqClient groqClient,
+            ILogger<GroqHealthCheck> logger)
         {
-            _ollamaClient = ollamaClient;
+            _groqClient = groqClient;
             _logger = logger;
         }
 
@@ -31,43 +30,40 @@ namespace HoopGameNight.Infrastructure.HealthChecks
         {
             try
             {
-                _logger.LogDebug("Verificando disponibilidade do Ollama...");
+                _logger.LogDebug("Verificando disponibilidade do Groq...");
 
-                var isAvailable = await _ollamaClient.IsAvailableAsync();
+                var isAvailable = await _groqClient.IsAvailableAsync();
 
                 if (isAvailable)
                 {
-                    _logger.LogDebug("Ollama disponível");
-
                     return HealthCheckResult.Healthy(
-                        "Ollama está rodando e respondendo corretamente",
+                        "O serviço Groq está configurado e disponível.",
                         new Dictionary<string, object>
                         {
-                            { "status", "running" },
-                            { "endpoint", "http://localhost:11434" },
-                            { "model", "llama3.2" }
+                            { "engine", "Groq" },
+                            { "model", "llama-3.3-70b-versatile" }
                         }
                     );
                 }
 
-                _logger.LogWarning("Ollama não está disponível");
+                _logger.LogWarning("Groq API Key não configurada no .env");
 
                 return HealthCheckResult.Degraded(
-                    "Ollama não está disponível. Verifique se está rodando.",
+                    "Groq API Key não encontrada. O assistente de IA não funcionará.",
                     null,
                     new Dictionary<string, object>
                     {
-                        { "status", "unavailable" },
-                        { "solution", "Execute: ollama serve" }
+                        { "status", "missing_config" },
+                        { "required_var", "GROQ_API_KEY" }
                     }
                 );
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Erro ao verificar Ollama (reportando como Degraded)");
+                _logger.LogWarning(ex, "Erro ao verificar Groq Health");
 
                 return HealthCheckResult.Degraded(
-                    "Erro ao verificar Ollama",
+                    "Erro ao verificar Groq",
                     ex,
                     new Dictionary<string, object>
                     {

@@ -31,7 +31,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices.ESPN
                 PropertyNameCaseInsensitive = true
             };
 
-            // Definindo política de resiliência (Retry + Circuit Breaker)
             _resiliencePolicy = HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -49,7 +48,6 @@ namespace HoopGameNight.Infrastructure.ExternalServices.ESPN
         {
             try
             {
-                // 1. Tentar Cache
                 var cached = await _cacheService.GetAsync<T>(cacheKey);
                 if (cached != null)
                 {
@@ -59,10 +57,8 @@ namespace HoopGameNight.Infrastructure.ExternalServices.ESPN
 
                 _logger.LogInformation("Fetching from ESPN: {Url}", url);
 
-                // 2. Executar Request com Polly
                 var response = await _resiliencePolicy.ExecuteAsync(() => _httpClient.GetAsync(url));
 
-                // 3. Tratar Erros
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
                     _logger.LogWarning("ESPN Resource not found: {Url}", url);
@@ -77,11 +73,9 @@ namespace HoopGameNight.Infrastructure.ExternalServices.ESPN
 
                 response.EnsureSuccessStatusCode();
 
-                // 4. Desserializar
                 var json = await response.Content.ReadAsStringAsync();
                 var result = JsonSerializer.Deserialize<T>(json, _serializerOptions);
 
-                // 5. Cache do Resultado
                 if (result != null && cacheDuration.HasValue)
                 {
                     await _cacheService.SetAsync(cacheKey, result, cacheDuration.Value);

@@ -165,3 +165,41 @@ a {
   white-space: nowrap;
   border: 0;
 }
+
+// ===== SKELETON ANIMATION =====
+@keyframes shimmer {
+  0% { background-position: -468px 0; }
+  100% { background-position: 468px 0; }
+}
+
+.skeleton {
+  background: var(--background-tertiary);
+  background-image: linear-gradient(
+    90deg,
+    var(--background-tertiary) 0px,
+    var(--background-secondary) 20%,
+    var(--background-tertiary) 40%,
+    var(--background-tertiary) 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  display: inline-block;
+  position: relative;
+  animation: shimmer 1.5s infinite linear;
+  border-radius: var(--border-radius-md);
+  color: transparent !important;
+  pointer-events: none;
+  user-select: none;
+  border: none !important;
+
+  &--text {
+    width: 100%;
+    height: 0.75em;
+    margin-bottom: 0.25em;
+  }
+
+  &--circle {
+    border-radius: var(--border-radius-full);
+    flex-shrink: 0;
+  }
+}

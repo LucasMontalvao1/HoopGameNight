@@ -17,25 +17,24 @@ namespace HoopGameNight.Core.Services.AI
         private readonly IGameService _gameService;
         private readonly ITeamRepository _teamRepository;
         private readonly NbaPromptBuilder _promptBuilder;
-        private readonly OllamaClient _ollamaClient;
+        private readonly GroqClient _groqClient;
         private readonly ICacheService _cacheService;
         private readonly ILogger<NbaAiService> _logger;
 
-        // Mapeamento dinâmico de times (carregado via JSON)
         private readonly Dictionary<string, string> _teamKeywords = new();
 
         public NbaAiService(
             IGameService gameService,
             ITeamRepository teamRepository,
             NbaPromptBuilder promptBuilder,
-            OllamaClient ollamaClient,
+            GroqClient groqClient,
             ICacheService cacheService,
             ILogger<NbaAiService> logger)
         {
             _gameService = gameService;
             _teamRepository = teamRepository;
             _promptBuilder = promptBuilder;
-            _ollamaClient = ollamaClient;
+            _groqClient = groqClient;
             _cacheService = cacheService;
             _logger = logger;
 
@@ -49,7 +48,6 @@ namespace HoopGameNight.Core.Services.AI
                 var filePath = Path.Combine(AppContext.BaseDirectory, "Resources", "teams_keywords.json");
                 if (!File.Exists(filePath))
                 {
-                    // Fallback para localização relativa (ex: dev environment)
                     filePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "HoopGameNight.Core", "Resources", "teams_keywords.json");
                 }
 
@@ -117,8 +115,8 @@ namespace HoopGameNight.Core.Services.AI
             // Montar prompt
             var prompt = _promptBuilder.BuildPrompt(request.Question, games);
 
-            // Enviar ao Ollama
-            var answer = await _ollamaClient.GenerateAsync(prompt);
+            // Enviar ao Groq
+            var answer = await _groqClient.GenerateAsync(prompt);
 
             var response = new AskResponse
             {
@@ -160,7 +158,7 @@ namespace HoopGameNight.Core.Services.AI
 
             var allGames = new List<GameResponse>();
 
-            // 3. Buscar jogos (Otimizado com Date Range)
+            // 3. Buscar jogos 
             var rangeGames = await _gameService.GetGamesByDateRangeAsync(startDate, endDate);
 
             if (teamIds.Any())

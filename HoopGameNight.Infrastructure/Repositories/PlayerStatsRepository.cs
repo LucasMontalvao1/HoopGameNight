@@ -35,7 +35,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return await ExecuteQuerySingleOrDefaultAsync<PlayerSeasonStats>(sql, new { PlayerId = playerId, Season = season });
         }
 
-        // ===== NOVO: Buscar season stats da VIEW calculada =====
         public async Task<Core.DTOs.Response.PlayerSeasonStatsResponse?> GetSeasonStatsFromViewAsync(int playerId, int season)
         {
             var sql = await LoadSqlAsync("GetSeasonStatsFromView");
@@ -175,8 +174,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             var result = await ExecuteAsync(sql, new { PlayerId = playerId, SyncDate = syncDate });
             return result > 0;
         }
-
-        // ===== NOVOS MÉTODOS: Estatísticas Detalhadas por Jogo (usando VIEW) =====
 
         public async Task<Core.DTOs.Response.PlayerGameStatsDetailedResponse?> GetPlayerGameStatsDetailedAsync(int playerId, int gameId)
         {

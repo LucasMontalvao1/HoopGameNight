@@ -14,11 +14,11 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             _builder = new NbaPromptBuilder();
         }
 
-        [Fact]
+        [Fact(DisplayName = "Deve conter regras obrigatórias e instrução de resposta em Markdown")]
         public void BuildPrompt_ShouldInclude_RestrictionRules_And_MarkdownUsage()
         {
             // Arrange
-            var games = new List<GameResponse>(); // Contexto vazio
+            var games = new List<GameResponse>();
             var question = "Jogos de hoje";
 
             // Act
@@ -27,30 +27,30 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             // Assert
             prompt.Should().Contain("regras_de_ouro", "Deve conter a seção de regras obrigatórias");
             prompt.Should().Contain("NÃO é fonte de verdade", "Deve negar que a IA é fonte de verdade");
-            prompt.Should().Contain("VALIDAÇÃO DE ESCUPO", "Deve exigir validação de escopo");
+            prompt.Should().Contain("VALIDAÇÃO DE ESCOPO", "Deve exigir validação de escopo");
             prompt.Should().Contain("VALIDAÇÃO DE DADOS", "Deve exigir validação de dados");
             prompt.Should().Contain("Gere a resposta em MARKDOWN", "Deve exigir formato Markdown");
         }
 
-        [Fact]
+        [Fact(DisplayName = "Deve rotular datas corretamente como HOJE e AMANHÃ")]
         public void BuildPrompt_ShouldLabel_Dates_Correctly()
         {
             // Arrange
             var today = DateTime.Today;
             var tomorrow = today.AddDays(1);
-            
+
             var games = new List<GameResponse>
             {
-                new GameResponse 
-                { 
-                    Date = today, 
+                new GameResponse
+                {
+                    Date = today,
                     HomeTeam = new TeamSummaryResponse { Abbreviation = "LAL" },
                     VisitorTeam = new TeamSummaryResponse { Abbreviation = "GSW" },
                     Status = "Scheduled"
                 },
-                new GameResponse 
-                { 
-                    Date = tomorrow, 
+                new GameResponse
+                {
+                    Date = tomorrow,
                     HomeTeam = new TeamSummaryResponse { Abbreviation = "BOS" },
                     VisitorTeam = new TeamSummaryResponse { Abbreviation = "MIA" },
                     Status = "Scheduled"
@@ -65,7 +65,7 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             prompt.Should().Contain($"AMANHÃ ({tomorrow:dd/MM/yyyy})");
         }
 
-        [Fact]
+        [Fact(DisplayName = "Deve lidar com lista vazia de jogos sem lançar exceção")]
         public void BuildPrompt_ShouldHandle_EmptyGames_Gracefully()
         {
             // Arrange
@@ -77,6 +77,144 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             // Assert
             prompt.Should().Contain("Nenhum jogo encontrado no banco de dados para este período");
             prompt.Should().Contain("Você DEVE responder: \"Não encontrei jogos no banco de dados para este período.\"");
+        }
+
+        [Fact(DisplayName = "Deve formatar jogo finalizado com status FINALIZADO e placar")]
+        public void BuildPrompt_ShouldFormat_FinalGame_Correctly()
+        {
+            // Arrange
+            var games = new List<GameResponse>
+            {
+                new GameResponse
+                {
+                    Date = DateTime.Today,
+                    Status = "Final",
+                    HomeTeam = new TeamSummaryResponse { Abbreviation = "LAL" },
+                    VisitorTeam = new TeamSummaryResponse { Abbreviation = "GSW" },
+                    HomeTeamScore = 110,
+                    VisitorTeamScore = 105
+                }
+            };
+
+            // Act
+            var prompt = _builder.BuildPrompt("Resultado de hoje?", games);
+
+            // Assert
+            prompt.Should().Contain("[FINALIZADO]");
+            prompt.Should().Contain("LAL");
+            prompt.Should().Contain("GSW");
+        }
+
+        [Fact(DisplayName = "Deve formatar jogo ao vivo com período e placar atual")]
+        public void BuildPrompt_ShouldFormat_LiveGame_Correctly()
+        {
+            // Arrange
+            var games = new List<GameResponse>
+            {
+                new GameResponse
+                {
+                    Date = DateTime.Today,
+                    Status = "Live",
+                    Period = 3,
+                    HomeTeam = new TeamSummaryResponse { Abbreviation = "BOS" },
+                    VisitorTeam = new TeamSummaryResponse { Abbreviation = "MIA" },
+                    HomeTeamScore = 88,
+                    VisitorTeamScore = 82
+                }
+            };
+
+            // Act
+            var prompt = _builder.BuildPrompt("Jogo ao vivo?", games);
+
+            // Assert
+            prompt.Should().Contain("[AO VIVO]");
+            prompt.Should().Contain("Período 3");
+        }
+
+        [Fact(DisplayName = "Deve incluir a pergunta do usuário no prompt gerado")]
+        public void BuildPrompt_ShouldInclude_UserQuestion()
+        {
+            // Arrange
+            var question = "Quais times jogam hoje?";
+
+            // Act
+            var prompt = _builder.BuildPrompt(question, new List<GameResponse>());
+
+            // Assert
+            prompt.Should().Contain(question, "A pergunta do usuário deve estar presente no prompt");
+        }
+
+        [Fact(DisplayName = "Deve incluir data e hora atual com referência ao horário de Brasília")]
+        public void BuildPrompt_ShouldInclude_CurrentDateTime()
+        {
+            // Act
+            var prompt = _builder.BuildPrompt("teste", new List<GameResponse>());
+
+            // Assert
+            prompt.Should().Contain(DateTime.Now.ToString("dd/MM/yyyy"), "Deve conter a data atual");
+            prompt.Should().Contain("Horário de Brasília", "Deve referenciar o fuso horário");
+        }
+
+        [Fact(DisplayName = "Deve exibir total de jogos disponíveis no prompt")]
+        public void BuildPrompt_ShouldShow_TotalGamesCount()
+        {
+            // Arrange
+            var games = new List<GameResponse>
+            {
+                new GameResponse
+                {
+                    Date = DateTime.Today,
+                    Status = "Scheduled",
+                    HomeTeam = new TeamSummaryResponse { Abbreviation = "LAL" },
+                    VisitorTeam = new TeamSummaryResponse { Abbreviation = "GSW" }
+                },
+                new GameResponse
+                {
+                    Date = DateTime.Today,
+                    Status = "Scheduled",
+                    HomeTeam = new TeamSummaryResponse { Abbreviation = "BOS" },
+                    VisitorTeam = new TeamSummaryResponse { Abbreviation = "MIA" }
+                }
+            };
+
+            // Act
+            var prompt = _builder.BuildPrompt("Jogos?", games);
+
+            // Assert
+            prompt.Should().Contain("TOTAL: 2 jogos disponíveis");
+        }
+
+        [Fact(DisplayName = "Deve rotular jogos passados como ONTEM e futuros como FUTURO")]
+        public void BuildPrompt_ShouldLabel_PastAndFuture_Dates_Correctly()
+        {
+            // Arrange
+            var yesterday = DateTime.Today.AddDays(-1);
+            var future = DateTime.Today.AddDays(3);
+
+            var games = new List<GameResponse>
+            {
+                new GameResponse
+                {
+                    Date = yesterday,
+                    Status = "Final",
+                    HomeTeam = new TeamSummaryResponse { Abbreviation = "LAL" },
+                    VisitorTeam = new TeamSummaryResponse { Abbreviation = "GSW" }
+                },
+                new GameResponse
+                {
+                    Date = future,
+                    Status = "Scheduled",
+                    HomeTeam = new TeamSummaryResponse { Abbreviation = "BOS" },
+                    VisitorTeam = new TeamSummaryResponse { Abbreviation = "MIA" }
+                }
+            };
+
+            // Act
+            var prompt = _builder.BuildPrompt("Jogos?", games);
+
+            // Assert
+            prompt.Should().Contain($"ONTEM ({yesterday:dd/MM/yyyy})");
+            prompt.Should().Contain($"FUTURO ({future:dd/MM/yyyy})");
         }
     }
 }

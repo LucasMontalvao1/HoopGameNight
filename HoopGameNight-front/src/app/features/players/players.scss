@@ -344,6 +344,46 @@
       font-weight: var(--font-weight-semibold);
       font-size: var(--font-size-sm);
       box-shadow: var(--shadow-md);
+      z-index: 2;
+    }
+
+    .favorite-btn {
+      position: absolute;
+      top: var(--spacing-md);
+      left: var(--spacing-md);
+      background: rgba(var(--surface-tertiary-rgb), 0.6);
+      backdrop-filter: blur(8px);
+      border: none;
+      border-radius: var(--border-radius-full);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: white;
+      transition: all var(--transition-normal);
+      z-index: 5;
+      box-shadow: var(--shadow-md);
+
+      &:hover {
+        background: white;
+        color: #ef4444;
+        transform: scale(1.1);
+      }
+
+      &--active {
+        color: #ef4444;
+        background: white;
+
+        &:hover {
+          background: #fee2e2;
+        }
+      }
+
+      .material-icons {
+        font-size: 1.25rem;
+      }
     }
   }
 

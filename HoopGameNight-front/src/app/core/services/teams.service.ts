@@ -19,11 +19,11 @@ export class TeamsService {
   readonly error = this._error.asReadonly();
   readonly lastUpdate = this._lastUpdate.asReadonly();
 
-  readonly easternConference = computed(() => 
+  readonly easternConference = computed(() =>
     this._allTeams().filter(team => team.conference === 'East')
   );
 
-  readonly westernConference = computed(() => 
+  readonly westernConference = computed(() =>
     this._allTeams().filter(team => team.conference === 'West')
   );
 
@@ -48,14 +48,14 @@ export class TeamsService {
     return grouped;
   });
 
-  readonly divisions = computed(() => 
+  readonly divisions = computed(() =>
     Array.from(new Set(this._allTeams().map(team => team.division))).sort()
   );
 
   private readonly NBA_TEAMS = new Set([
-    'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GS', 'GWS',
-    'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NO', 'NY',
-    'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SA', 'TOR', 'UTAH', 'WSH'
+    'ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GS', 'GSW',
+    'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NO', 'NY', 'NYK',
+    'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SA', 'SAS', 'TOR', 'UTAH', 'UTA', 'WSH', 'WAS'
   ]);
 
   constructor(
@@ -77,14 +77,14 @@ export class TeamsService {
     try {
       console.log('Carregando teams da API...');
       const allTeams = await this.teamsApiService.getAllTeams();
-      
+
       const nbaTeams = this.filterNBATeamsOnly(allTeams);
-      
+
       this._allTeams.set(nbaTeams);
       this._lastUpdate.set(new Date());
-      
+
       await this.saveToCache();
-      
+
       console.log(`${nbaTeams.length} times NBA carregados com sucesso (${allTeams.length - nbaTeams.length} times não-NBA filtrados)`);
     } catch (error) {
       const errorMessage = `Erro ao carregar teams: ${error}`;
@@ -99,11 +99,11 @@ export class TeamsService {
     return teams.filter(team => {
       const upperAbbr = team.abbreviation.toUpperCase();
       const isValidNBA = this.NBA_TEAMS.has(upperAbbr);
-      
+
       if (!isValidNBA) {
         console.log(`Time não-NBA filtrado: ${team.abbreviation} - ${team.displayName || team.name}`);
       }
-      
+
       return isValidNBA;
     });
   }
@@ -119,7 +119,7 @@ export class TeamsService {
     try {
       console.log(`Carregando team ${teamId}...`);
       const team = await this.teamsApiService.getTeamById(teamId);
-      
+
       if (team && this.isNBATeam(team.abbreviation)) {
         this._selectedTeam.set(team);
         const teamName = team.displayName || `${team.city} ${team.name}`;
@@ -129,12 +129,40 @@ export class TeamsService {
         console.log(`Time não-NBA rejeitado: ${team.abbreviation}`);
         return null;
       }
-      
+
       return null;
     } catch (error) {
       const errorMessage = `Erro ao carregar team: ${error}`;
       console.error(errorMessage);
       this._error.set(errorMessage);
+      return null;
+    } finally {
+      this._isLoading.set(false);
+    }
+  }
+
+  async loadTeamByAbbreviationFromApi(abbreviation: string): Promise<TeamResponse | null> {
+    this._isLoading.set(true);
+    this._error.set(null);
+
+    try {
+      console.log(`Buscando team na API pela abreviação: ${abbreviation}...`);
+      const team = await this.teamsApiService.getTeamByAbbreviation(abbreviation);
+
+      if (team && this.isNBATeam(team.abbreviation)) {
+        // Se o time for válido, garantimos que ele está na nossa lista local (evita futuras buscas)
+        const exists = this._allTeams().some(t => t.abbreviation.toLowerCase() === team.abbreviation.toLowerCase());
+        if (!exists) {
+          this._allTeams.update(teams => [...teams, team]);
+        }
+
+        console.log(`Team ${team.displayName} encontrado via API e adicionado à lista.`);
+        return team;
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`Erro ao buscar team por abreviação: ${error}`);
       return null;
     } finally {
       this._isLoading.set(false);
@@ -165,7 +193,7 @@ export class TeamsService {
   }
 
   getTeamByAbbreviation(abbreviation: string): TeamResponse | undefined {
-    return this._allTeams().find(team => 
+    return this._allTeams().find(team =>
       team.abbreviation.toLowerCase() === abbreviation.toLowerCase()
     );
   }
@@ -257,7 +285,7 @@ export class TeamsService {
 
   async syncTeams(): Promise<void> {
     console.log('Sincronizando teams...');
-    
+
     this._isLoading.set(true);
     this._error.set(null);
 
@@ -278,17 +306,17 @@ export class TeamsService {
     try {
       const cachedTeams = await this.storageService.getAppData<TeamResponse[]>('teams', 'all');
       const cachedUpdate = await this.storageService.getAppData<string>('teams', 'last_update');
-      
+
       if (cachedTeams && cachedTeams.length > 0) {
         const nbaTeams = this.filterNBATeamsOnly(cachedTeams);
         this._allTeams.set(nbaTeams);
-        
+
         if (cachedUpdate) {
           this._lastUpdate.set(new Date(cachedUpdate));
         }
-        
+
         console.log(`${nbaTeams.length} times NBA carregados do cache (${cachedTeams.length - nbaTeams.length} times não-NBA filtrados)`);
-        
+
         if (cachedTeams.length !== nbaTeams.length) {
           await this.saveToCache();
         }
@@ -313,9 +341,9 @@ export class TeamsService {
     this._selectedTeam.set(null);
     this._lastUpdate.set(null);
     this._error.set(null);
-    
+
     this.storageService.clearAppData('teams');
-    
+
     console.log('Cache de teams limpo');
   }
 

@@ -1,16 +1,21 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { PlayersService } from '../../core/services/players.service';
+import { SEOService } from '../../core/services/seo.service';
+import { PreferencesStore } from '../../core/services/preferences.store';
+import { SkeletonLoader } from '../../shared/components/skeleton-loader/skeleton-loader';
+import { ErrorView } from '../../shared/components/error-view/error-view';
 import { PlayerResponse, PlayerPosition, POSITION_NAMES } from '../../core/interfaces/api.interface';
 
 @Component({
   selector: 'app-players',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SkeletonLoader, ErrorView],
   templateUrl: './players.html',
-  styleUrl: './players.scss'
+  styleUrl: './players.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PlayersComponent implements OnInit {
   // Local signals
@@ -36,10 +41,14 @@ export class PlayersComponent implements OnInit {
 
   constructor(
     public readonly playersService: PlayersService,
+    private readonly seoService: SEOService,
+    protected readonly preferencesStore: PreferencesStore,
     private readonly router: Router
-  ) {}
+  ) { }
 
   ngOnInit(): void {
+    this.seoService.updateTitle('Jogadores e Astros');
+    this.seoService.updateMeta('Descubra estatísticas e detalhes dos principais astros da NBA.');
     this.loadInitialPlayers();
   }
 

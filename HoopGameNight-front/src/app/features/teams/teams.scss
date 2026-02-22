@@ -276,40 +276,9 @@
   color: var(--text-tertiary);
 }
 
-// ===== LOADING & ERROR STATES =====
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-3xl);
-  background: var(--surface-primary);
-  border: 1px solid var(--border-primary);
-  border-radius: var(--border-radius-xl);
-
-  :root.dark & {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  p {
-    color: var(--text-secondary);
-    margin-top: var(--spacing-md);
-  }
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-primary);
-  border-top: 3px solid var(--accent-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+.skeleton-card {
+  pointer-events: none;
+  opacity: 0.7;
 }
 
 .error-state {
@@ -390,6 +359,7 @@
   overflow: hidden;
   transition: all var(--transition-fast);
   cursor: pointer;
+  position: relative;
 
   :root.dark & {
     background: rgba(255, 255, 255, 0.05);
@@ -418,6 +388,45 @@
   &__content {
     padding: var(--spacing-lg);
     text-align: center;
+  }
+
+  .favorite-btn {
+    position: absolute;
+    top: var(--spacing-sm);
+    left: var(--spacing-sm); // Posição oposta ao badge da conferência
+    background: var(--surface-tertiary);
+    border: none;
+    border-radius: var(--border-radius-full);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    transition: all var(--transition-normal);
+    z-index: 10;
+    backdrop-filter: blur(4px);
+
+    &:hover {
+      background: var(--surface-secondary);
+      transform: scale(1.1);
+      color: var(--accent-primary);
+    }
+
+    &--active {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+
+      &:hover {
+        background: rgba(239, 68, 68, 0.2);
+        color: #dc2626;
+      }
+    }
+
+    .material-icons {
+      font-size: 1.25rem;
+    }
   }
 }
 
@@ -568,7 +577,7 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
-    
+
     .material-icons {
       color: var(--text-tertiary);
     }

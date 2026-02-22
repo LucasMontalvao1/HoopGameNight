@@ -19,16 +19,19 @@ namespace HoopGameNight.Api.Controllers.V1
     public class GamesController : BaseApiController
     {
         private readonly IGameService _gameService;
+        private readonly IGameSyncService _gameSyncService;
         private readonly IEspnApiService _espnService;
         private readonly IMemoryCache _cache;
 
         public GamesController(
             IGameService gameService,
+            IGameSyncService gameSyncService,
             IEspnApiService espnService,
             IMemoryCache cache,
             ILogger<GamesController> logger) : base(logger)
         {
             _gameService = gameService;
+            _gameSyncService = gameSyncService;
             _espnService = espnService;
             _cache = cache;
         }
@@ -196,7 +199,7 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         /// <summary>
-        /// Buscar jogos de múltiplos times em um período (COM SUPORTE A JOGOS FUTUROS)
+        /// Buscar jogos de múltiplos times em um período 
         /// </summary>
         /// <param name="request">Requisição com times e período</param>
         /// <returns>Jogos agrupados por time com estatísticas</returns>
@@ -379,7 +382,7 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         /// <summary>
-        /// Buscar jogos dos times favoritos (COM SUPORTE A JOGOS FUTUROS)
+        /// Buscar jogos dos times favoritos
         /// </summary>
         /// <param name="teamIds">Lista de IDs dos times favoritos</param>
         /// <param name="startDate">Data inicial (opcional)</param>
@@ -458,7 +461,7 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         /// <summary>
-        /// Buscar calendário do mês (COM JOGOS FUTUROS)
+        /// Buscar calendário do mês
         /// </summary>
         /// <param name="year">Ano</param>
         /// <param name="month">Mês</param>
@@ -527,7 +530,7 @@ namespace HoopGameNight.Api.Controllers.V1
             {
                 Logger.LogInformation("Iniciando sincronização manual dos jogos de hoje");
 
-                await _gameService.SyncTodayGamesAsync();
+                await _gameSyncService.SyncTodayGamesAsync();
 
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
 
@@ -574,7 +577,7 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 Logger.LogInformation("Sincronizando jogos para a data: {Date}", date.ToShortDateString());
 
-                var syncCount = await _gameService.SyncGamesByDateAsync(date);
+                var syncCount = await _gameSyncService.SyncGamesByDateAsync(date);
 
                 _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
                 _cache.Remove(string.Format(ApiConstants.CacheKeys.GAMES_BY_DATE, date.ToString("yyyy-MM-dd")));

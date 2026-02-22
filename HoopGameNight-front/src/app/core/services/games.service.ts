@@ -14,8 +14,9 @@ export class GamesService {
   private readonly _error = signal<string | null>(null);
   private readonly _syncStatus = signal<SyncStatusResponse | null>(null);
   private readonly _lastUpdate = signal<Date | null>(null);
+  private readonly _selectedGame = signal<GameResponse | null>(null);
 
-  
+
   readonly todayGames = this._todayGames.asReadonly();
   readonly selectedDateGames = this._selectedDateGames.asReadonly();
   readonly selectedDate = this._selectedDate.asReadonly();
@@ -23,24 +24,25 @@ export class GamesService {
   readonly error = this._error.asReadonly();
   readonly syncStatus = this._syncStatus.asReadonly();
   readonly lastUpdate = this._lastUpdate.asReadonly();
+  readonly selectedGame = this._selectedGame.asReadonly();
 
-  readonly liveGames = computed(() => 
+  readonly liveGames = computed(() =>
     this._todayGames().filter(game => game.isLive)
   );
 
-  readonly completedGames = computed(() => 
+  readonly completedGames = computed(() =>
     this._todayGames().filter(game => game.isCompleted)
   );
 
-  readonly scheduledGames = computed(() => 
+  readonly scheduledGames = computed(() =>
     this._todayGames().filter(game => !game.isLive && !game.isCompleted)
   );
 
-  readonly hasLiveGames = computed(() => 
+  readonly hasLiveGames = computed(() =>
     this.liveGames().length > 0
   );
 
-  readonly selectedDateString = computed(() => 
+  readonly selectedDateString = computed(() =>
     this._selectedDate().toISOString().split('T')[0]
   );
 
@@ -68,7 +70,7 @@ export class GamesService {
   async loadTodayGames(forceRefresh = false): Promise<void> {
     await this.executeWithLoading(async () => {
       const cacheKey = APP_CONSTANTS.CACHE_KEYS.TODAY_GAMES;
-      
+
       if (!forceRefresh && this.isCacheValid(cacheKey)) {
         const cached = this.getFromCache<GameResponse[]>(cacheKey);
         if (cached) {
@@ -81,7 +83,7 @@ export class GamesService {
       this._todayGames.set(games);
       this.setCache(cacheKey, games);
       this._lastUpdate.set(new Date());
-      
+
       console.log(`Carregados ${games.length} jogos de hoje`);
     });
   }
@@ -157,7 +159,7 @@ export class GamesService {
   async syncGamesForDate(date?: Date): Promise<void> {
     await this.executeWithLoading(async () => {
       const targetDate = date || this._selectedDate();
-      
+
       if (this.isToday() && !date) {
         await this.gamesApi.syncTodayGames();
         await this.loadTodayGames(true);
@@ -165,7 +167,7 @@ export class GamesService {
         await this.gamesApi.syncGamesByDate(targetDate);
         await this.loadGamesByDate(targetDate, true);
       }
-      
+
       await this.checkSyncStatus();
       console.log(`Sincronização concluída para ${targetDate.toISOString().split('T')[0]}`);
     });
@@ -187,6 +189,34 @@ export class GamesService {
   getGameById(id: number): GameResponse | undefined {
     const allGames = [...this._todayGames(), ...this._selectedDateGames()];
     return allGames.find(game => game.id === id);
+  }
+
+  async loadGameById(id: number): Promise<void> {
+    const cacheKey = `game_detail_${id}`;
+
+    // 1. Verificar se já temos em algum signal
+    const sessionGame = this.getGameById(id);
+    if (sessionGame) {
+      this._selectedGame.set(sessionGame);
+    }
+
+    await this.executeWithLoading(async () => {
+      // 2. Verificar cache
+      if (this.isCacheValid(cacheKey)) {
+        const cached = this.getFromCache<GameResponse>(cacheKey);
+        if (cached) {
+          this._selectedGame.set(cached);
+          return;
+        }
+      }
+
+      // 3. Buscar da API
+      const game = await this.gamesApi.getGameById(id);
+      if (game) {
+        this._selectedGame.set(game);
+        this.setCache(cacheKey, game, 60000); // 1 min de cache para detalhes
+      }
+    });
   }
 
   async getGamesByDateRange(startDate: Date, endDate: Date): Promise<GameResponse[]> {
@@ -272,7 +302,7 @@ export class GamesService {
   private async executeWithLoading<T>(fn: () => Promise<T>): Promise<T> {
     this._isLoading.set(true);
     this._error.set(null);
-    
+
     try {
       const result = await fn();
       return result;
@@ -335,7 +365,7 @@ export class GamesService {
 
   private startAutoRefresh(): void {
     this.stopAutoRefresh();
-    
+
     this.autoRefreshTimer = window.setInterval(async () => {
       if (this.hasLiveGames()) {
         console.log('Auto-refresh: atualizando jogos ao vivo...');

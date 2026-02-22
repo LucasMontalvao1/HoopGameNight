@@ -4,13 +4,16 @@ import { Router, RouterModule } from '@angular/router';
 
 import { GamesService } from '../../core/services/games.service';
 import { TeamsService } from '../../core/services/teams.service';
+import { SEOService } from '../../core/services/seo.service';
 import { GameResponse } from '../../core/interfaces/api.interface';
 import { DatePicker } from '../../shared/components/date-picker/date-picker';
+import { SkeletonLoader } from '../../shared/components/skeleton-loader/skeleton-loader';
+import { ErrorView } from '../../shared/components/error-view/error-view';
 
 @Component({
   selector: 'app-games',
   standalone: true,
-  imports: [CommonModule, RouterModule, DatePicker],
+  imports: [CommonModule, RouterModule, DatePicker, SkeletonLoader, ErrorView],
   templateUrl: './games.html',
   styleUrls: ['./games.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -20,18 +23,21 @@ export class Games implements OnInit, OnDestroy {
   constructor(
     protected readonly gamesService: GamesService,
     protected readonly teamsService: TeamsService,
+    protected readonly seoService: SEOService,
     private readonly router: Router
-  ) {}
+  ) { }
 
   async ngOnInit(): Promise<void> {
-    console.log('Games component inicializado');
+    this.seoService.updateTitle('Jogos da NBA');
+    this.seoService.updateMeta('Confira o calendário completo e resultados em tempo real da NBA.');
+    console.log('Calendário de jogos inicializado');
     await this.loadInitialData();
     await this.gamesService.checkSyncStatus();
   }
 
   ngOnDestroy(): void {
   }
-  
+
   async goToPreviousDay(): Promise<void> {
     await this.gamesService.navigateToDate('prev');
   }
@@ -83,7 +89,7 @@ export class Games implements OnInit, OnDestroy {
   async onDateChange(date: Date): Promise<void> {
     await this.gamesService.loadGamesByDate(date);
   }
- 
+
   async syncCurrentDate(): Promise<void> {
     await this.gamesService.syncGamesForDate();
   }
@@ -95,7 +101,7 @@ export class Games implements OnInit, OnDestroy {
       await this.gamesService.loadGamesByDate(this.gamesService.selectedDate(), true);
     }
   }
-  
+
   getCurrentDate(): string {
     return this.gamesService.selectedDate().toLocaleDateString('pt-BR', {
       weekday: 'long',
@@ -175,6 +181,10 @@ export class Games implements OnInit, OnDestroy {
     if (abbreviation) {
       this.router.navigate(['/teams', abbreviation]);
     }
+  }
+
+  viewGameDetails(gameId: number): void {
+    this.router.navigate(['/games', gameId]);
   }
 
   private async loadInitialData(): Promise<void> {

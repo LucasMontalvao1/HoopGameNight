@@ -17,4 +17,4 @@
     @Assists, @Steals, @Blocks, @Turnovers, @PersonalFouls, @PlusMinus,
     NOW(), NOW()
 );
-SELECT LAST_INSERT_ID();
+SELECT ROW_COUNT() AS affected_rows;

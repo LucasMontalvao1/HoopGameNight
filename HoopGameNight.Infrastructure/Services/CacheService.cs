@@ -98,7 +98,6 @@ namespace HoopGameNight.Infrastructure.Services
 
                         var deserializedData = JsonSerializer.Deserialize<T>(redisData);
 
-                        // Salvar também no memory cache para próximas buscas
                         if (deserializedData != null)
                         {
                             _memoryCache.Set(key, deserializedData, TimeSpan.FromMinutes(5));
@@ -111,7 +110,6 @@ namespace HoopGameNight.Infrastructure.Services
                     _logger.LogDebug("REDIS MISS: {Key}", key);
                 }
 
-                // 2️⃣ Fallback: Memory Cache
                 if (_memoryCache.TryGetValue(key, out T? memCached))
                 {
                     Interlocked.Increment(ref _memoryHits);
@@ -171,7 +169,6 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                // 1️⃣ Salvar no Redis (se disponível)
                 if (_distributedCache != null)
                 {
                     var json = JsonSerializer.Serialize(value);
@@ -184,7 +181,6 @@ namespace HoopGameNight.Infrastructure.Services
                     _logger.LogDebug("REDIS SET: {Key} (TTL: {TTL})", key, ttl);
                 }
 
-                // 2️⃣ Salvar no Memory Cache (sempre)
                 var cacheOptions = new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = ttl
@@ -228,14 +224,12 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                // Remover do Redis
                 if (_distributedCache != null)
                 {
                     await _distributedCache.RemoveAsync(key);
                     _logger.LogDebug("REDIS REMOVE: {Key}", key);
                 }
 
-                // Remover do Memory
                 _memoryCache.Remove(key);
                 _logger.LogDebug("MEMORY REMOVE: {Key}", key);
             }
@@ -291,7 +285,6 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                // Verificar Redis
                 if (_distributedCache != null)
                 {
                     var redisData = await _distributedCache.GetStringAsync(key);
@@ -299,7 +292,6 @@ namespace HoopGameNight.Infrastructure.Services
                         return true;
                 }
 
-                // Verificar Memory
                 return _memoryCache.TryGetValue(key, out _);
             }
             catch (Exception ex)

@@ -76,7 +76,7 @@ namespace HoopGameNight.Core.Helpers
         /// </summary>
         public static int ToEspnSeasonFormat(int season)
         {
-            return season; // ESPN já espera exatamente assim
+            return season;
         }
     }
 }

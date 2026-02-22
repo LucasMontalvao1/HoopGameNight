@@ -120,6 +120,15 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.FreeThrows, opt => opt.MapFrom(src => src.FreeThrowsFormatted))
                 .ForMember(dest => dest.DoubleDouble, opt => opt.MapFrom(src => src.DoubleDouble))
                 .ForMember(dest => dest.TripleDouble, opt => opt.MapFrom(src => src.TripleDouble));
+
+            // PlayerGameStatsDetailedResponse para PlayerRecentGameResponse
+            CreateMap<PlayerGameStatsDetailedResponse, PlayerRecentGameResponse>()
+                .ForMember(dest => dest.Rebounds, opt => opt.MapFrom(src => src.TotalRebounds))
+                .ForMember(dest => dest.Minutes, opt => opt.MapFrom(src => src.MinutesFormatted))
+                .ForMember(dest => dest.FieldGoals, opt => opt.MapFrom(src => src.FieldGoalsFormatted))
+                .ForMember(dest => dest.ThreePointers, opt => opt.MapFrom(src => src.ThreePointersFormatted))
+                .ForMember(dest => dest.FreeThrows, opt => opt.MapFrom(src => src.FreeThrowsFormatted))
+                .ForMember(dest => dest.Opponent, opt => opt.MapFrom(src => src.OpponentAbbreviation));
         }
 
         private static TeamSummaryResponse? GetWinningTeamSummary(Game game)

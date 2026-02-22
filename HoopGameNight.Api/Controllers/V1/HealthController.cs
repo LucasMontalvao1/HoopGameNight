@@ -48,7 +48,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Health check simples - sempre retorna 200 se a API está rodando
+        /// Health check simples
         /// </summary>
         [HttpGet("live")]
         [ProducesResponseType(typeof(LivenessCheck), StatusCodes.Status200OK)]
@@ -65,7 +65,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Health check de prontidão - verifica dependências críticas
+        /// Health check de prontidão
         /// </summary>
         [HttpGet("ready")]
         [ProducesResponseType(typeof(ReadinessCheck), StatusCodes.Status200OK)]
@@ -101,7 +101,7 @@ namespace HoopGameNight.Api.Controllers
         }
 
         /// <summary>
-        /// Health check completo - informações detalhadas do sistema
+        /// Health check completo
         /// </summary>
         [HttpGet]
         [ProducesResponseType(typeof(HealthCheckResponse), StatusCodes.Status200OK)]
@@ -382,7 +382,6 @@ namespace HoopGameNight.Api.Controllers
         {
             var dependencies = new List<DependencyDiagnostic>();
 
-            // Database
             dependencies.Add(new DependencyDiagnostic
             {
                 Name = "MySQL Database",
@@ -391,7 +390,6 @@ namespace HoopGameNight.Api.Controllers
                 Status = (await CheckDatabaseAsync()).IsHealthy ? "Connected" : "Disconnected"
             });
 
-            // External API
             dependencies.Add(new DependencyDiagnostic
             {
                 Name = "ESPN API",

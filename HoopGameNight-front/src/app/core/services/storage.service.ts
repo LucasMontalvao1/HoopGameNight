@@ -4,14 +4,14 @@ import { Injectable } from '@angular/core';
   providedIn: 'root'
 })
 export class StorageService {
-  
-  constructor() {}
- 
+
+  constructor() { }
+
   async getItem<T>(key: string): Promise<T | null> {
     try {
       const item = localStorage.getItem(key);
       if (!item) return null;
-      
+
       return JSON.parse(item) as T;
     } catch (error) {
       console.warn(`Erro ao recuperar item '${key}' do storage:`, error);
@@ -23,14 +23,14 @@ export class StorageService {
     try {
       const item = localStorage.getItem(key);
       if (!item) return null;
-      
+
       return JSON.parse(item) as T;
     } catch (error) {
       console.warn(`Erro ao recuperar item '${key}' do storage:`, error);
       return null;
     }
   }
-  
+
   async setItem<T>(key: string, value: T): Promise<void> {
     try {
       const serialized = JSON.stringify(value);
@@ -66,7 +66,7 @@ export class StorageService {
       console.error(`Erro ao remover item '${key}' do storage:`, error);
     }
   }
-  
+
   async clear(): Promise<void> {
     try {
       localStorage.clear();
@@ -116,15 +116,25 @@ export class StorageService {
       return 0;
     }
   }
-  
+
   async getAppData<T>(module: string, key: string): Promise<T | null> {
     const fullKey = `nba_app_${module}_${key}`;
     return this.getItem<T>(fullKey);
   }
 
+  getAppDataSync<T>(module: string, key: string): T | null {
+    const fullKey = `nba_app_${module}_${key}`;
+    return this.getItemSync<T>(fullKey);
+  }
+
   async setAppData<T>(module: string, key: string, value: T): Promise<void> {
     const fullKey = `nba_app_${module}_${key}`;
     return this.setItem(fullKey, value);
+  }
+
+  setAppDataSync<T>(module: string, key: string, value: T): void {
+    const fullKey = `nba_app_${module}_${key}`;
+    this.setItemSync(fullKey, value);
   }
 
   async removeAppData(module: string, key: string): Promise<void> {
@@ -136,13 +146,13 @@ export class StorageService {
     try {
       const prefix = module ? `nba_app_${module}_` : 'nba_app_';
       const keys = await this.getAllKeys();
-      
+
       const keysToRemove = keys.filter(key => key.startsWith(prefix));
-      
+
       for (const key of keysToRemove) {
         await this.removeItem(key);
       }
-      
+
       console.log(`🗑️ Limpeza concluída: ${keysToRemove.length} itens removidos`);
     } catch (error) {
       console.error('Erro ao limpar dados do app:', error);

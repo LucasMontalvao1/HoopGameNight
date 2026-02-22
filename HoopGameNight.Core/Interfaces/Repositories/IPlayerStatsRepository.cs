@@ -20,7 +20,6 @@ namespace HoopGameNight.Core.Interfaces.Repositories
         Task<IEnumerable<PlayerGameStats>> GetAllPlayerGamesAsync(int playerId);
         Task UpsertGameStatsAsync(PlayerGameStats gameStats);
 
-        // ===== NOVO: Buscar season stats da VIEW calculada =====
         Task<PlayerSeasonStatsResponse?> GetSeasonStatsFromViewAsync(int playerId, int season);
 
         Task<IEnumerable<dynamic>> GetScoringLeadersAsync(int season, int minGames, int limit);
@@ -31,7 +30,6 @@ namespace HoopGameNight.Core.Interfaces.Repositories
         Task<DateTime?> GetLastSyncDateForPlayerAsync(int playerId);
         Task<bool> UpdateLastSyncDateAsync(int playerId, DateTime syncDate);
 
-        // ===== NOVOS MÉTODOS: Estatísticas Detalhadas por Jogo (usando VIEW) =====
         Task<PlayerGameStatsDetailedResponse?> GetPlayerGameStatsDetailedAsync(int playerId, int gameId);
         Task<IEnumerable<PlayerGameStatsDetailedResponse>> GetPlayerRecentGamesDetailedAsync(int playerId, int limit);
         Task<IEnumerable<PlayerGameStatsDetailedResponse>> GetPlayerAllGamesDetailedAsync(int playerId, int page, int pageSize);

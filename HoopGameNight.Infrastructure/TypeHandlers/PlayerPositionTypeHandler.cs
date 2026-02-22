@@ -19,13 +19,11 @@ namespace HoopGameNight.Infrastructure.TypeHandlers
             if (string.IsNullOrWhiteSpace(stringValue))
                 return null;
 
-            // Realiza o parse da string para o tipo enum ignorando diferenciação de maiúsculas/minúsculas
             if (Enum.TryParse<PlayerPosition>(stringValue, ignoreCase: true, out var position))
             {
                 return position;
             }
 
-            // Caso não consiga, retornar null
             return null;
         }
 
@@ -50,7 +48,7 @@ namespace HoopGameNight.Infrastructure.TypeHandlers
         public override PlayerPosition Parse(object value)
         {
             if (value == null || value == DBNull.Value)
-                return PlayerPosition.PG; // Valor padrão
+                return PlayerPosition.PG; 
 
             var stringValue = value.ToString();
             if (string.IsNullOrWhiteSpace(stringValue))

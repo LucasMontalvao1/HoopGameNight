@@ -29,16 +29,12 @@ namespace HoopGameNight.Infrastructure.Data
         {
             var possiblePaths = new[]
             {
-                // 1. Pasta Sql dentro do assembly atual
                 Path.Combine(GetAssemblyDirectory(), "Sql"),
                 
-                // 2. Pasta Sql na Infrastructure
                 Path.Combine(GetProjectRoot(), "HoopGameNight.Infrastructure", "Sql"),
                 
-                // 3. Pasta Database na raiz do projeto
                 Path.Combine(GetProjectRoot(), "Database"),
                 
-                // 4. Pasta raiz do projeto
                 GetProjectRoot()
             };
 
@@ -51,7 +47,6 @@ namespace HoopGameNight.Infrastructure.Data
                 }
             }
 
-            // Se não encontrar nenhuma pasta, criar a estrutura padrão
             var defaultPath = Path.Combine(GetAssemblyDirectory(), "Sql");
             Directory.CreateDirectory(defaultPath);
             _logger.LogWarning("Created default SQL path: {Path}", defaultPath);
@@ -62,7 +57,6 @@ namespace HoopGameNight.Infrastructure.Data
         {
             var currentDir = GetAssemblyDirectory();
 
-            // Subir até encontrar o arquivo .sln ou pasta com projetos
             while (currentDir != null && !Directory.GetFiles(currentDir, "*.sln").Any())
             {
                 var parent = Directory.GetParent(currentDir);
@@ -90,7 +84,6 @@ namespace HoopGameNight.Infrastructure.Data
 
             try
             {
-                // Tentar múltiplos caminhos para encontrar o arquivo
                 var possiblePaths = new[]
                 {
                     Path.Combine(_sqlBasePath, category, $"{fileName}.sql"),

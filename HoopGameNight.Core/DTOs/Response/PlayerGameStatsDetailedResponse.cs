@@ -9,7 +9,6 @@ namespace HoopGameNight.Core.DTOs.Response
     public class PlayerGameStatsDetailedResponse
     {
         // IDs
-        public int Id { get; set; }
         public int PlayerId { get; set; }
         public int GameId { get; set; }
         public int TeamId { get; set; }

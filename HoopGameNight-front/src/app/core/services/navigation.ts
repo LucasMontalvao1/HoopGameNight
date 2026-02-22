@@ -17,32 +17,31 @@ export class NavigationService {
   private readonly _navigationItems = signal<NavigationItem[]>([
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Início',
       icon: 'dashboard',
       route: '/dashboard'
     },
     {
       id: 'games',
-      label: 'Games',
+      label: 'Agenda',
       icon: 'sports_basketball',
       route: '/games'
     },
-    
     {
       id: 'teams',
-      label: 'Teams',
+      label: 'Times',
       icon: 'groups',
       route: '/teams'
     },
     {
       id: 'players',
-      label: 'Players',
+      label: 'Jogadores',
       icon: 'person',
       route: '/players'
     },
     {
       id: 'api-status',
-      label: 'API Status',
+      label: 'Conexão',
       icon: 'monitor_heart',
       route: '/api-status'
     }
@@ -68,9 +67,9 @@ export class NavigationService {
   }
 
   updateBadge(itemId: string, count: number): void {
-    this._navigationItems.update(items => 
-      items.map(item => 
-        item.id === itemId 
+    this._navigationItems.update(items =>
+      items.map(item =>
+        item.id === itemId
           ? { ...item, badge: count > 0 ? count : undefined }
           : item
       )

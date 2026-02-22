@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 
 namespace HoopGameNight.Core.DTOs.External.ESPN
 {
-    // --- GAMES / EVENTS ---
     public class EspnGameDetailDto
     {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -157,7 +156,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
     public class EspnGameRosterDto
     {
         public List<EspnRosterEntryDto>? Entries { get; set; } 
-        // A API da ESPN pode retornar atletas em 'Entries' ou diretamente em 'Athletes' dependendo do endpoint (Game vs Team)
         public List<EspnAthleteRefDto>? Athletes { get; set; }
     }
     
@@ -167,17 +165,15 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public string? FullName { get; set; }
     }
 
-    // --- TEAMS ---
     public class EspnTeamStatisticsDto
     {
-        // Estrutura genérica da ESPN que pareia nomes de estatísticas com seus respectivos valores numéricos
          public List<string>? Names { get; set; }
          public List<double>? Values { get; set; }
     }
 
     public class EspnTeamLeadersDto
     {
-          public List<EspnLeaderCategoryDto>? Categories { get; set; } // Mapeia categorias como 'Points', 'Rebounds', etc.
+          public List<EspnLeaderCategoryDto>? Categories { get; set; } 
     }
 
 
@@ -186,12 +182,10 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public List<EspnLeaderCategoryDto>? LeagueLeaders { get; set; }
     }
 
-
-    // --- STANDINGS / CONTENT ---
     public class EspnStandingsDto
     {
         public string? Name { get; set; } 
-        public List<EspnStandingEntryDto>? Children { get; set; } // Conferences/Divisions often in children
+        public List<EspnStandingEntryDto>? Children { get; set; } 
         public List<EspnStandingEntryDto>? Entries { get; set; }
     }
 
@@ -240,7 +234,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public EspnTeamRefDto? Team { get; set; }
     }
 
-    // --- PLAYERS EXTENDED ---
     public class EspnPlayerSplitsDto
     {
          public List<EspnSplitCategoryDto>? SplitCategories { get; set; }
@@ -257,7 +250,7 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public string? Name { get; set; }
         public string? DisplayName { get; set; }
         public string? Abbreviation { get; set; }
-        public List<string>? Stats { get; set; } // Lista de valores brutos que seguem a ordem definida no cabeçalho do Split
+        public List<string>? Stats { get; set; } 
     }
 
     public class EspnPlayerGamelogDto
@@ -321,8 +314,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public string? Logo { get; set; }
     }
 
-
-    // --- SEASONS ---
     public class EspnSeasonsDto
     {
         public List<EspnSeasonRefDto>? Items { get; set; }
@@ -357,8 +348,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
     {
         public List<EspnStandingEntryDto>? Children { get; set; }
     }
-
-    // ===== TEAMS (from EspnTeamDto.cs) =====
     
     /// <summary>
     /// DTO para times da ESPN API
@@ -387,7 +376,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public bool IsActive { get; set; }
         public bool IsAllStar { get; set; }
 
-        // Logos
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<EspnLogoDto> Logos { get; set; } = new();
     }
@@ -422,8 +410,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Abbreviation { get; set; }
     }
-
-    // ===== PLAYERS / ATHLETES (from EspnPlayerStatsDto.cs) =====
     
     public class EspnPlayerStatsDto
     {
@@ -450,7 +436,7 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public object? SeasonType { get; set; }
 
         [JsonPropertyName("seasonTypeId")]
-        public int SeasonTypeId { get; set; } = 2; // Identificador da temporada (2 = Regular Season, 3 = Postseason)
+        public int SeasonTypeId { get; set; } = 2; 
     }
 
     public class EspnAthleteRefDto
@@ -463,6 +449,9 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
 
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("displayName")]
+        public string? DisplayName { get; set; }
     }
 
     public class EspnAthletesListDto
@@ -581,9 +570,7 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         [JsonPropertyName("abbreviation")]
         public string Abbreviation { get; set; } = string.Empty;
     }
-
-    // ===== STATISTICS (from EspnPlayerStatsSplitDto.cs) =====
-    
+        
     public class EspnPlayerStatsSplitDto
     {
         [JsonIgnore]
@@ -671,8 +658,6 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         [JsonPropertyName("$ref")]
         public string? _JsonRef { set => Ref = value ?? string.Empty; }
     }
-
-    // ===== SEASONS (from EspnPlayerStatsDto.cs) =====
     
     public class EspnSeasonRefDto
     {

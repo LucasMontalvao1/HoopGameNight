@@ -1,17 +1,22 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 import { TeamsService } from '../../core/services/teams.service';
+import { SEOService } from '../../core/services/seo.service';
+import { PreferencesStore } from '../../core/services/preferences.store';
+import { SkeletonLoader } from '../../shared/components/skeleton-loader/skeleton-loader';
+import { ErrorView } from '../../shared/components/error-view/error-view';
 import { TeamResponse } from '../../core/interfaces/api.interface';
 
 @Component({
   selector: 'app-teams',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, SkeletonLoader, ErrorView],
   templateUrl: './teams.html',
-  styleUrls: ['./teams.scss']
+  styleUrls: ['./teams.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Teams implements OnInit {
   private readonly _searchQuery = signal<string>('');
@@ -28,11 +33,15 @@ export class Teams implements OnInit {
 
   constructor(
     protected readonly teamsService: TeamsService,
+    protected readonly seoService: SEOService,
+    protected readonly preferencesStore: PreferencesStore,
     private readonly router: Router
-  ) {}
+  ) { }
 
   async ngOnInit(): Promise<void> {
-    console.log('Teams component inicializado');
+    this.seoService.updateTitle('Equipes da NBA');
+    this.seoService.updateMeta('Explore todas as franquias da NBA, conferências e divisões.');
+    console.log('Central de equipes inicializada');
     await this.loadInitialData();
   }
 
@@ -55,7 +64,7 @@ export class Teams implements OnInit {
   onConferenceChange(conference: 'All' | 'East' | 'West'): void {
     this._selectedConference.set(conference);
     if (conference !== 'All') {
-      this._selectedDivision.set('All'); 
+      this._selectedDivision.set('All');
     }
   }
 
@@ -109,7 +118,7 @@ export class Teams implements OnInit {
 
   private sortTeams(teams: TeamResponse[]): TeamResponse[] {
     const sortBy = this._sortBy();
-    
+
     return [...teams].sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -149,7 +158,7 @@ export class Teams implements OnInit {
     return grouped;
   }
 
-  getTeamsByDivisionArray(): Array<{key: string, value: TeamResponse[]}> {
+  getTeamsByDivisionArray(): Array<{ key: string, value: TeamResponse[] }> {
     const divisions = this.getTeamsByDivision();
     return Object.entries(divisions).map(([key, value]) => ({ key, value }));
   }
@@ -160,15 +169,15 @@ export class Teams implements OnInit {
 
   handleLogoError(event: Event, abbreviation: string): void {
     const img = event.target as HTMLImageElement;
-    
+
     if (img.src.includes('nba-logo-fallback.svg')) {
       return;
     }
-    
+
     console.warn(`Logo não encontrado para: ${abbreviation}`);
-    
+
     img.src = 'assets/images/nba-logo-fallback.svg';
-    
+
     img.classList.add('logo-fallback');
   }
 
@@ -204,7 +213,7 @@ export class Teams implements OnInit {
     return team.id;
   }
 
-  trackByDivisionEntry(index: number, item: {key: string, value: TeamResponse[]}): string {
+  trackByDivisionEntry(index: number, item: { key: string, value: TeamResponse[] }): string {
     return item.key;
   }
 
@@ -219,11 +228,11 @@ export class Teams implements OnInit {
   getFilterSummary(): string {
     const total = this.getFilteredTeams().length;
     const allTeams = this.teamsService.allTeams().length;
-    
+
     if (total === allTeams) {
       return `${total} times`;
     }
-    
+
     return `${total} de ${allTeams} times`;
   }
 
@@ -240,11 +249,11 @@ export class Teams implements OnInit {
   get availableDivisions(): string[] {
     const teams = this.teamsService.allTeams();
     const conference = this._selectedConference();
-    
+
     if (conference === 'All') {
       return this.teamsService.divisions();
     }
-    
+
     const conferenceTeams = teams.filter(team => team.conference === conference);
     const divisions = new Set(conferenceTeams.map(team => team.division));
     return Array.from(divisions).sort();

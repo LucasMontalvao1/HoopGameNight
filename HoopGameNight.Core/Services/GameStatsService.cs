@@ -7,6 +7,7 @@ using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Core.Models.Entities;
+using HoopGameNight.Core.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Core.Services
@@ -23,6 +24,8 @@ namespace HoopGameNight.Core.Services
         private readonly ITeamRepository _teamRepository;
         private readonly IEspnApiService _espnService;
         private readonly ICacheService _cacheService;
+        private readonly ITeamService _teamService;
+        private readonly IEspnParser _espnParser;
         private readonly ILogger<GameStatsService> _logger;
 
         public GameStatsService(
@@ -32,6 +35,8 @@ namespace HoopGameNight.Core.Services
             ITeamRepository teamRepository,
             IEspnApiService espnService,
             ICacheService cacheService,
+            ITeamService teamService,
+            IEspnParser espnParser,
             ILogger<GameStatsService> logger)
         {
             _gameRepository = gameRepository;
@@ -40,57 +45,56 @@ namespace HoopGameNight.Core.Services
             _teamRepository = teamRepository;
             _espnService = espnService;
             _cacheService = cacheService;
+            _teamService = teamService;
+            _espnParser = espnParser;
             _logger = logger;
         }
 
         #region Buscar Estatísticas por Jogo
 
-        /// <summary>
-        /// Busca estatísticas de TODOS os jogadores em um jogo específico
-        /// </summary>
         public async Task<GamePlayerStatsResponse?> GetGamePlayerStatsAsync(int gameId)
         {
-            var cacheKey = $"game_all_stats_{gameId}";
-
-            // 1. Tentar cache
-            var cached = await _cacheService.GetAsync<GamePlayerStatsResponse>(cacheKey);
-            if (cached != null) return cached;
-
-            // 2. Buscar do banco
-            var game = await _gameRepository.GetByIdAsync(gameId);
-            if (game == null) return null;
-
-            var allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
-
-            // 3. Se não tem dados no banco, sincronizar da ESPN
-            if (!allStats.Any())
+            try
             {
-                _logger.LogInformation("Stats do jogo {GameId} não encontradas. Sincronizando...", gameId);
-                await SyncGameStatsAsync(gameId);
-                allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
+                var cacheKey = $"game_all_stats_{gameId}";
+
+                var cached = await _cacheService.GetAsync<GamePlayerStatsResponse>(cacheKey);
+                if (cached != null) return cached;
+
+                var game = await _gameRepository.GetByIdAsync(gameId);
+                if (game == null) return null;
+
+                var allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
+
+                if (!allStats.Any())
+                {
+                    _logger.LogInformation("Stats do jogo {GameId} não encontradas. Sincronizando...", gameId);
+                    await SyncGameStatsAsync(gameId);
+                    allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
+                }
+
+                var response = new GamePlayerStatsResponse
+                {
+                    GameId = gameId,
+                    GameDate = game.Date,
+                    HomeTeam = game.HomeTeam?.Name ?? "",
+                    VisitorTeam = game.VisitorTeam?.Name ?? "",
+                    HomeScore = game.HomeTeamScore,
+                    VisitorScore = game.VisitorTeamScore,
+                    HomeTeamStats = allStats.Where(s => s.TeamId == game.HomeTeamId).ToList(),
+                    VisitorTeamStats = allStats.Where(s => s.TeamId == game.VisitorTeamId).ToList()
+                };
+
+                await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromMinutes(10));
+                return response;
             }
-
-            // 4. Montar resposta
-            var response = new GamePlayerStatsResponse
+            catch (Exception ex)
             {
-                GameId = gameId,
-                GameDate = game.Date,
-                HomeTeam = game.HomeTeam?.Name ?? "",
-                VisitorTeam = game.VisitorTeam?.Name ?? "",
-                HomeScore = game.HomeTeamScore,
-                VisitorScore = game.VisitorTeamScore,
-                HomeTeamStats = allStats.Where(s => s.TeamId == game.HomeTeamId).ToList(),
-                VisitorTeamStats = allStats.Where(s => s.TeamId == game.VisitorTeamId).ToList()
-            };
-
-            // 5. Cachear
-            await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromMinutes(10));
-            return response;
+                _logger.LogError(ex, "Erro ao buscar stats do jogo {GameId}", gameId);
+                return null;
+            }
         }
 
-        /// <summary>
-        /// Busca líderes estatísticos de um jogo
-        /// </summary>
         public async Task<GameLeadersResponse?> GetGameLeadersAsync(int gameId)
         {
             try
@@ -127,9 +131,6 @@ namespace HoopGameNight.Core.Services
             }
         }
 
-        /// <summary>
-        /// Busca boxscore completo de um jogo
-        /// </summary>
         public async Task<EspnBoxscoreDto?> GetGameBoxscoreAsync(int gameId)
         {
             var game = await _gameRepository.GetByIdAsync(gameId);
@@ -151,17 +152,12 @@ namespace HoopGameNight.Core.Services
 
         #region Sincronização de Estatísticas
 
-        /// <summary>
-        /// Sincroniza estatísticas de TODOS os jogadores de um jogo
-        /// Usa o BOXSCORE da ESPN (mais eficiente que buscar jogador por jogador)
-        /// </summary>
         public async Task<bool> SyncGameStatsAsync(int gameId)
         {
             try
             {
-                _logger.LogInformation("🔄 Iniciando sincronização de stats do jogo {GameId}", gameId);
+                _logger.LogInformation("Iniciando sincronização de stats do jogo {GameId}", gameId);
 
-                // 1. Buscar informações do jogo
                 var game = await _gameRepository.GetByIdAsync(gameId);
                 if (game == null || string.IsNullOrEmpty(game.ExternalId))
                 {
@@ -169,7 +165,6 @@ namespace HoopGameNight.Core.Services
                     return false;
                 }
 
-                // 2. Buscar BOXSCORE da ESPN (contém stats de TODOS os jogadores)
                 var boxscore = await _espnService.GetGameBoxscoreAsync(game.ExternalId);
                 if (boxscore?.Players == null || !boxscore.Players.Any())
                 {
@@ -178,21 +173,18 @@ namespace HoopGameNight.Core.Services
                 }
 
                 int syncedCount = 0;
-                int errorCount = 0;
+                var playerStatsDict = new Dictionary<int, PlayerGameStats>();
 
-                // 3. Processar stats de cada time
                 foreach (var teamStats in boxscore.Players)
                 {
                     if (teamStats.Statistics == null) continue;
 
-                    // Determinar qual é o TeamId do sistema
                     var espnTeamId = teamStats.Team?.Id;
                     if (string.IsNullOrEmpty(espnTeamId)) continue;
 
-                    int systemTeamId = await MapEspnTeamToSystemIdAsync(espnTeamId);
+                    int systemTeamId = await _teamService.MapEspnTeamToSystemIdAsync(espnTeamId, teamStats.Team?.Abbreviation ?? "");
                     if (systemTeamId == 0) continue;
 
-                    // 4. Processar cada jogador
                     foreach (var athleteStat in teamStats.Statistics)
                     {
                         if (athleteStat.Athletes == null) continue;
@@ -201,20 +193,14 @@ namespace HoopGameNight.Core.Services
                         {
                             try
                             {
-                                // Extrair ESPN Player ID
-                                var espnPlayerId = athleteEntry.Athlete?.Ref?.Split('/').LastOrDefault();
+                                var espnPlayerId = athleteEntry.Athlete?.Id;
+                                if (string.IsNullOrEmpty(espnPlayerId)) espnPlayerId = _espnParser.ExtractIdFromRef(athleteEntry.Athlete?.Ref);
                                 if (string.IsNullOrEmpty(espnPlayerId)) continue;
 
-                                // Mapear para Player do sistema
-                                var systemPlayerId = await MapEspnPlayerToSystemIdAsync(espnPlayerId);
-                                if (systemPlayerId == 0)
-                                {
-                                    _logger.LogDebug("Jogador ESPN {EspnId} não encontrado no sistema", espnPlayerId);
-                                    continue;
-                                }
+                                var systemPlayerId = await GetOrCreateSystemPlayerAsync(espnPlayerId, systemTeamId);
+                                if (systemPlayerId == 0) continue;
 
-                                // 5. Criar entidade de stats
-                                var gameStats = ParseBoxscoreToGameStats(
+                                var currentCategoryStats = _espnParser.ParseBoxscoreToGameStats(
                                     athleteStat,
                                     athleteEntry,
                                     systemPlayerId,
@@ -222,25 +208,38 @@ namespace HoopGameNight.Core.Services
                                     systemTeamId
                                 );
 
-                                // 6. Salvar no banco
-                                await _statsRepository.UpsertGameStatsAsync(gameStats);
-                                syncedCount++;
+                                if (playerStatsDict.TryGetValue(systemPlayerId, out var existingStats))
+                                {
+                                    _espnParser.MergeGameStats(existingStats, currentCategoryStats);
+                                }
+                                else
+                                {
+                                    playerStatsDict[systemPlayerId] = currentCategoryStats;
+                                }
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogError(ex, "Erro ao processar jogador em jogo {GameId}", gameId);
-                                errorCount++;
+                                _logger.LogDebug("Erro ao agrupar stats para jogador no jogo {GameId}: {Message}", gameId, ex.Message);
                             }
                         }
                     }
                 }
 
-                _logger.LogInformation(
-                    "✅ Sincronização do jogo {GameId} concluída: {Synced} jogadores, {Errors} erros",
-                    gameId, syncedCount, errorCount
-                );
+                foreach (var stats in playerStatsDict.Values)
+                {
+                    try
+                    {
+                        await _statsRepository.UpsertGameStatsAsync(stats);
+                        syncedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Erro ao salvar stats agregadas para jogador {PId} no jogo {GameId}", stats.PlayerId, gameId);
+                    }
+                }
 
-                // Invalidar cache
+                _logger.LogInformation("Sincronização do jogo {GameId} concluída: {Synced} jogadores salvos/atualizados", gameId, syncedCount);
+
                 await _cacheService.RemoveAsync($"game_all_stats_{gameId}");
                 await _cacheService.RemoveAsync($"game_leaders_{gameId}");
 
@@ -248,110 +247,67 @@ namespace HoopGameNight.Core.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "❌ Erro crítico ao sincronizar jogo {GameId}", gameId);
+                _logger.LogError(ex, "Erro crítico ao sincronizar jogo {GameId}", gameId);
                 return false;
             }
         }
 
         #endregion
 
-        #region Mapeamento e Parsing
+        #region Auxiliares de Banco (Player/Team Management)
 
-        /// <summary>
-        /// Mapeia ESPN Team ID para System Team ID
-        /// </summary>
-        private async Task<int> MapEspnTeamToSystemIdAsync(string espnTeamId)
+        private async Task<int> GetOrCreateSystemPlayerAsync(string externalId, int teamId)
         {
-            // Buscar time pelo ExternalId
-            var team = await _teamRepository.GetByExternalIdAsync(int.Parse(espnTeamId));
-            return team?.Id ?? 0;
+            if (!int.TryParse(externalId, out var espnId)) return 0;
+            
+            var player = await _playerRepository.GetByExternalIdAsync(espnId);
+            if (player != null) return player.Id;
+
+            try
+            {
+                _logger.LogInformation("Jogador ESPN {EspnId} não encontrado. Buscando detalhes para criação...", espnId);
+                var details = await _espnService.GetPlayerDetailsAsync(externalId);
+                
+                if (details == null) return 0;
+
+                var newPlayer = new Player
+                {
+                    ExternalId = espnId,
+                    EspnId = externalId,
+                    FirstName = details.FirstName ?? details.DisplayName?.Split(' ').FirstOrDefault() ?? "Unknown",
+                    LastName = details.LastName ?? details.DisplayName?.Split(' ').LastOrDefault() ?? "Player",
+                    TeamId = teamId,
+                    Position = _espnParser.ParsePosition(details.Position?.Abbreviation),
+                    HeightFeet = 0,
+                    HeightInches = 0,
+                    WeightPounds = 0,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                await _playerRepository.InsertAsync(newPlayer);
+                _logger.LogInformation("Jogador criado com sucesso: {FullName} (ID: {Id})", newPlayer.FullName, newPlayer.Id);
+                return newPlayer.Id;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao criar jogador ESPN {EspnId}", externalId);
+                return 0;
+            }
         }
 
-        /// <summary>
-        /// Mapeia ESPN Player ID para System Player ID
-        /// </summary>
         private async Task<int> MapEspnPlayerToSystemIdAsync(string externalId)
         {
-            // Buscar jogador pelo EspnId - O repositório agora aceita int
             if (!int.TryParse(externalId, out var espnId)) return 0;
             var player = await _playerRepository.GetByExternalIdAsync(espnId);
             return player?.Id ?? 0;
         }
 
-        /// <summary>
-        /// Converte dados do Boxscore da ESPN para PlayerGameStats
-        /// </summary>
-        private PlayerGameStats ParseBoxscoreToGameStats(
-            EspnAthleteStatDto statCategory,
-            EspnAthleteEntryDto athleteEntry,
-            int playerId,
-            int gameId,
-            int teamId)
-        {
-            var stats = new PlayerGameStats
-            {
-                PlayerId = playerId,
-                GameId = gameId,
-                TeamId = teamId,
-                DidNotPlay = false,
-                IsStarter = false
-            };
+        #endregion
 
-            // Os nomes das estatísticas estão em statCategory.Names
-            // Os valores estão em athleteEntry.Stats
-            if (statCategory.Names == null || athleteEntry.Stats == null) return stats;
+        #region Mapeamento de Líderes
 
-            for (int i = 0; i < statCategory.Names.Count && i < athleteEntry.Stats.Count; i++)
-            {
-                var statName = statCategory.Names[i]?.ToLowerInvariant() ?? "";
-                var statValue = athleteEntry.Stats[i] ?? "0";
-
-                try
-                {
-                    switch (statName)
-                    {
-                        case "min":
-                        case "minutes":
-                            if (statValue.Contains(":"))
-                            {
-                                var parts = statValue.Split(':');
-                                if (parts.Length == 2)
-                                {
-                                    stats.MinutesPlayed = int.Parse(parts[0]);
-                                    stats.SecondsPlayed = int.Parse(parts[1]);
-                                }
-                            }
-                            break;
-                        case "pts": case "points": stats.Points = int.Parse(statValue); break;
-                        case "fgm": stats.FieldGoalsMade = int.Parse(statValue); break;
-                        case "fga": stats.FieldGoalsAttempted = int.Parse(statValue); break;
-                        case "3pm": stats.ThreePointersMade = int.Parse(statValue); break;
-                        case "3pa": stats.ThreePointersAttempted = int.Parse(statValue); break;
-                        case "ftm": stats.FreeThrowsMade = int.Parse(statValue); break;
-                        case "fta": stats.FreeThrowsAttempted = int.Parse(statValue); break;
-                        case "oreb": stats.OffensiveRebounds = int.Parse(statValue); break;
-                        case "dreb": stats.DefensiveRebounds = int.Parse(statValue); break;
-                        case "reb": case "totalrebounds": stats.TotalRebounds = int.Parse(statValue); break;
-                        case "ast": case "assists": stats.Assists = int.Parse(statValue); break;
-                        case "stl": case "steals": stats.Steals = int.Parse(statValue); break;
-                        case "blk": case "blocks": stats.Blocks = int.Parse(statValue); break;
-                        case "to": case "turnovers": stats.Turnovers = int.Parse(statValue); break;
-                        case "pf": case "fouls": stats.PersonalFouls = int.Parse(statValue); break;
-                        case "+/-": case "plusminus": stats.PlusMinus = int.Parse(statValue); break;
-                    }
-                }
-                catch
-                {
-                    // Ignora erros de parsing individual
-                }
-            }
-
-            return stats;
-        }
-
-        /// <summary>
-        /// Mapeia ESPN Game Leaders para GameLeadersResponse simplificado
-        /// </summary>
         private async Task<GameLeadersResponse?> MapEspnGameLeadersToResponse(EspnGameLeadersDto espnLeaders, Game game)
         {
             try
@@ -366,11 +322,9 @@ namespace HoopGameNight.Core.Services
                     VisitorTeamLeaders = new TeamGameLeaders { TeamName = game.VisitorTeam?.Name ?? "" }
                 };
 
-                if (espnLeaders.Leaders == null || !espnLeaders.Leaders.Any())
-                {
-                    _logger.LogDebug("No leaders data found for game {GameId}", game.Id);
-                    return response;
-                }
+                if (espnLeaders.Leaders == null || !espnLeaders.Leaders.Any()) return response;
+
+                var playersCache = new Dictionary<int, Player>();
 
                 foreach (var category in espnLeaders.Leaders)
                 {
@@ -384,15 +338,18 @@ namespace HoopGameNight.Core.Services
 
                         try
                         {
-                            // Extract player ID from athlete ref
-                            var espnPlayerId = leader.Athlete.Ref?.Split('/').LastOrDefault();
+                            var espnPlayerId = _espnParser.ExtractIdFromRef(leader.Athlete.Ref);
                             if (string.IsNullOrEmpty(espnPlayerId)) continue;
 
-                            // Map to system player
                             var systemPlayerId = await MapEspnPlayerToSystemIdAsync(espnPlayerId);
                             if (systemPlayerId == 0) continue;
 
-                            var player = await _playerRepository.GetByIdAsync(systemPlayerId);
+                            if (!playersCache.TryGetValue(systemPlayerId, out var player))
+                            {
+                                player = await _playerRepository.GetByIdAsync(systemPlayerId);
+                                if (player != null) playersCache[systemPlayerId] = player;
+                            }
+
                             if (player == null) continue;
 
                             var statLeader = new StatLeader
@@ -400,15 +357,13 @@ namespace HoopGameNight.Core.Services
                                 PlayerId = systemPlayerId,
                                 PlayerName = player.FullName,
                                 Team = player.Team?.Abbreviation ?? "",
-                                Value = decimal.TryParse(leader.DisplayValue, out var val) ? val : 0,
-                                GamesPlayed = 1 // Game leaders are for single game
+                                Value = _espnParser.SafeParseDecimal(leader.DisplayValue),
+                                GamesPlayed = 1
                             };
 
-                            // Determine which team and category
                             var isHomeTeam = player.TeamId == game.HomeTeamId;
                             var teamLeaders = isHomeTeam ? response.HomeTeamLeaders : response.VisitorTeamLeaders;
 
-                            // Assign to appropriate category
                             if (categoryName.Contains("point") || categoryName.Contains("scoring"))
                             {
                                 if (teamLeaders.PointsLeader == null || statLeader.Value > teamLeaders.PointsLeader.Value)

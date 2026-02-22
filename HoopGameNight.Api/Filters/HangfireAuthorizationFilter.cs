@@ -11,10 +11,12 @@ namespace HoopGameNight.Api.Filters
     public class HangfireAuthorizationFilter : IDashboardAuthorizationFilter
     {
         private readonly IConfiguration _configuration;
+        private readonly ILogger<HangfireAuthorizationFilter> _logger;
 
-        public HangfireAuthorizationFilter(IConfiguration configuration)
+        public HangfireAuthorizationFilter(IConfiguration configuration, ILogger<HangfireAuthorizationFilter> logger)
         {
             _configuration = configuration;
+            _logger = logger;
         }
 
         public bool Authorize(DashboardContext context)
@@ -66,9 +68,10 @@ namespace HoopGameNight.Api.Filters
                     return true;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Fall through to challenge
+                _logger.LogWarning(ex, "Tentativa de acesso ao Hangfire com header Authorization inválido. IP: {IP}",
+                httpContext.Connection.RemoteIpAddress);
             }
 
             SetChallengeResponse(httpContext);

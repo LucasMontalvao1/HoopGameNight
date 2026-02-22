@@ -44,7 +44,9 @@ namespace HoopGameNight.Api.Extensions
             // 4. Configure Hangfire Dashboard
             app.UseHangfireDashboard("/hangfire", new DashboardOptions
             {
-                Authorization = new[] { new HangfireAuthorizationFilter(app.Configuration) },
+                Authorization = new[] { new HangfireAuthorizationFilter(
+                    app.Configuration,
+                    app.Services.GetRequiredService<ILogger<HangfireAuthorizationFilter>>()) },
                 DashboardTitle = "Hoop Game Night - Job Dashboard",
                 AppPath = "/",
                 StatsPollingInterval = 5000
@@ -175,7 +177,6 @@ namespace HoopGameNight.Api.Extensions
                 }
             });
 
-            // System/Management Endpoints
             app.MapSystemEndpoints();
         }
 
@@ -446,7 +447,7 @@ namespace HoopGameNight.Api.Extensions
 
             if (env.IsDevelopment())
             {
-                var firstUrl = app.Urls.FirstOrDefault() ?? "http://localhost:5214"; // Fallback para desenvolvimento
+                var firstUrl = app.Urls.FirstOrDefault() ?? "http://localhost:5214"; 
 
                 Log.Information("");
                 Log.Information("Links:");

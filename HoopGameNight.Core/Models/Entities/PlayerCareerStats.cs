@@ -6,7 +6,6 @@ namespace HoopGameNight.Core.Models.Entities
     public class PlayerCareerStats : BaseEntity
     {
         public int PlayerId { get; set; }
-
         public int TotalSeasons { get; set; }
         public int TotalGames { get; set; }
         public int TotalGamesStarted { get; set; }
@@ -23,20 +22,16 @@ namespace HoopGameNight.Core.Models.Entities
         public int TotalSteals { get; set; }
         public int TotalBlocks { get; set; }
         public int TotalTurnovers { get; set; }
-
         public decimal CareerPPG { get; set; } 
         public decimal CareerRPG { get; set; }
         public decimal CareerAPG { get; set; } 
         public decimal CareerFgPercentage { get; set; }
         public decimal Career3PtPercentage { get; set; }
         public decimal CareerFtPercentage { get; set; }
-
         public int HighestPointsGame { get; set; }
         public int HighestReboundsGame { get; set; }
         public int HighestAssistsGame { get; set; }
-
         public DateTime? LastGameDate { get; set; }
-
         public Player? Player { get; set; }
 
         public decimal AverageMinutesPerGame => TotalGames > 0

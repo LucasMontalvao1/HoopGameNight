@@ -70,7 +70,6 @@ namespace HoopGameNight.Api.Services
                 using var scope = _serviceProvider.CreateScope();
                 var lockFactory = scope.ServiceProvider.GetService<RedLockNet.IDistributedLockFactory>();
                 
-                // Se o factory estiver disponível, tentamos obter o lock
                 if (lockFactory != null)
                 {
                     var resource = "lock:espn:data_sync";
@@ -91,7 +90,6 @@ namespace HoopGameNight.Api.Services
                     }
                 }
 
-                // Fallback se Redis/RedLock não estiver configurado
                 return await ExecuteSyncLogicAsync(scope, syncType);
             }
             catch (Exception ex)
@@ -105,6 +103,7 @@ namespace HoopGameNight.Api.Services
         {
             var teamService = scope.ServiceProvider.GetRequiredService<ITeamService>();
             var gameService = scope.ServiceProvider.GetRequiredService<IGameService>();
+            var gameSyncService = scope.ServiceProvider.GetRequiredService<IGameSyncService>();
 
             _logger.LogInformation("Starting {SyncType} data synchronization (#{Counter})",
                 syncType, _syncCounter);
@@ -119,16 +118,16 @@ namespace HoopGameNight.Api.Services
             if (_syncCounter == 1 || _syncCounter % 12 == 0)
             {
                 _logger.LogInformation("Syncing yesterday's games");
-                await gameService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
+                await gameSyncService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
             }
 
             _logger.LogInformation("Syncing today's games");
-            await gameService.SyncTodayGamesAsync();
+            await gameSyncService.SyncTodayGamesAsync();
             
             if (_syncCounter == 1 || _syncCounter % 4 == 0)
             {
                 _logger.LogInformation("Syncing future games (next 7 days)");
-                await gameService.SyncFutureGamesAsync(days: 7);
+                await gameSyncService.SyncFutureGamesAsync(days: 7);
             }
 
             var todayGames = await gameService.GetTodayGamesAsync();

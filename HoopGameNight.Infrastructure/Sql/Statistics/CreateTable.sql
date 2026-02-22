@@ -73,7 +73,6 @@ COMMENT='Estatísticas por temporada de cada jogador';
 -- Estatísticas detalhadas de cada jogador em cada jogo
 -- ============================================
 CREATE TABLE IF NOT EXISTS player_game_stats (
-    id INT AUTO_INCREMENT PRIMARY KEY,
     player_id INT NOT NULL,
     game_id INT NOT NULL,
     team_id INT NOT NULL,
@@ -117,7 +116,7 @@ CREATE TABLE IF NOT EXISTS player_game_stats (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     -- Constraints
-    UNIQUE KEY unique_player_game (player_id, game_id),
+    PRIMARY KEY (player_id, game_id),
     FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
     FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
@@ -126,8 +125,7 @@ CREATE TABLE IF NOT EXISTS player_game_stats (
     INDEX idx_game_stats_player (player_id),
     INDEX idx_game_stats_game (game_id),
     INDEX idx_game_stats_team (team_id),
-    INDEX idx_game_stats_points (points DESC),
-    INDEX idx_game_stats_player_game (player_id, game_id)
+    INDEX idx_game_stats_points (points DESC)
     
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Estatísticas de jogadores por jogo';

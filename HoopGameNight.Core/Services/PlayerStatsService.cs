@@ -22,6 +22,7 @@ namespace HoopGameNight.Core.Services
         private readonly IEspnApiService _espnApiService;
         private readonly IMemoryCache _cache;
         private readonly IGameService _gameService;
+        private readonly IGameSyncService _gameSyncService;
         private readonly ILogger<PlayerStatsService> _logger;
 
         private const int CACHE_MINUTES = 30;
@@ -33,6 +34,7 @@ namespace HoopGameNight.Core.Services
             ITeamRepository teamRepository,
             IEspnApiService espnApiService,
             IGameService gameService,
+            IGameSyncService gameSyncService,
             IMemoryCache cache,
             ILogger<PlayerStatsService> logger)
         {
@@ -42,12 +44,16 @@ namespace HoopGameNight.Core.Services
             _teamRepository = teamRepository;
             _espnApiService = espnApiService;
             _gameService = gameService;
+            _gameSyncService = gameSyncService;
             _cache = cache;
             _logger = logger;
         }
 
         public async Task<PlayerSeasonStatsResponse?> GetPlayerSeasonStatsAsync(int playerId, int season)
         {
+             var cacheKey = $"player_season_stats_{playerId}_{season}";
+             if (_cache.TryGetValue(cacheKey, out PlayerSeasonStatsResponse? cached)) return cached;
+
              var stats = await _statsRepository.GetSeasonStatsFromViewAsync(playerId, season);
              
              if (stats == null)
@@ -56,6 +62,8 @@ namespace HoopGameNight.Core.Services
                  await SyncPlayerSeasonStatsAsync(playerId, season);
                  stats = await _statsRepository.GetSeasonStatsFromViewAsync(playerId, season);
              }
+
+             if (stats != null) _cache.Set(cacheKey, stats, TimeSpan.FromMinutes(CACHE_MINUTES));
              return stats;
         }
 
@@ -86,7 +94,7 @@ namespace HoopGameNight.Core.Services
                     return null;
                 }
 
-                var key = $"gamelog_v2_{playerId}"; // Mudei versão do cache
+                var key = $"gamelog_v2_{playerId}"; 
 
                 // VERIFICAR CACHE PRIMEIRO
                 if (_cache.TryGetValue(key, out PlayerGamelogResponse? cachedResponse))
@@ -117,7 +125,7 @@ namespace HoopGameNight.Core.Services
                             if (gameInDb == null)
                             {
                                 _logger.LogInformation("Gamelog Sync: Jogo {GameId} não encontrado. Sincronizando...", g.GameId);
-                                await _gameService.SyncGameByIdAsync(g.GameId.ToString());
+                                await _gameSyncService.SyncGameByIdAsync(g.GameId.ToString());
                                 // Tentar buscar novamente após sync
                                 gameInDb = await _gameRepository.GetByExternalIdAsync(g.GameId.ToString());
                             }
@@ -270,18 +278,57 @@ namespace HoopGameNight.Core.Services
             }
         }
 
-        public async Task<IEnumerable<PlayerGameStatsDetailedResponse>> GetPlayerRecentGamesAsync(int playerId, int limit = 5)
+        public async Task<PlayerGamelogResponse?> GetPlayerRecentGamesAsync(int playerId, int limit = 20)
         {
+            var cacheKey = $"player_recent_games_{playerId}_{limit}";
+            if (_cache.TryGetValue(cacheKey, out PlayerGamelogResponse? cached)) return cached;
+
+            var player = await _playerRepository.GetByIdAsync(playerId);
+            if (player == null) return null;
+
             var stats = await _statsRepository.GetPlayerRecentGamesDetailedAsync(playerId, limit);
             if (stats == null || !stats.Any())
             {
                 _logger.LogInformation("Nenhum dado recente no banco para Player {PlayerId}. Iniciando Sync...", playerId);
-                // Temporada atual (2025-26 -> 2026)
                 var currentSeason = DateTime.Now.Month >= 10 ? DateTime.Now.Year + 1 : DateTime.Now.Year;
                 await SyncPlayerSeasonStatsAsync(playerId, currentSeason);
                 stats = await _statsRepository.GetPlayerRecentGamesDetailedAsync(playerId, limit);
             }
-            return stats;
+
+            if (stats == null) return null;
+
+            var response = new PlayerGamelogResponse
+            {
+                PlayerId = playerId,
+                PlayerName = player.FullName,
+                Season = DateTime.Now.Year,
+                Games = stats.Select(s => {
+                    var recent = new PlayerRecentGameResponse
+                    {
+                        GameId = s.GameId,
+                        GameDate = s.GameDate,
+                        Opponent = s.OpponentAbbreviation,
+                        IsHome = s.IsHome,
+                        Result = s.Result,
+                        Points = s.Points,
+                        Rebounds = s.TotalRebounds,
+                        Assists = s.Assists,
+                        Steals = s.Steals,
+                        Blocks = s.Blocks,
+                        Minutes = s.MinutesFormatted,
+                        FieldGoals = s.FieldGoalsFormatted,
+                        ThreePointers = s.ThreePointersFormatted,
+                        FreeThrows = s.FreeThrowsFormatted,
+                        PlusMinus = s.PlusMinus,
+                        DoubleDouble = s.DoubleDouble,
+                        TripleDouble = s.TripleDouble
+                    };
+                    return recent;
+                }).ToList()
+            };
+
+            _cache.Set(cacheKey, response, TimeSpan.FromMinutes(CACHE_MINUTES));
+            return response;
         }
 
         public async Task<bool> SyncPlayerGameStatsAsync(int playerId, int gameId)
@@ -312,12 +359,9 @@ namespace HoopGameNight.Core.Services
                     return false;
                 }
 
-                // Determinar o TeamId correto para o jogador neste jogo
                 int actualTeamId = player.TeamId ?? 0;
                 if (game.HomeTeamId > 0 && game.VisitorTeamId > 0)
                 {
-                    // Se o jogador não estiver no time atual (troca?), tentamos inferir do jogo
-                    // Por padrão usamos o player.TeamId se ele for um dos times do jogo
                     if (player.TeamId != game.HomeTeamId && player.TeamId != game.VisitorTeamId)
                     {
                         // TODO: Logica mais avançada para trocas históricas
@@ -354,7 +398,6 @@ namespace HoopGameNight.Core.Services
                     return false;
                 }
 
-                // NBA Season dates: October to July of next year
                 var startDate = new DateTime(season - 1, 10, 1);
                 var endDate = new DateTime(season, 7, 30);
                 
@@ -371,8 +414,6 @@ namespace HoopGameNight.Core.Services
                 int syncedCount = 0;
                 foreach(var gm in games)
                 {
-                    // Verifica se o jogo já aconteceu ou está ao vivo (Status Final ou InProgress)
-                    // Se o jogo for futuro ou cancelado, pula.
                     if (gm.Status == GameStatus.Scheduled || gm.Status == GameStatus.Postponed || gm.Status == GameStatus.Cancelled) continue;
 
                     if(await SyncPlayerGameStatsAsync(playerId, gm.Id))
@@ -416,7 +457,7 @@ namespace HoopGameNight.Core.Services
                     return null;
                 }
 
-                var key = $"career_v24_{playerId}"; // Bumped version for playoff persistence fix
+                var key = $"career_v24_{playerId}"; 
 
                 // VERIFICAR CACHE
                 if (_cache.TryGetValue(key, out PlayerCareerResponse? cachedResponse))
@@ -455,7 +496,7 @@ namespace HoopGameNight.Core.Services
                             st.Team.DisplayName = dbTeam.FullName;
                             st.Team.Abbreviation = dbTeam.Abbreviation;
                         }
-                        else if (extId == 9) // ESPN's Golden State ID is 9
+                        else if (extId == 9) 
                         {
                             var gsw = allDbTeams.FirstOrDefault(t => t.Abbreviation == "GS" || t.Abbreviation == "GSW" || t.FullName.Contains("Warriors"));
                             if (gsw != null)
@@ -480,10 +521,8 @@ namespace HoopGameNight.Core.Services
 
                 var response = MapEspnCareerToResponse(espnData, playerId, player.FullName);
 
-                // --- PERSISTÊNCIA ---
                 if (response?.CareerTotals != null)
                 {
-                    // 1. SALVAR CAREER TOTALS
                     var careerEntity = new PlayerCareerStats
                     {
                         PlayerId = playerId,
@@ -502,8 +541,6 @@ namespace HoopGameNight.Core.Services
                     await _statsRepository.UpsertCareerStatsAsync(careerEntity);
                     _logger.LogInformation("Estatísticas de carreira persistidas para o Player {PlayerId}", playerId);
 
-                    // 2. SALVAR CADA TEMPORADA INDIVIDUAL NA player_season_stats
-                    // Use the deduplicated season stats from the response instead of raw ESPN data
                     if (response.SeasonStats != null)
                     {
                         foreach (var seasonStats in response.SeasonStats)
@@ -556,7 +593,6 @@ namespace HoopGameNight.Core.Services
                     }
                 }
 
-                // CACHEAR APÓS PERSISTIR
                 _cache.Set(key, response, TimeSpan.FromHours(6));
                 _logger.LogInformation("Estatísticas de carreira persistidas em cache para o Player {PlayerId}", playerId);
 
@@ -592,6 +628,11 @@ namespace HoopGameNight.Core.Services
                     var key = s.Name?.ToLower() ?? "";
                     var val = s.Value;
 
+                    if (val == 0 && !string.IsNullOrEmpty(s.DisplayValue) && s.DisplayValue != "0" && s.DisplayValue != "0.0")
+                    {
+                         val = (double)SafeParseDecimal(s.DisplayValue);
+                    }
+
                     switch (key)
                     {
                         case "gamesplayed": case "gp": entity.GamesPlayed = (int)val; break;
@@ -615,10 +656,16 @@ namespace HoopGameNight.Core.Services
                         case "blocks": case "blk": entity.Blocks = (int)val; break;
                         case "turnovers": case "to": entity.Turnovers = (int)val; break;
                         case "personalfouls": case "pf": entity.PersonalFouls = (int)val; break;
-                        case "avgpoints": case "ppg": entity.AvgPoints = (decimal)val; break;
-                        case "avgrebounds": case "rpg": entity.AvgRebounds = (decimal)val; break;
-                        case "avgassists": case "apg": entity.AvgAssists = (decimal)val; break;
-                        case "avgminutes": case "mpg": entity.AvgMinutes = (decimal)val; break;
+                        case "avgpoints": case "ppg": case "pointspergame": entity.AvgPoints = (decimal)val; break;
+                        case "avgrebounds": case "rpg": case "reboundspergame": entity.AvgRebounds = (decimal)val; break;
+                        case "avgassists": case "apg": case "assistspergame": entity.AvgAssists = (decimal)val; break;
+                        case "avgminutes": case "mpg": case "minutespergame": entity.AvgMinutes = (decimal)val; break;
+                        case "avgfieldgoalsmade": entity.FieldGoalsMade = (int)val; break;
+                        case "avgfieldgoalsattempted": entity.FieldGoalsAttempted = (int)val; break;
+                        case "avgthreepointersmade": entity.ThreePointersMade = (int)val; break;
+                        case "avgthreepointersattempted": entity.ThreePointersAttempted = (int)val; break;
+                        case "avgfreethrowsmade": entity.FreeThrowsMade = (int)val; break;
+                        case "avgfreethrowsattempted": entity.FreeThrowsAttempted = (int)val; break;
                     }
                 }
             }
@@ -714,8 +761,6 @@ namespace HoopGameNight.Core.Services
             return stats;
         }
 
-        // === NEW MAPPERS FOR SIMPLIFIED DTOs ===
-
         private PlayerGamelogResponse? MapEspnGamelogToResponse(EspnPlayerGamelogDto espnData, int playerId, string playerName)
         {
             try
@@ -724,29 +769,21 @@ namespace HoopGameNight.Core.Services
                 {
                     PlayerId = playerId,
                     PlayerName = playerName,
-                    Season = DateTime.Now.Year // TODO: Extract from ESPN data if available
+                    Season = DateTime.Now.Year 
                 };
 
                 var games = new List<PlayerRecentGameResponse>();
-
-                // ESPN gamelog structure: 
-                // 1. SeasonTypes (Standard, etc.) -> Categories (By Month etc.) -> Events (Games with Stats)
-                // 2. SeasonTypes -> Events (Flat list)
-                // 3. Events (Root dictionary, glossary only, no stats)
                 
                 IEnumerable<EspnGamelogEventDto> events = Enumerable.Empty<EspnGamelogEventDto>();
                 
                 if (espnData.SeasonTypes != null && espnData.SeasonTypes.Any())
                 {
-                     // Flatten all events from all season types and categories
                      events = espnData.SeasonTypes.SelectMany(st => 
                         (st.Categories?.SelectMany(c => c.Events ?? Enumerable.Empty<EspnGamelogEventDto>()) ?? Enumerable.Empty<EspnGamelogEventDto>())
                         .Concat(st.Events ?? Enumerable.Empty<EspnGamelogEventDto>())
                      );
                 }
 
-
-                // Filter out events without stats
                 Console.WriteLine($"DEBUG: Found {events.Count()} raw events.");
                 var validEvents = events.Where(evt => evt.Stats != null && evt.Stats.Any()).DistinctBy(e => e.EventId);
                 Console.WriteLine($"DEBUG: Found {validEvents.Count()} valid events with stats.");
@@ -755,7 +792,6 @@ namespace HoopGameNight.Core.Services
                 {
                     if (evt?.Stats == null || !evt.Stats.Any()) continue;
                     
-                    // Identify the opponent from metadata
                     var opponentName = "Unknown";
                     var opponentId = "";
                     string? gameDateStr = null;
@@ -788,8 +824,6 @@ namespace HoopGameNight.Core.Services
                             IsHome = isHome
                         };
 
-                        // Final verified indices for NBA Gamelog v3:
-                        // 13: PTS, 1: FG, 3: 3PT, 5: FT, 7: REB, 8: AST, 9: BLK, 10: STL, 0: MIN
                         if (evt.Stats.Count > 13) game.Points = int.TryParse(evt.Stats[13], out var pts) ? pts : 0;
                         if (evt.Stats.Count > 7) game.Rebounds = int.TryParse(evt.Stats[7], out var reb) ? reb : 0;
                         if (evt.Stats.Count > 8) game.Assists = int.TryParse(evt.Stats[8], out var ast) ? ast : 0;
@@ -855,7 +889,6 @@ namespace HoopGameNight.Core.Services
                                     GamesPlayed = split.Stats.Count > 0 && int.TryParse(split.Stats[0], out var gp) ? gp : 0
                                 };
 
-                                // Defensive parsing of stats
                                 if (split.Stats.Count > 1 && decimal.TryParse(split.Stats[1], out var ppg)) splitStats.PPG = ppg;
                                 if (split.Stats.Count > 2 && decimal.TryParse(split.Stats[2], out var rpg)) splitStats.RPG = rpg;
                                 if (split.Stats.Count > 3 && decimal.TryParse(split.Stats[3], out var apg)) splitStats.APG = apg;
@@ -901,7 +934,7 @@ namespace HoopGameNight.Core.Services
                 };
 
                 var seasonsList = new List<PlayerSeasonStatsResponse>();
-                var uniqueSeasons = new Dictionary<string, PlayerSeasonStatsResponse>(); // Key: "season_type"
+                var uniqueSeasons = new Dictionary<string, PlayerSeasonStatsResponse>(); 
                 
                 int totalGames = 0, totalPoints = 0, totalRebs = 0, totalAsts = 0;
                 decimal totalPPG = 0, totalRPG = 0, totalAPG = 0, totalFG = 0;
@@ -918,12 +951,11 @@ namespace HoopGameNight.Core.Services
                         {
                             Season = seasonData.Season?.Year ?? 0,
                             SeasonName = seasonData.Season?.Year > 1900 ? $"{seasonData.Season.Year - 1}/{seasonData.Season.Year}" : "Unknown",
-                            SeasonType = seasonData.SeasonTypeId, // Usar SeasonTypeId mapeado
+                            SeasonType = seasonData.SeasonTypeId, 
                             TeamId = int.TryParse(seasonData.Team?.Id, out var teamId) && teamId > 0 ? teamId : 0,
                             TeamName = seasonData.Team?.DisplayName ?? seasonData.Team?.Abbreviation ?? "Unknown"
                         };
 
-                        // Parse stats from categories
                         foreach (var category in seasonData.Splits.Categories)
                         {
                             if (category?.Stats == null) continue;
@@ -933,6 +965,11 @@ namespace HoopGameNight.Core.Services
                                 var key = stat.Name?.ToLower() ?? "";
                                 var val = stat.Value;
 
+                                if (val == 0 && !string.IsNullOrEmpty(stat.DisplayValue) && stat.DisplayValue != "0" && stat.DisplayValue != "0.0")
+                                {
+                                     val = (double)SafeParseDecimal(stat.DisplayValue);
+                                }
+
                                 try
                                 {
                                     switch (key)
@@ -940,17 +977,19 @@ namespace HoopGameNight.Core.Services
                                         case "gamesplayed": case "gp": seasonStats.GamesPlayed = (int)val; break;
                                         case "gamesstarted": case "gs": seasonStats.GamesStarted = (int)val; break;
                                         case "points": case "pts": case "totalpoints": seasonStats.TotalPoints = (int)val; break;
-                                        case "avgpoints": case "ppg": seasonStats.PPG = (decimal)val; break;
+                                        case "avgpoints": case "ppg": case "pointspergame": seasonStats.PPG = (decimal)val; break;
                                         case "rebounds": case "reb": case "totalrebounds": seasonStats.TotalRebounds = (int)val; break;
-                                        case "avgrebound": case "avgrebounds": case "avgtotalrebounds": case "rpg": seasonStats.RPG = (decimal)val; break;
+                                        case "avgrebound": case "avgrebounds": case "avgtotalrebounds": case "rpg": case "reboundspergame": seasonStats.RPG = (decimal)val; break;
                                         case "assists": case "ast": case "totalassists": seasonStats.TotalAssists = (int)val; break;
-                                        case "avgassists": case "apg": seasonStats.APG = (decimal)val; break;
+                                        case "avgassists": case "apg": case "assistspergame": seasonStats.APG = (decimal)val; break;
                                         case "steals": case "stl": case "totalsteals": seasonStats.Steals = (int)val; break;
-                                        case "avgsteals": case "spg": seasonStats.SPG = (decimal)val; break;
+                                        case "avgsteals": case "spg": case "stealspergame": seasonStats.SPG = (decimal)val; break;
                                         case "blocks": case "blk": case "totalblocks": seasonStats.Blocks = (int)val; break;
-                                        case "avgblocks": case "bpg": seasonStats.BPG = (decimal)val; break;
-                                        case "turnovers": case "to": case "totalturnovers": seasonStats.Turnovers = (int)val; break;
-                                        case "personalfouls": case "pf": case "totalpersonalfouls": seasonStats.PersonalFouls = (int)val; break;
+                                        case "avgblocks": case "bpg": case "blockspergame": seasonStats.BPG = (decimal)val; break;
+                                        case "turnovers": case "to": case "tov": case "totalturnovers": seasonStats.Turnovers = (int)val; break;
+                                        case "avgturnovers": case "tpg": case "turnoverspergame": seasonStats.TPG = (decimal)val; break;
+                                        case "personalfouls": case "pf": case "fouls": case "totalpersonalfouls": seasonStats.PersonalFouls = (int)val; break;
+                                        case "avgpersonalfouls": case "avgfouls": case "fpg": case "foulspergame": seasonStats.FPG = (decimal)val; break;
                                         case "fieldgoalsmade": case "fgm": case "totalfieldgoalsmade": seasonStats.FieldGoalsMade = (int)val; break;
                                         case "fieldgoalsattempted": case "fga": case "totalfieldgoalsattempted": seasonStats.FieldGoalsAttempted = (int)val; break;
                                         case "threepointfieldgoalsmade": case "3pm": case "totalthreepointfieldgoalsmade": case "threepointersmade": seasonStats.ThreePointersMade = (int)val; break;
@@ -960,10 +999,10 @@ namespace HoopGameNight.Core.Services
                                         case "offensiverebounds": case "oreb": case "totaloffensiverebounds": seasonStats.OffensiveRebounds = (int)val; break;
                                         case "defensiverebounds": case "dreb": case "totaldefensiverebounds": seasonStats.DefensiveRebounds = (int)val; break;
                                         case "totalminutes": case "min": case "minutes": seasonStats.MinutesPlayed = (decimal)val; break;
-                                        case "avgminutes": case "averageminutes": case "mpg": seasonStats.MPG = (decimal)val; break;
-                                        case "fieldgoalpercentage": case "fg%": case "fieldgoalpct": case "fgpct": seasonStats.FGPercentage = (decimal)val; break;
+                                        case "avgminutes": case "averageminutes": case "mpg": case "minutespergame": seasonStats.MPG = (decimal)val; break;
+                                        case "fieldgoalpercentage": case "fg%": case "fieldgoalpct": case "fgpct": case "fieldgoalperc": seasonStats.FGPercentage = (decimal)val; break;
                                         case "threepointpercentage": case "3p%": case "threepointfieldgoalpct": case "3ptpct": case "threepointpct": case "threepointfieldgoalpercentage": seasonStats.ThreePointPercentage = (decimal)val; break;
-                                        case "freethrowpercentage": case "ft%": case "freethrowpct": case "ftpct": seasonStats.FTPercentage = (decimal)val; break;
+                                        case "freethrowpercentage": case "ft%": case "freethrowpct": case "ftpct": case "freethrowperc": seasonStats.FTPercentage = (decimal)val; break;
                                     }
                                 }
                                 catch { /* Ignore individual stat parsing errors */ }
@@ -972,10 +1011,8 @@ namespace HoopGameNight.Core.Services
 
                         if (seasonStats.GamesPlayed > 0)
                         {
-                            // Create unique key: season + seasonType + teamId
                             var uniqueKey = $"{seasonStats.Season}_{seasonStats.SeasonType}_{seasonStats.TeamId}";
                             
-                            // Only add if not already present (deduplication)
                             if (!uniqueSeasons.ContainsKey(uniqueKey))
                             {
                                 uniqueSeasons[uniqueKey] = seasonStats;
@@ -983,7 +1020,6 @@ namespace HoopGameNight.Core.Services
                                     playerId, seasonStats.Season, seasonStats.SeasonType, seasonStats.TeamId);
                                 seasonsList.Add(seasonStats);
                                 
-                                // Agregação de carreira (only regular season)
                                 if (seasonStats.SeasonType == 2)
                                 {
                                     totalGames += seasonStats.GamesPlayed;
@@ -999,8 +1035,6 @@ namespace HoopGameNight.Core.Services
                                     seasonCount++;
                                 }
                                 
-                                // Recordes (podem ser de qualquer tipo de season)
-                                // NOTE: These represent SEASON highs, not single-game records
                                 if (seasonStats.TotalPoints > highPts) highPts = seasonStats.TotalPoints;
                                 if (seasonStats.TotalRebounds > highRebs) highRebs = seasonStats.TotalRebounds;
                                 if (seasonStats.TotalAssists > highAsts) highAsts = seasonStats.TotalAssists;
@@ -1018,7 +1052,6 @@ namespace HoopGameNight.Core.Services
                     }
                 }
 
-                // Calculate career totals
                 response.CareerTotals.TotalSeasons = seasonCount;
                 response.CareerTotals.TotalGames = totalGames;
                 response.CareerTotals.TotalPoints = totalPoints;
@@ -1042,56 +1075,31 @@ namespace HoopGameNight.Core.Services
                 return null;
             }
         }
-
-        private DateTime ParseEspnDate(string? dateStr)
-        {
-            if (string.IsNullOrWhiteSpace(dateStr)) return DateTime.MinValue;
-
-            try
-            {
-                var culture = System.Globalization.CultureInfo.InvariantCulture;
-                // Base formats without year
-                var baseFormats = new[] { "ddd M/d", "ddd MM/dd" };
-                
-                // Try to find a year where the Day of Week matches the Date
-                // We check: Next Year, Current Year, Last Year, Year-2
-                // This handles the "Season 2024/2025" vs "System Time 2026" mismatch perfectly,
-                // because Jan 1 2025 is Wednesday (matches "Wed 1/1") while Jan 1 2026 is Thursday.
-                var now = DateTime.Now;
-                var currentYear = now.Year;
-                var yearsToTry = new[] { currentYear + 1, currentYear, currentYear - 1, currentYear - 2 };
-
-                foreach (var year in yearsToTry)
-                {
-                    // Construct string with Year, e.g. "Wed 1/1 2025"
-                    var input = $"{dateStr} {year}";
-                    var formatsWithYear = baseFormats.Select(f => $"{f} yyyy").ToArray();
-
-                    if (DateTime.TryParseExact(input, formatsWithYear, culture, System.Globalization.DateTimeStyles.None, out var dt))
-                    {
-                        return dt;
-                    }
-                }
-
-                _logger.LogDebug("Failed to find matching year for ESPN date: {DateStr}", dateStr);
-                return DateTime.MinValue;
-            }
-            catch
-            {
-                return DateTime.MinValue;
-            }
-        }
-
         private System.Text.Json.JsonElement GetProperty(System.Text.Json.JsonElement? element, string name)
         {
             if (element == null || element.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined) return default;
             if (element.Value.TryGetProperty(name, out var val)) return val;
             
-            // Try PascalCase
             var pascal = char.ToUpper(name[0]) + name.Substring(1);
             if (element.Value.TryGetProperty(pascal, out val)) return val;
             
             return default;
+        }
+
+        private int SafeParseInt(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return 0;
+            var clean = new string(value.Where(c => char.IsDigit(c) || c == '-' || c == '+').ToArray());
+            if (int.TryParse(clean, out int res)) return res;
+            return 0;
+        }
+
+        private decimal SafeParseDecimal(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return 0;
+            var clean = new string(value.Where(c => char.IsDigit(c) || c == '.' || c == '-' || c == '+').ToArray());
+            if (decimal.TryParse(clean, out decimal res)) return res;
+            return 0;
         }
     }
 }

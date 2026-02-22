@@ -13,7 +13,7 @@ namespace HoopGameNight.Core.Services.AI
             var gamesText = FormatGames(games);
 
             // Prompt restritivo com validação de escopo e dados
-            return $@"Você é um assistente de consulta de jogos da NBA. Você NÃO tem acesso à internet e NÃO conhece resultados de jogos além dos listados abaixo.
+            return $@"Você é um assistente de consulta de jogos da NBA. Data e hora atual: {DateTime.Now:dd/MM/yyyy HH:mm} (Horário de Brasília). Você NÃO tem acesso à internet e NÃO conhece resultados de jogos além dos listados abaixo.
 
 ═══════════════════════════════════════════════════════════════
 regras_de_ouro (OBRIGATÓRIO):
@@ -23,7 +23,7 @@ regras_de_ouro (OBRIGATÓRIO):
 4. NUNCA invente placares ou horários.
 
 ═══════════════════════════════════════════════════════════════
-ETAPA 1: VALIDAÇÃO DE ESCUPO (Mentalmente)
+ETAPA 1: VALIDAÇÃO DE ESCOPO (Mentalmente)
 - A pergunta é sobre NBA? (Se não -> Regra 2)
 - A pergunta é sobre jogos/agendas/resultados? (Se não -> Regra 2)
 
@@ -77,10 +77,11 @@ Você DEVE responder: ""Não encontrei jogos no banco de dados para este períod
 
                 foreach (var game in group.OrderBy(g => g.DateTime))
                 {
-                    var status = game.Status switch
+                    var statusNormalized = game.Status?.Trim().ToUpperInvariant();
+                    var status = statusNormalized switch
                     {
-                        "Final" => $"[FINALIZADO]: {game.VisitorTeam.Abbreviation} {game.VisitorTeamScore} x {game.HomeTeamScore} {game.HomeTeam.Abbreviation}",
-                        "Live" => $"[AO VIVO] (Período {game.Period}): {game.VisitorTeam.Abbreviation} {game.VisitorTeamScore} x {game.HomeTeamScore} {game.HomeTeam.Abbreviation}",
+                        "FINAL" or "FINISHED" or "COMPLETE" => $"[FINALIZADO]: {game.VisitorTeam.Abbreviation} {game.VisitorTeamScore} x {game.HomeTeamScore} {game.HomeTeam.Abbreviation}",
+                        "LIVE" or "IN_PROGRESS" or "STATUS_IN_PROGRESS" => $"[AO VIVO] (Período {game.Period}): {game.VisitorTeam.Abbreviation} {game.VisitorTeamScore} x {game.HomeTeamScore} {game.HomeTeam.Abbreviation}",
                         _ => $"[AGENDADO]: {game.VisitorTeam.Abbreviation} @ {game.HomeTeam.Abbreviation} às {game.DateTime:HH:mm}"
                     };
 

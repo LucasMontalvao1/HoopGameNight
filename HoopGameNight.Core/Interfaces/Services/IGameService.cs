@@ -20,7 +20,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<List<GameResponse>> GetGamesByDateAsync(DateTime date);
 
         /// <summary>
-        /// Busca jogos em um intervalo de datas (otimizado para evitar N+1)
+        /// Busca jogos em um intervalo de datas
         /// </summary>
         Task<List<GameResponse>> GetGamesByDateRangeAsync(DateTime startDate, DateTime endDate);
 
@@ -54,34 +54,8 @@ namespace HoopGameNight.Core.Interfaces.Services
         /// </summary>
         Task<List<GameResponse>> GetRecentGamesForTeamAsync(int teamId, int days = 7);
 
-        /// <summary>
-        /// Sincroniza jogos por data específica
-        /// </summary>
-        Task<int> SyncGamesByDateAsync(DateTime date);
-
-        /// <summary>
-        /// Sincroniza jogos para um período específico
-        /// </summary>
-        Task<int> SyncGamesForPeriodAsync(DateTime startDate, DateTime endDate);
-
-        /// <summary>
-        /// Sincroniza jogos do dia atual
-        /// </summary>
-        Task SyncTodayGamesAsync();
-
-        /// <summary>
-        /// Sincroniza jogos futuros da ESPN e salva no banco
-        /// </summary>
-        Task<int> SyncFutureGamesAsync(int days = 30);
-
-        // Métodos para Estatísticas e Líderes
         Task<EspnBoxscoreDto?> GetGameBoxscoreAsync(int gameId);
         Task<GameLeadersResponse?> GetGameLeadersAsync(int gameId);
         Task<TeamSeasonLeadersResponse?> GetTeamLeadersAsync(int teamId);
-
-        /// <summary>
-        /// Sincroniza um jogo específico pelo ID da ESPN
-        /// </summary>
-        Task<int> SyncGameByIdAsync(string gameId);
     }
 }

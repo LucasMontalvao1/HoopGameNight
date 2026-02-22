@@ -10,5 +10,6 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<TeamResponse?> GetTeamByIdAsync(int id);
         Task<TeamResponse?> GetTeamByAbbreviationAsync(string abbreviation);
         Task SyncAllTeamsAsync();
+        Task<int> MapEspnTeamToSystemIdAsync(string espnTeamId, string espnAbbreviation);
     }
 }

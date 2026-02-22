@@ -21,245 +21,323 @@
     }
 
     @if (playersService.selectedPlayer(); as player) {
-    <div class="player-profile">
+    <div class="player-profile glass-panel animate-fade-in">
       <div class="profile-header">
-        <div class="player-photo">
-          <img [src]="getPlayerPhotoUrl()" [alt]="player.fullName" (error)="onImageError($event)" />
+        <div class="player-visual">
+          <div class="player-photo-wrapper">
+            <img [src]="getPlayerPhotoUrl()" [alt]="player.fullName" (error)="onImageError($event)" />
+          </div>
+          <div class="player-team-mini">
+            <img [src]="getTeamLogoUrl()" (error)="onTeamLogoError($event)" class="team-mini-logo" />
+          </div>
         </div>
 
-        <div class="player-main-info">
+        <div class="player-essence">
+          <div class="player-badge">#{{ player.id }} • {{ player.team.abbreviation }}</div>
           <h1 class="player-name">{{ player.fullName }}</h1>
-          <div class="player-position-badge">{{ player.position }}</div>
-          <p class="player-position-full">{{ player.positionDisplay }}</p>
-        </div>
-      </div>
-
-      <div class="info-cards">
-        <div class="info-card">
-          <h3><span class="material-icons">straighten</span> Informações Físicas</h3>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">Altura</span>
-              <span class="value">{{ player.height }}</span>
-            </div>
-            <div class="info-item">
-              <span class="label">Peso</span>
-              <span class="value">{{ player.weight }}</span>
-            </div>
+          <div class="player-meta">
+            <span class="position-tag">{{ player.positionDisplay }}</span>
+            <span class="meta-divider">|</span>
+            <span class="physical-info">{{ player.height }} • {{ player.weight }}</span>
           </div>
         </div>
 
-        <div class="info-card clickable" (click)="viewTeam(player.team.abbreviation)">
-          <h3><span class="material-icons">groups</span> Time Atual</h3>
-          <div class="team-info">
-            <img [src]="getTeamLogoUrl()" [alt]="player.team.name" class="team-logo" (error)="onTeamLogoError($event)" />
-            <div class="team-details">
-              <span class="team-name">{{ player.team.displayName }}</span>
-              <span class="team-abbr">{{ player.team.abbreviation }}</span>
-            </div>
-            <span class="material-icons view-icon">chevron_right</span>
-          </div>
+        <div class="header-actions">
+          <button class="btn btn--primary btn--sm" (click)="viewTeam(player.team.abbreviation)">
+            <span class="material-icons">groups</span>
+            Ver Time
+          </button>
         </div>
-
-        <div class="info-card">
-          <h3><span class="material-icons">badge</span> Identificadores</h3>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="label">ID Interno</span>
-              <span class="value">{{ player.id }}</span>
-            </div>
-            @if (player.espnId) {
-            <div class="info-item">
-              <span class="label">ESPN ID</span>
-              <span class="value">{{ player.espnId }}</span>
-            </div>
-            }
-            <div class="info-item">
-              <span class="label">External ID</span>
-              <span class="value">{{ player.externalId }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="action-btn primary" (click)="viewTeam(player.team.abbreviation)">
-          <span class="material-icons">sports_basketball</span>
-          Ver Time Completo
-        </button>
-      </div>
-
-      <!-- ESTATÍSTICAS POR TEMPORADA -->
-      <div class="stats-section">
-        <h2><span class="material-icons">bar_chart</span> Estatísticas por Temporada</h2>
-
-        @if (loadingStats()) {
-        <div class="stats-loading">
-          <div class="loading-spinner"></div>
-          <p>Carregando estatísticas...</p>
-        </div>
-        }
-
-        @if (!loadingStats() && availableSeasons().length === 0) {
-        <div class="no-stats">
-          <span class="material-icons">info</span>
-          <p>Nenhuma estatística disponível para este jogador</p>
-        </div>
-        }
-
-        @if (!loadingStats() && availableSeasons().length > 0) {
-        <!-- Seletor de Temporada -->
-        <div class="season-selector">
-          <span class="season-label">Temporada:</span>
-          <div class="season-tabs">
-            @for (season of availableSeasons(); track season) {
-            <button [class.active]="selectedSeason() === season" (click)="selectSeason(season)">
-              {{ season }}-{{ season + 1 }}
-            </button>
-            }
-          </div>
-        </div>
-
-        <!-- Grid de Estatísticas -->
-        @if (seasonStats(); as stats) {
-        <div class="stats-container">
-          <!-- Principais Médias -->
-          <div class="stats-category">
-            <h3>Médias por Jogo</h3>
-            <div class="stats-grid">
-              <div class="stat-card highlight">
-                <span class="stat-label">PPG</span>
-                <span class="stat-value">{{ formatDecimal(stats.avgPoints) }}</span>
-                <span class="stat-sublabel">Pontos</span>
-              </div>
-              <div class="stat-card highlight">
-                <span class="stat-label">RPG</span>
-                <span class="stat-value">{{ formatDecimal(stats.avgRebounds) }}</span>
-                <span class="stat-sublabel">Rebotes</span>
-              </div>
-              <div class="stat-card highlight">
-                <span class="stat-label">APG</span>
-                <span class="stat-value">{{ formatDecimal(stats.avgAssists) }}</span>
-                <span class="stat-sublabel">Assistências</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">MPG</span>
-                <span class="stat-value">{{ formatDecimal(stats.avgMinutes) }}</span>
-                <span class="stat-sublabel">Minutos</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Porcentagens de Arremesso -->
-          <div class="stats-category">
-            <h3>Aproveitamento</h3>
-            <div class="stats-grid">
-              <div class="stat-card">
-                <span class="stat-label">FG%</span>
-                <span class="stat-value">{{ formatPercentage(stats.fieldGoalPercentage) }}</span>
-                <span class="stat-sublabel">{{ stats.fieldGoalsMade || 0 }}/{{ stats.fieldGoalsAttempted || 0 }}</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">3P%</span>
-                <span class="stat-value">{{ formatPercentage(stats.threePointPercentage) }}</span>
-                <span class="stat-sublabel">{{ stats.threePointersMade || 0 }}/{{ stats.threePointersAttempted || 0 }}</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">FT%</span>
-                <span class="stat-value">{{ formatPercentage(stats.freeThrowPercentage) }}</span>
-                <span class="stat-sublabel">{{ stats.freeThrowsMade || 0 }}/{{ stats.freeThrowsAttempted || 0 }}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Rebotes Detalhados -->
-          <div class="stats-category">
-            <h3>Rebotes</h3>
-            <div class="stats-grid">
-              <div class="stat-card">
-                <span class="stat-label">OFF</span>
-                <span class="stat-value">{{ stats.offensiveRebounds || 0 }}</span>
-                <span class="stat-sublabel">Ofensivos</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">DEF</span>
-                <span class="stat-value">{{ stats.defensiveRebounds || 0 }}</span>
-                <span class="stat-sublabel">Defensivos</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">TOT</span>
-                <span class="stat-value">{{ stats.totalRebounds || 0 }}</span>
-                <span class="stat-sublabel">Total</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Outras Estatísticas -->
-          <div class="stats-category">
-            <h3>Outras Estatísticas</h3>
-            <div class="stats-grid">
-              <div class="stat-card">
-                <span class="stat-label">STL</span>
-                <span class="stat-value">{{ stats.steals || 0 }}</span>
-                <span class="stat-sublabel">Roubos</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">BLK</span>
-                <span class="stat-value">{{ stats.blocks || 0 }}</span>
-                <span class="stat-sublabel">Tocos</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">TOV</span>
-                <span class="stat-value">{{ stats.turnovers || 0 }}</span>
-                <span class="stat-sublabel">Turnovers</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">PF</span>
-                <span class="stat-value">{{ stats.personalFouls || 0 }}</span>
-                <span class="stat-sublabel">Faltas</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Informações da Temporada -->
-          <div class="stats-category">
-            <h3>Informações da Temporada</h3>
-            <div class="stats-grid">
-              <div class="stat-card">
-                <span class="stat-label">GP</span>
-                <span class="stat-value">{{ stats.gamesPlayed || 0 }}</span>
-                <span class="stat-sublabel">Jogos</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">GS</span>
-                <span class="stat-value">{{ stats.gamesStarted || 0 }}</span>
-                <span class="stat-sublabel">Titular</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">MIN</span>
-                <span class="stat-value">{{ formatDecimal(stats.minutesPlayed) }}</span>
-                <span class="stat-sublabel">Min. Total</span>
-              </div>
-              <div class="stat-card">
-                <span class="stat-label">PTS</span>
-                <span class="stat-value">{{ stats.points || 0 }}</span>
-                <span class="stat-sublabel">Pts. Total</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        }
-        }
       </div>
     </div>
-    }
 
+    <div class="detail-grid">
+      <div class="stats-main-area">
+        <!-- TABS NAVEGAÇÃO -->
+        <nav class="player-tabs glass-panel animate-fade-in" style="animation-delay: 0.1s">
+          <button [class.active]="activeTab() === 'stats'" (click)="setTab('stats')">
+            <span class="material-icons">analytics</span> Estatísticas
+          </button>
+          <button [class.active]="activeTab() === 'gamelog'" (click)="setTab('gamelog')">
+            <span class="material-icons">history</span> Histórico
+          </button>
+        </nav>
+
+        <!-- ESTATÍSTICAS POR TEMPORADA -->
+        @if (activeTab() === 'stats') {
+        <div class="stats-section glass-panel animate-fade-in" style="animation-delay: 0.2s">
+          <div class="section-header-compact">
+            <h2><span class="material-icons">bar_chart</span> Estatísticas de Temporada</h2>
+
+            @if (!loadingStats() && availableSeasons().length > 0) {
+            <div class="season-selector-inline">
+              <select class="season-dropdown" [value]="selectedSeason()" (change)="onSeasonChange($event)">
+                @for (season of availableSeasons(); track season) {
+                <option [value]="season">{{ season }}/{{ (season + 1).toString().slice(-2) }}</option>
+                }
+              </select>
+            </div>
+            }
+          </div>
+
+          @if (loadingStats()) {
+          <div class="stats-loading">
+            <div class="loading-spinner"></div>
+            <p>Carregando dados da liga...</p>
+          </div>
+          }
+
+          @if (!loadingStats() && availableSeasons().length === 0) {
+          <div class="no-stats">
+            <span class="material-icons">info</span>
+            <p>Dados históricos indisponíveis para este atleta.</p>
+          </div>
+          }
+
+          @if (!loadingStats() && availableSeasons().length > 0) {
+          <!-- Grid de Estatísticas -->
+          @if (seasonStats(); as stats) {
+          <div class="stats-container">
+            <!-- Principais Médias -->
+            <div class="stats-category">
+              <h3>Médias por Jogo</h3>
+              <div class="stats-grid">
+                <div class="stat-card highlight">
+                  <span class="stat-label" title="Pontos Por Jogo">PPG</span>
+                  <span class="stat-value">{{ formatDecimal(stats.avgPoints) }}</span>
+                  <span class="stat-sublabel">Pontos</span>
+                </div>
+                <div class="stat-card highlight">
+                  <span class="stat-label" title="Rebotes Por Jogo">RPG</span>
+                  <span class="stat-value">{{ formatDecimal(stats.avgRebounds) }}</span>
+                  <span class="stat-sublabel">Rebotes</span>
+                </div>
+                <div class="stat-card highlight">
+                  <span class="stat-label" title="Assistências Por Jogo">APG</span>
+                  <span class="stat-value">{{ formatDecimal(stats.avgAssists) }}</span>
+                  <span class="stat-sublabel">Assistências</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Minutos Por Jogo">MPG</span>
+                  <span class="stat-value">{{ formatDecimal(stats.avgMinutes) }}</span>
+                  <span class="stat-sublabel">Minutos</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Porcentagens de Arremesso -->
+            <div class="stats-category">
+              <h3>Aproveitamento</h3>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <span class="stat-label" title="Porcentagem de Arremessos de Quadra">FG%</span>
+                  <span class="stat-value">{{ formatPercentage(stats.fieldGoalPercentage) }}</span>
+                  <span class="stat-sublabel">{{ stats.fieldGoalsMade || 0 }}/{{ stats.fieldGoalsAttempted || 0
+                    }}</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Porcentagem de Arremessos de 3 Pontos">3P%</span>
+                  <span class="stat-value">{{ formatPercentage(stats.threePointPercentage) }}</span>
+                  <span class="stat-sublabel">{{ stats.threePointersMade || 0 }}/{{ stats.threePointersAttempted || 0
+                    }}</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Porcentagem de Lances Livres">FT%</span>
+                  <span class="stat-value">{{ formatPercentage(stats.freeThrowPercentage) }}</span>
+                  <span class="stat-sublabel">{{ stats.freeThrowsMade || 0 }}/{{ stats.freeThrowsAttempted || 0
+                    }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rebotes Detalhados -->
+            <div class="stats-category">
+              <h3>Rebotes</h3>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <span class="stat-label" title="Rebotes Ofensivos">OFF</span>
+                  <span class="stat-value">{{ stats.offensiveRebounds || 0 }}</span>
+                  <span class="stat-sublabel">Ofensivos</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Rebotes Defensivos">DEF</span>
+                  <span class="stat-value">{{ stats.defensiveRebounds || 0 }}</span>
+                  <span class="stat-sublabel">Defensivos</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Total de Rebotes">TOT</span>
+                  <span class="stat-value">{{ stats.totalRebounds || 0 }}</span>
+                  <span class="stat-sublabel">Total</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Outras Estatísticas -->
+            <div class="stats-category">
+              <h3>Outras Estatísticas</h3>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <span class="stat-label" title="Roubos de Bola">STL</span>
+                  <span class="stat-value">{{ stats.steals || 0 }}</span>
+                  <span class="stat-sublabel">Roubos</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Tocos">BLK</span>
+                  <span class="stat-value">{{ stats.blocks || 0 }}</span>
+                  <span class="stat-sublabel">Tocos</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Erros (Turnovers)">TOV</span>
+                  <div class="stat-value-group">
+                    <span class="stat-value">{{ stats.turnovers || 0 }}</span>
+                    <span class="stat-avg">({{ formatDecimal(stats.tpg) }})</span>
+                  </div>
+                  <span class="stat-sublabel">Erros</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Faltas Acadêmicas/Pessoais">PF</span>
+                  <div class="stat-value-group">
+                    <span class="stat-value">{{ stats.personalFouls || 0 }}</span>
+                    <span class="stat-avg">({{ formatDecimal(stats.fpg) }})</span>
+                  </div>
+                  <span class="stat-sublabel">Faltas</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Informações da Temporada -->
+            <div class="stats-category">
+              <h3>Informações da Temporada</h3>
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <span class="stat-label" title="Jogos Jogados">GP</span>
+                  <span class="stat-value">{{ stats.gamesPlayed || 0 }}</span>
+                  <span class="stat-sublabel">Jogos</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Jogos como Titular">GS</span>
+                  <span class="stat-value">{{ stats.gamesStarted || 0 }}</span>
+                  <span class="stat-sublabel">Titular</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Minutos Totais na Temporada">MIN</span>
+                  <span class="stat-value">{{ formatDecimal(stats.minutesPlayed) }}</span>
+                  <span class="stat-sublabel">Min. Total</span>
+                </div>
+                <div class="stat-card">
+                  <span class="stat-label" title="Pontos Totais na Temporada">PTS</span>
+                  <span class="stat-value">{{ stats.points || 0 }}</span>
+                  <span class="stat-sublabel">Pts. Total</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          }
+          }
+        </div>
+        } @else {
+        <!-- Gamelog section -->
+        <div class="gamelog-section glass-panel animate-fade-in" style="animation-delay: 0.2s">
+          <div class="section-header-compact">
+            <h2><span class="material-icons">list_alt</span> Histórico Recente</h2>
+            <span class="badge badge--nba">Ultimos 20 Jogos</span>
+          </div>
+
+          @if (statsService.isLoading()) {
+          <div class="stats-loading">
+            <div class="loading-spinner"></div>
+          </div>
+          } @else {
+          @if (statsService.currentPlayerGamelog(); as gamelog) {
+          <div class="table-responsive-wrapper">
+            <table class="gamelog-table-modern">
+              <thead>
+                <tr>
+                  <th class="sticky-col">OPONENTE</th>
+                  <th title="Resultado do Jogo (Vitória/Derrota)">RES</th>
+                  <th title="Minutos em Quadra">MIN</th>
+                  <th title="Pontos Marcados">PTS</th>
+                  <th title="Rebotes Totais">REB</th>
+                  <th title="Assistências">AST</th>
+                  <th title="Roubos de Bola">STL</th>
+                  <th title="Tocos">BLK</th>
+                  <th title="Arremessos de Quadra">FG</th>
+                  <th title="Saldo de Pontos (Plus/Minus)">+/-</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (game of gamelog.games; track game.gameId) {
+                <tr class="game-row" (click)="router.navigate(['/games', game.gameId])">
+                  <td class="opponent-cell sticky-col">
+                    <div class="game-brief">
+                      <span class="game-date-mini">{{ game.gameDate | date:'dd/MM' }}</span>
+                      <span class="home-away">{{ game.isHome ? 'vs' : '@' }}</span>
+                      <span class="opponent-abbr">{{ game.opponent }}</span>
+                    </div>
+                  </td>
+                  <td><span class="result-badge" [class.win]="game.result === 'W'" [class.loss]="game.result === 'L'">{{
+                      game.result }}</span></td>
+                  <td>{{ game.minutes }}</td>
+                  <td class="stat-highlight">{{ game.points }}</td>
+                  <td>{{ game.rebounds }}</td>
+                  <td>{{ game.assists }}</td>
+                  <td>{{ game.steals }}</td>
+                  <td>{{ game.blocks }}</td>
+                  <td class="fg-cell">{{ game.fieldGoals }}</td>
+                  <td [class.pos]="game.plusMinus > 0" [class.neg]="game.plusMinus < 0">
+                    {{ game.plusMinus > 0 ? '+' : '' }}{{ game.plusMinus }}
+                  </td>
+                </tr>
+                } @empty {
+                <tr>
+                  <td colspan="10" class="empty-msg">Nenhum histórico encontrado para este ciclo.</td>
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          }
+          }
+        </div>
+        }
+      </div>
+
+      <!-- SIDEBAR -->
+      <aside class="player-sidebar">
+        <div class="info-card-modern glass-panel animate-fade-in" style="animation-delay: 0.3s">
+          <h3 class="sidebar-title"><span class="material-icons">fitness_center</span> Biometria</h3>
+          <div class="sidebar-stats">
+            <div class="sidebar-stat">
+              <span class="sidebar-label">Altura</span>
+              <span class="sidebar-value">{{ player.height }}</span>
+            </div>
+            <div class="sidebar-stat">
+              <span class="sidebar-label">Peso</span>
+              <span class="sidebar-value">{{ player.weight }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-card-modern glass-panel animate-fade-in" style="animation-delay: 0.4s"
+          (click)="viewTeam(player.team.abbreviation)">
+          <h3 class="sidebar-title"><span class="material-icons">hub</span> Time</h3>
+          <div class="sidebar-team">
+            <img [src]="getTeamLogoUrl()" class="sidebar-team-logo" (error)="onTeamLogoError($event)" />
+            <div class="sidebar-team-info">
+              <span class="sidebar-team-name">{{ player.team.displayName }}</span>
+              <span class="sidebar-team-city">{{ player.team.city }}</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    }
     @if (!playersService.isLoading() && !playersService.selectedPlayer() && !playersService.error()) {
     <div class="not-found">
       <span class="material-icons">person_off</span>
       <h2>Jogador não encontrado</h2>
-      <p>O jogador solicitado não foi encontrado no sistema.</p>
-      <button (click)="goBack()">Voltar para Jogadores</button>
+      <p>O atleta solicitado não consta em nossa base de dados.</p>
+      <button class="btn btn--primary" (click)="goBack()">Voltar</button>
     </div>
     }
   </div>

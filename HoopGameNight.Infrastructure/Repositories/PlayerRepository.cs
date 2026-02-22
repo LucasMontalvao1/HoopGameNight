@@ -50,17 +50,14 @@ namespace HoopGameNight.Infrastructure.Repositories
             var players = await ExecuteQueryAsync<Player>(sql, parameters);
             var playersList = players.ToList();
 
-            // Get unique team IDs
             var teamIds = playersList.Where(p => p.TeamId.HasValue).Select(p => p.TeamId!.Value).Distinct().ToList();
 
             if (teamIds.Any())
             {
-                // Fetch teams
                 var teamSql = "SELECT id, external_id, name, full_name, abbreviation, city, conference, division FROM teams WHERE id IN @TeamIds";
                 var teams = await ExecuteQueryAsync<Team>(teamSql, new { TeamIds = teamIds });
                 var teamDict = teams.ToDictionary(t => t.Id);
 
-                // Map teams to players
                 foreach (var player in playersList)
                 {
                     if (player.TeamId.HasValue && teamDict.TryGetValue(player.TeamId.Value, out var team))
@@ -182,7 +179,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return players;
         }
 
-        // NOVO: Implementação do método SearchAsync da interface
         public async Task<IEnumerable<Player>> SearchAsync(string searchTerm)
         {
             Logger.LogDebug("Searching players with term: {SearchTerm}", searchTerm);
@@ -266,7 +262,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return deleted;
         }
 
-        // Métodos adicionais úteis 
         public async Task<IEnumerable<Player>> GetPlayersByPositionAsync(string position)
         {
             Logger.LogDebug("Getting players by position: {Position}", position);

@@ -23,7 +23,6 @@ namespace HoopGameNight.Infrastructure.Repositories
         {
         }
 
-        // Métodos básicos de consulta
         public async Task<IEnumerable<Game>> GetTodayGamesAsync()
         {
             Logger.LogDebug("Getting today's games");
@@ -71,7 +70,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return await ExecuteQueryAsync<Game>(sql);
         }
 
-        // Métodos de consulta por time
         public async Task<IEnumerable<Game>> GetByTeamAsync(int teamId, DateTime? startDate = null, DateTime? endDate = null)
         {
             Logger.LogDebug("Getting games for team: {TeamId}", teamId);
@@ -83,7 +81,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                 StartDate = startDate,
                 EndDate = endDate,
                 Offset = 0,
-                PageSize = 1000 // Limite seguro para trazer todos os jogos da temporada
+                PageSize = 1000 
             };
 
             var games = await ExecuteQueryWithTeamsAsync(sql, parameters);
@@ -113,7 +111,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return (games, totalCount);
         }
 
-        // Métodos de consulta com filtros
         public async Task<(IEnumerable<Game> Games, int TotalCount)> GetGamesAsync(GetGamesRequest request)
         {
             Logger.LogDebug("Getting games with filters: {@Request}", request);
@@ -141,7 +138,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return (games, totalCount);
         }
 
-        // Métodos por ID externo
         public async Task<Game?> GetByExternalIdAsync(string externalId)
         {
             Logger.LogDebug("Getting game by external ID: {ExternalId}", externalId);
@@ -166,14 +162,12 @@ namespace HoopGameNight.Infrastructure.Repositories
             return exists;
         }
 
-        // Implementação do IBaseRepository (verifica por ID do banco)
         public async Task<bool> ExistsAsync(int id)
         {
             var game = await GetByIdAsync(id);
             return game != null;
         }
 
-        // Métodos de atualização específicos
         public async Task<bool> UpdateScoreAsync(int gameId, int homeScore, int visitorScore)
         {
             var sql = @"UPDATE Games 
@@ -192,7 +186,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             return result > 0;
         }
 
-        // Métodos herdados do BaseRepository
         public async Task<Game?> GetByIdAsync(int id)
         {
             Logger.LogDebug("Getting game by ID: {GameId}", id);
@@ -312,8 +305,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                 return await ExecuteQueryWithTeamsManualAsync(sql, parameters);
             }
         }
-
-        // Método de fallback com mapeamento manual 
+ 
         private async Task<IEnumerable<Game>> ExecuteQueryWithTeamsManualAsync(string sql, object? parameters = null)
         {
             using var connection = _connection.CreateConnection();
@@ -399,7 +391,6 @@ namespace HoopGameNight.Infrastructure.Repositories
             }
         }
 
-        // Helper para buscar time por ID 
         private async Task<Team?> GetTeamByIdAsync(int teamId)
         {
             using var connection = _connection.CreateConnection();

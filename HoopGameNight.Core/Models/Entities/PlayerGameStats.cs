@@ -3,40 +3,31 @@ using System;
 
 namespace HoopGameNight.Core.Models.Entities
 {
-    public class PlayerGameStats : BaseEntity
+    public class PlayerGameStats
     {
         public int PlayerId { get; set; }
         public int GameId { get; set; }
         public int TeamId { get; set; }
-
         public bool DidNotPlay { get; set; } = false;
         public bool IsStarter { get; set; } = false;
-
         public int MinutesPlayed { get; set; }
         public int SecondsPlayed { get; set; }
-
         public int Points { get; set; }
         public int FieldGoalsMade { get; set; }
         public int FieldGoalsAttempted { get; set; }
-
         public int ThreePointersMade { get; set; }
         public int ThreePointersAttempted { get; set; }
-
         public int FreeThrowsMade { get; set; }
         public int FreeThrowsAttempted { get; set; }
-
         public int OffensiveRebounds { get; set; }
         public int DefensiveRebounds { get; set; }
         public int TotalRebounds { get; set; }
-
         public int Assists { get; set; }
         public int Steals { get; set; }
         public int Blocks { get; set; }
         public int Turnovers { get; set; }
         public int PersonalFouls { get; set; }
-
         public int PlusMinus { get; set; }
-
         public Player? Player { get; set; }
         public Game? Game { get; set; }
         public Team? Team { get; set; }

@@ -17,7 +17,6 @@ namespace HoopGameNight.Tests.Helpers
         {
             var mock = new Mock<IGameRepository>();
 
-            // Setup default behaviors
             mock.Setup(x => x.GetTodayGamesAsync())
                 .ReturnsAsync(new List<Game>());
 
@@ -94,7 +93,6 @@ namespace HoopGameNight.Tests.Helpers
         {
             var mock = new Mock<IMapper>();
 
-            // Setup common mappings with default returns
             mock.Setup(x => x.Map<List<GameResponse>>(It.IsAny<List<Game>>()))
                 .Returns(new List<GameResponse>());
 
@@ -116,7 +114,6 @@ namespace HoopGameNight.Tests.Helpers
         {
             var mock = new Mock<ICacheService>();
 
-            // Setup métodos básicos - sem setup genérico, deixar o comportamento padrão
             mock.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<object>(), It.IsAny<TimeSpan?>()))
                 .Returns(Task.CompletedTask);
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ChangeDetectionStrategy, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,15 +9,21 @@ import { HealthCheck } from '../../core/services/health-check';
 import { GamesService } from '../../core/services/games.service';
 import { TeamsService } from '../../core/services/teams.service';
 import { PlayersService } from '../../core/services/players.service';
+import { SEOService } from '../../core/services/seo.service';
+import { PreferencesStore } from '../../core/services/preferences.store';
+import { AssistantService } from '../../core/services/assistant.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
+import { SkeletonLoader } from '../../shared/components/skeleton-loader/skeleton-loader';
+import { ErrorView } from '../../shared/components/error-view/error-view';
 import { ApiStatus, PlayerResponse } from '../../core/interfaces/api.interface';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule],
+  imports: [CommonModule, RouterModule, StatusIndicator, SkeletonLoader, ErrorView, FormsModule],
   templateUrl: './dashboard.html',
-  styleUrls: ['./dashboard.scss']
+  styleUrls: ['./dashboard.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Dashboard implements OnInit {
   readonly ApiStatusEnum = ApiStatus;
@@ -29,40 +35,37 @@ export class Dashboard implements OnInit {
   protected isSearchingPlayers = signal<boolean>(false);
   protected showPlayerResults = signal<boolean>(false);
 
-  protected readonly myTeams = [
-    { code: 'LAL', name: 'Lakers', city: 'Los Angeles', nextGame: 'vs Warriors hoje', color: '#552583' },
-    { code: 'GSW', name: 'Warriors', city: 'Golden State', nextGame: 'vs Lakers hoje', color: '#1D428A' }
-  ];
-
-  protected readonly aiInsights = [
-    { 
-      type: 'highlight', 
-      title: 'Destaque do Dia', 
-      description: 'LeBron com 28 pts de média nos últimos 5 jogos' 
-    },
-    { 
-      type: 'statistic', 
-      title: 'Estatística', 
-      description: 'Celtics: 87% de aproveitamento em casa' 
-    }
-  ];
+  protected readonly favoriteTeams = computed(() => {
+    const favoriteIds = this.preferencesStore.favoriteTeamIds();
+    return this.teamsService.allTeams().filter(t => favoriteIds.includes(t.id));
+  });
 
   constructor(
     protected readonly healthCheck: HealthCheck,
     protected readonly gamesService: GamesService,
     protected readonly teamsService: TeamsService,
     protected readonly playersService: PlayersService,
+    protected readonly seoService: SEOService,
+    protected readonly preferencesStore: PreferencesStore,
+    protected readonly assistantService: AssistantService,
     private readonly router: Router
-  ) {}
+  ) { }
+
+  async askAssistant(question: string) {
+    if (!question.trim()) return;
+    await this.assistantService.sendMessage(question);
+  }
 
   async ngOnInit(): Promise<void> {
+    this.seoService.updateTitle('Dashboard Central');
+    this.seoService.updateMeta('Seu ponto central para insights da NBA.');
     this.healthCheck.checkHealth();
-    
+
     try {
       await this.gamesService.loadTodayGames();
-      console.log('Dashboard: Jogos de hoje carregados');
+      console.log('Dashboard: Jogos de hoje preparados');
     } catch (error) {
-      console.error('Dashboard: Erro ao carregar jogos', error);
+      console.error('Dashboard: Erro ao preparar jogos', error);
     }
   }
 
@@ -81,7 +84,7 @@ export class Dashboard implements OnInit {
   getNextGame(): string {
     const games = this.gamesService.scheduledGames();
     if (games.length === 0) return 'Nenhum jogo agendado';
-    
+
     const nextGame = games[0];
     const time = this.formatGameTime(nextGame.dateTime);
     return `${nextGame.gameTitle} às ${time}`;
@@ -124,9 +127,12 @@ export class Dashboard implements OnInit {
 
   async onDateChange(event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement;
-    const value = select.value;
-    this.selectedDateOption = value;
+    this.selectedDateOption = select.value;
+    await this.refreshDashboardGames();
+  }
 
+  async refreshDashboardGames(): Promise<void> {
+    const value = this.selectedDateOption;
     const today = new Date();
     let targetDate: Date;
 
@@ -159,6 +165,10 @@ export class Dashboard implements OnInit {
       console.log(`Navegando para detalhes do time: ${abbreviation}`);
       this.router.navigate(['/teams', abbreviation]);
     }
+  }
+
+  viewGameDetails(gameId: number): void {
+    this.router.navigate(['/games', gameId]);
   }
 
   getCurrentGames() {

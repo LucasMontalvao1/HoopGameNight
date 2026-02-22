@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { PlayersService } from '../../../core/services/players.service';
 import { PlayerStatsApiService, PlayerSeasonStats } from '../../../core/services/player-stats-api.service';
+import { StatsService } from '../../../core/services/stats.service';
 
 @Component({
   selector: 'app-player-details',
@@ -19,6 +20,9 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
   private readonly _loadingStats = signal<boolean>(false);
   private readonly _currentPlayerId = signal<number | null>(null);
 
+  // Cache de todos os dados de temporada do jogador
+  private _allStatsData: PlayerSeasonStats[] = [];
+
   // Getters públicos
   readonly selectedSeason = this._selectedSeason.asReadonly();
   readonly seasonStats = this._seasonStats.asReadonly();
@@ -28,9 +32,19 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
   constructor(
     public readonly playersService: PlayersService,
     private readonly playerStatsService: PlayerStatsApiService,
+    protected readonly statsService: StatsService,
     private readonly route: ActivatedRoute,
-    private readonly router: Router
-  ) {}
+    public readonly router: Router
+  ) { }
+
+  protected readonly activeTab = signal<'stats' | 'gamelog'>('stats');
+
+  onSeasonChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    if (select) {
+      this.selectSeason(+select.value);
+    }
+  }
 
   async ngOnInit(): Promise<void> {
     this.route.params.subscribe(async params => {
@@ -47,6 +61,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     this.playersService.clearSelectedPlayer();
     this._seasonStats.set(null);
     this._availableSeasons.set([]);
+    this._allStatsData = [];
   }
 
   goBack(): void {
@@ -86,69 +101,85 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
       console.log(`🏀 PLAYER DETAILS: Iniciando carregamento de stats para jogador ${playerId}`);
       this._loadingStats.set(true);
 
-      // Buscar todas as temporadas disponíveis
+      // Buscar todas as temporadas disponíveis via /career (ESPN Data - Mais completo)
       console.log(`→ Chamando playerStatsService.getPlayerAllSeasons(${playerId})`);
       const allSeasons = await this.playerStatsService.getPlayerAllSeasons(playerId);
 
-      console.log(`✅ Recebido ${allSeasons?.length || 0} temporadas:`, allSeasons);
+      this._allStatsData = allSeasons || [];
+      console.log(`✅ Recebido ${this._allStatsData.length} registros de temporada:`, this._allStatsData);
 
-      if (allSeasons && allSeasons.length > 0) {
-        // Extrair anos das temporadas e ordenar (mais recente primeiro)
-        const seasons = allSeasons
+      if (this._allStatsData.length > 0) {
+        // Extrair anos únicos das temporadas e ordenar (mais recente primeiro)
+        const seasons = this._allStatsData
           .map(s => s.season)
-          .filter((v, i, a) => a.indexOf(v) === i) // remover duplicatas
+          .filter((v, i, a) => a.indexOf(v) === i)
           .sort((a, b) => b - a);
 
-        console.log(`📅 Temporadas extraídas e ordenadas:`, seasons);
+        console.log(`📅 Temporadas únicas:`, seasons);
         this._availableSeasons.set(seasons);
 
-        // Carregar temporada mais recente
+        // Selecionar a temporada mais recente
         const latestSeason = seasons[0];
-        console.log(`→ Carregando temporada mais recente: ${latestSeason}`);
-        this._selectedSeason.set(latestSeason);
-        await this.loadSeasonStats(latestSeason);
+        console.log(`→ Selecionando temporada inicial: ${latestSeason}`);
+        await this.selectSeason(latestSeason);
       } else {
-        console.warn('⚠️ Nenhuma estatística disponível para este jogador');
+        console.warn('⚠️ Nenhuma estatística disponível via API de carreira');
       }
     } catch (error) {
       console.error('❌ Erro ao carregar estatísticas:', error);
     } finally {
       this._loadingStats.set(false);
-      console.log(`✓ Loading stats finalizado`);
     }
   }
 
   async selectSeason(season: number): Promise<void> {
     console.log(`📅 Selecionando temporada: ${season}`);
     this._selectedSeason.set(season);
-    await this.loadSeasonStats(season);
+
+    // Prioridade 1: Procurar nos dados de carreira (ESPN) que já carregamos
+    // Preferimos a Regular Season (isPlayoffs === false)
+    const statsFromCareer = this._allStatsData.find(s => s.season === season && s.isPlayoffs === false)
+      || this._allStatsData.find(s => s.season === season);
+
+    if (statsFromCareer) {
+      console.log('✅ Usando stats do cache de carreira (ESPN):', statsFromCareer);
+      this._seasonStats.set(statsFromCareer);
+    } else {
+      // Prioridade 2: Buscar do nosso banco de dados (Calculado via View)
+      console.log(`🔍 Stats não encontradas no cache. Buscando via API para season ${season}`);
+      await this.loadSeasonStatsFromDb(season);
+    }
   }
 
-  private async loadSeasonStats(season: number): Promise<void> {
-    const playerId = this._currentPlayerId();
-    if (!playerId) {
-      console.warn('⚠️ Player ID não definido');
-      return;
+  async setTab(tab: 'stats' | 'gamelog'): Promise<void> {
+    this.activeTab.set(tab);
+    if (tab === 'gamelog') {
+      await this.loadRecentGamelog();
     }
+  }
+
+  private async loadRecentGamelog(): Promise<void> {
+    const playerId = this._currentPlayerId();
+    if (playerId) {
+      await this.statsService.loadRecentPlayerGames(playerId);
+    }
+  }
+
+  /**
+   * Busca estatísticas agregadas da nossa VIEW local no banco de dados.
+   * Usado como fallback ou quando queremos dados locais granulares.
+   */
+  private async loadSeasonStatsFromDb(season: number): Promise<void> {
+    const playerId = this._currentPlayerId();
+    if (!playerId) return;
 
     try {
-      console.log(`🏀 PLAYER DETAILS: Carregando stats para temporada ${season}`);
       this._loadingStats.set(true);
       const stats = await this.playerStatsService.getPlayerSeasonStats(playerId, season);
-
-      console.log(`✅ Stats recebidas para temporada ${season}:`, stats);
-      
-      if (stats) {
-        console.log(`   PPG: ${stats.avgPoints}, RPG: ${stats.avgRebounds}, APG: ${stats.avgAssists}`);
-        console.log(`   FG%: ${stats.fieldGoalPercentage}, 3P%: ${stats.threePointPercentage}, FT%: ${stats.freeThrowPercentage}`);
-        console.log(`   GP: ${stats.gamesPlayed}, GS: ${stats.gamesStarted}`);
-      } else {
-        console.warn(`⚠️ Stats NULAS para temporada ${season}`);
-      }
-
+      console.log(`✅ Stats carregadas via DB View para season ${season}:`, stats);
       this._seasonStats.set(stats);
     } catch (error) {
-      console.error(`❌ Erro ao carregar stats da temporada ${season}:`, error);
+      console.error(`❌ Erro ao carregar stats da season ${season} via DB:`, error);
       this._seasonStats.set(null);
     } finally {
       this._loadingStats.set(false);
@@ -157,37 +188,25 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
 
   // ⚠️ FORMATAÇÃO DE PORCENTAGENS
   formatPercentage(value: number | null | undefined): string {
-    console.log('🔍 formatPercentage chamado com:', value, typeof value);
-    
-    if (value === null || value === undefined) {
-      console.log('→ Retornando "-" (valor null/undefined)');
-      return '-';
-    }
-    
-    // Converter para número se for string
+    if (value === null || value === undefined) return '-';
+
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    
-    if (isNaN(numValue)) {
-      console.log('→ Retornando "-" (NaN)');
-      return '-';
+    if (isNaN(numValue)) return '-';
+
+    // O backend envia percentuais tanto como 0.55 quanto 55.0
+    // Regra: se for < 1 (e não for zero puro), multiplicamos por 100
+    let percentage = numValue;
+    if (numValue > 0 && numValue < 1) {
+      percentage = numValue * 100;
     }
-    
-    // Se o valor já estiver em percentual (> 1), não multiplicar
-    // Caso contrário, multiplicar por 100
-    const percentage = numValue > 1 ? numValue : numValue * 100;
-    const formatted = percentage.toFixed(1) + '%';
-    
-    console.log(`→ Retornando: ${formatted} (valor original: ${value}, calculado: ${percentage})`);
-    return formatted;
+
+    return percentage.toFixed(1) + '%';
   }
 
   formatDecimal(value: number | null | undefined): string {
     if (value === null || value === undefined) return '-';
-    
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    
     if (isNaN(numValue)) return '-';
-    
     return numValue.toFixed(1);
   }
 }

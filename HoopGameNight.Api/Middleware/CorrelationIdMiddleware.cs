@@ -23,10 +23,8 @@ namespace HoopGameNight.Api.Middleware
                 correlationId = Guid.NewGuid().ToString();
             }
 
-            // Adicionar ao contexto de logs
             context.Items[CorrelationIdHeader] = correlationId.ToString();
 
-            // Adicionar à resposta
             context.Response.OnStarting(() =>
             {
                 if (!context.Response.Headers.ContainsKey(CorrelationIdHeader))

@@ -33,19 +33,14 @@ namespace HoopGameNight.Infrastructure.Data
             {
                 _logger.LogInformation("Iniciando a inicialização do banco de dados...");
 
-                // criar o schema
                 await EnsureSchemaExistsAsync();
 
-                // criar tabelas
                 await CreateTablesAsync();
 
-                // criar triggers
                 await CreateTriggersAsync();
 
-                // criar views
                 await CreateViewsAsync();
 
-                // verificar se precisa enviar dados iniciais
                 await SeedInitialDataAsync();
 
                 _logger.LogInformation("Inicialização do banco de dados concluída com sucesso");
@@ -64,7 +59,6 @@ namespace HoopGameNight.Infrastructure.Data
             var connectionString = _configuration.GetConnectionString("MySqlConnection");
             var builder = new MySqlConnector.MySqlConnectionStringBuilder(connectionString);
 
-            // Extrair o nome do database da connection string
             var schemaName = builder.Database;
             if (string.IsNullOrEmpty(schemaName))
             {
@@ -73,7 +67,6 @@ namespace HoopGameNight.Infrastructure.Data
 
             _logger.LogInformation("Nome do esquema: {SchemaName}", schemaName);
 
-            // Criar uma conexão SEM especificar o database para poder criar o schema
             builder.Database = null;
 
             try
@@ -81,7 +74,6 @@ namespace HoopGameNight.Infrastructure.Data
                 using var connection = new MySqlConnector.MySqlConnection(builder.ConnectionString);
                 await connection.OpenAsync();
 
-                // Verificar se o schema já existe
                 using var checkCommand = connection.CreateCommand();
                 checkCommand.CommandText = @"
                     SELECT COUNT(*) 
@@ -95,7 +87,6 @@ namespace HoopGameNight.Infrastructure.Data
                 {
                     _logger.LogInformation("Schema '{SchemaName}' não existe. Criando...", schemaName);
 
-                    // Criar o schema
                     using var createCommand = connection.CreateCommand();
                     createCommand.CommandText = $@"
                         CREATE SCHEMA IF NOT EXISTS `{schemaName}` 
@@ -110,7 +101,6 @@ namespace HoopGameNight.Infrastructure.Data
                     _logger.LogInformation("Schema '{SchemaName}' já existe", schemaName);
                 }
 
-                // Agora usar o schema
                 using var useCommand = connection.CreateCommand();
                 useCommand.CommandText = $"USE `{schemaName}`";
                 await useCommand.ExecuteNonQueryAsync();
@@ -172,12 +162,7 @@ namespace HoopGameNight.Infrastructure.Data
 
         private async Task CreateTriggersAsync()
         {
-            _logger.LogInformation("Triggers não são mais necessários (stats calculadas via VIEW)");
-            
-            // REMOVIDO: Triggers de season stats não são mais necessários
-            // A VIEW vw_player_season_stats_calculated calcula tudo em tempo real
-            // a partir dos dados de player_game_stats
-            
+            _logger.LogInformation("Triggers não são mais necessários (stats calculadas via VIEW)");            
             await Task.CompletedTask;
         }
 
@@ -187,7 +172,6 @@ namespace HoopGameNight.Infrastructure.Data
 
             try
             {
-                // VIEW 1: Estatísticas detalhadas por jogo
                 await DropViewIfExistsAsync("vw_player_game_stats_detailed");
                 var createGameStatsViewSql = await _sqlLoader.LoadSqlAsync("Database", "CreateViews");
                 if (!string.IsNullOrEmpty(createGameStatsViewSql))
@@ -196,7 +180,6 @@ namespace HoopGameNight.Infrastructure.Data
                     _logger.LogInformation("VIEW vw_player_game_stats_detailed criada com sucesso");
                 }
 
-                // VIEW 2: Estatísticas por temporada (calculadas)
                 await DropViewIfExistsAsync("vw_player_season_stats_calculated");
                 var createSeasonStatsViewSql = await _sqlLoader.LoadSqlAsync("Database", "CreateSeasonStatsView");
                 if (!string.IsNullOrEmpty(createSeasonStatsViewSql))

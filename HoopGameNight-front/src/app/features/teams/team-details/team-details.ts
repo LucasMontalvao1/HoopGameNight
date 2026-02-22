@@ -67,7 +67,7 @@ export class TeamDetails implements OnInit {
     protected readonly teamsService: TeamsService,
     protected readonly gamesService: GamesService,
     protected readonly playersService: PlayersService
-  ) {}
+  ) { }
 
   async ngOnInit(): Promise<void> {
     const abbreviation = this.route.snapshot.paramMap.get('abbreviation');
@@ -97,20 +97,33 @@ export class TeamDetails implements OnInit {
 
       // Buscar time pela abreviação (case-insensitive)
       const upperAbbr = abbreviation.toUpperCase();
-      const team = this.teamsService.getTeamByAbbreviation(upperAbbr);
+      let team = this.teamsService.getTeamByAbbreviation(upperAbbr);
 
-      console.log(`Time encontrado:`, team);
+      console.log(`Time em cache local:`, team);
+
+      // Se não achou no cache, tentar buscar na API (Fallback robusto)
+      if (!team) {
+        console.log(`Time "${abbreviation}" não está no cache local. Buscando na API...`);
+        try {
+          const apiTeam = await this.teamsService.loadTeamByAbbreviationFromApi(upperAbbr);
+          if (apiTeam) {
+            team = apiTeam;
+          }
+        } catch (apiError) {
+          console.warn(`Erro na busca via API para "${abbreviation}":`, apiError);
+        }
+      }
 
       if (!team) {
         const availableTeams = this.teamsService.allTeams().map(t => t.abbreviation).join(', ');
-        console.error(`Time "${abbreviation}" não encontrado. Times disponíveis: ${availableTeams}`);
+        console.error(`Time "${abbreviation}" não encontrado após tentativa de cache e API. Times disponíveis: ${availableTeams}`);
         this._error.set(`Time "${abbreviation}" não encontrado`);
         this._loading.set(false);
         return;
       }
 
       this._team.set(team);
-      console.log(`Time carregado: ${team.displayName || team.name} (ID: ${team.id})`);
+      console.log(`Time carregado com sucesso: ${team.displayName || team.name} (ID: ${team.id})`);
 
       // Buscar jogos do time
       await this.loadTeamGames(team.id);

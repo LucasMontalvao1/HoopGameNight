@@ -61,7 +61,6 @@ namespace HoopGameNight.Api.Controllers
         [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Ask([FromBody] AskRequest request)
         {
-            // Validação detalhada
             if (string.IsNullOrWhiteSpace(request.Question))
             {
                 return BadRequest(new
@@ -89,18 +88,6 @@ namespace HoopGameNight.Api.Controllers
                     error = "Question too long",
                     message = "A pergunta não pode ter mais de 500 caracteres",
                     hint = "Seja mais específico, por exemplo: 'Qual foi o resultado do jogo do Lakers ontem?'"
-                });
-            }
-
-            // Bloquear perguntas sobre estatísticas (não temos no banco)
-            var forbiddenKeywords = new[] { "ponto", "assist", "rebound", "estatística", "stat" };
-            if (forbiddenKeywords.Any(k => request.Question.ToLower().Contains(k)))
-            {
-                return BadRequest(new
-                {
-                    error = "Unsupported question type",
-                    message = "No momento, não temos estatísticas de jogadores no banco de dados.",
-                    supported = "Perguntas sobre resultados e horários de jogos"
                 });
             }
 

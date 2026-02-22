@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace HoopGameNight.Core.DTOs.Response
 {
     /// <summary>
-    /// Response DTO for player splits (Home/Away, vs Conference, etc.)
+    /// Response DTO for player splits 
     /// </summary>
     public class PlayerSplitsResponse
     {
@@ -14,7 +14,7 @@ namespace HoopGameNight.Core.DTOs.Response
     }
 
     /// <summary>
-    /// Category of splits (e.g., "Home/Away", "vs Conference")
+    /// Category of splits
     /// </summary>
     public class PlayerSplitCategory
     {
@@ -27,7 +27,7 @@ namespace HoopGameNight.Core.DTOs.Response
     /// </summary>
     public class PlayerSplitStats
     {
-        public string SplitName { get; set; } = string.Empty; // "Home", "Away", "vs East", etc.
+        public string SplitName { get; set; } = string.Empty; 
         public int GamesPlayed { get; set; }
         public decimal PPG { get; set; }
         public decimal RPG { get; set; }

@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { ThemeService } from '../../core/services/theme';
 import { NavigationService } from '../../core/services/navigation';
 import { HealthCheck } from '../../core/services/health-check';
+import { ConnectivityService } from '../../core/services/connectivity.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
 
 @Component({
@@ -18,8 +19,9 @@ export class Header {
   constructor(
     protected readonly themeService: ThemeService,
     protected readonly navigationService: NavigationService,
-    protected readonly healthCheck: HealthCheck
-  ) {}
+    protected readonly healthCheck: HealthCheck,
+    protected readonly connectivityService: ConnectivityService
+  ) { }
 
   onMobileMenuToggle(): void {
     this.navigationService.toggleMobileMenu();

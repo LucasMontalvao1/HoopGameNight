@@ -51,12 +51,13 @@ namespace HoopGameNight.Api.Controllers.V1
         }
 
         [HttpGet("{playerId}/recent")]
-        [ProducesResponseType(typeof(ApiResponse<IEnumerable<PlayerGameStatsDetailedResponse>>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<IEnumerable<PlayerGameStatsDetailedResponse>>>> GetRecentGames(int playerId, [FromQuery] int limit = 5)
+        [ProducesResponseType(typeof(ApiResponse<PlayerGamelogResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<PlayerGamelogResponse>>> GetRecentGames(int playerId, [FromQuery] int limit = 20)
         {
-            return await ExecuteAsync<IEnumerable<PlayerGameStatsDetailedResponse>>(async () =>
+            return await ExecuteAsync<PlayerGamelogResponse>(async () =>
             {
                 var stats = await _playerStatsService.GetPlayerRecentGamesAsync(playerId, limit);
+                if (stats == null) return NotFound<PlayerGamelogResponse>("Recent games not found");
                 return Ok(stats);
             });
         }

@@ -42,7 +42,7 @@ SELECT
     g.season,
     @SeasonTypeId,
     MAX(pgs.team_id) as team_id, -- Simplification: use the last team for season stats
-    COUNT(pgs.id) as games_played,
+    COUNT(*) as games_played,
     SUM(pgs.is_starter) as games_started,
     SUM(pgs.minutes_played) as minutes_played,
     SUM(pgs.points) as points,
@@ -61,10 +61,10 @@ SELECT
     SUM(pgs.turnovers) as turnovers,
     SUM(pgs.personal_fouls) as personal_fouls,
     -- Averages
-    SUM(pgs.points) / NULLIF(COUNT(pgs.id), 0) as avg_points,
-    SUM(pgs.total_rebounds) / NULLIF(COUNT(pgs.id), 0) as avg_rebounds,
-    SUM(pgs.assists) / NULLIF(COUNT(pgs.id), 0) as avg_assists,
-    SUM(pgs.minutes_played) / NULLIF(COUNT(pgs.id), 0) as avg_minutes,
+    SUM(pgs.points) / NULLIF(COUNT(*), 0) as avg_points,
+    SUM(pgs.total_rebounds) / NULLIF(COUNT(*), 0) as avg_rebounds,
+    SUM(pgs.assists) / NULLIF(COUNT(*), 0) as avg_assists,
+    SUM(pgs.minutes_played) / NULLIF(COUNT(*), 0) as avg_minutes,
     -- Percentages
     SUM(pgs.field_goals_made) / NULLIF(SUM(pgs.field_goals_attempted), 0) as field_goal_percentage,
     SUM(pgs.three_pointers_made) / NULLIF(SUM(pgs.three_pointers_attempted), 0) as three_point_percentage,

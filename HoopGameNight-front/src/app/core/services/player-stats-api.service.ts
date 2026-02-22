@@ -8,6 +8,8 @@ export interface PlayerSeasonStats {
   teamName: string;
   gamesPlayed: number;
   gamesStarted: number;
+  seasonType?: number;
+  isPlayoffs?: boolean;
 
   // Médias por jogo
   ppg: number;
@@ -16,6 +18,8 @@ export interface PlayerSeasonStats {
   spg: number;
   bpg: number;
   mpg: number;
+  tpg: number;
+  fpg: number;
 
   // ⚠️ CORREÇÃO: Porcentagens como number | null
   fgPercentage: number | null;
@@ -25,6 +29,12 @@ export interface PlayerSeasonStats {
   // Aliases para compatibilidade
   fieldGoalPercentage?: number | null;
   freeThrowPercentage?: number | null;
+  avgPoints: number;
+  avgRebounds: number;
+  avgAssists: number;
+  avgMinutes: number;
+  avgTurnovers: number;
+  avgFouls: number;
 
   // Totais
   totalPoints: number;
@@ -50,12 +60,6 @@ export interface PlayerSeasonStats {
   personalFouls: number;
   minutesPlayed: number;
   points: number;
-
-  // Aliases de médias
-  avgPoints: number;
-  avgRebounds: number;
-  avgAssists: number;
-  avgMinutes: number;
 }
 
 interface ApiResponse<T> {
@@ -72,59 +76,22 @@ interface ApiResponse<T> {
 export class PlayerStatsApiService {
   private readonly apiUrl = `${environment.apiUrl}/api/v1/playerstats`;
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(private readonly http: HttpClient) { }
 
   async getPlayerSeasonStats(playerId: number, season: number): Promise<PlayerSeasonStats | null> {
     try {
       console.log(`📡 API: GET /playerstats/${playerId}/season/${season}`);
-      
+
       const response = await firstValueFrom(
         this.http.get<ApiResponse<any>>(
           `${this.apiUrl}/${playerId}/season/${season}`
         )
       );
 
-      console.log('📡 API Response COMPLETA:', JSON.stringify(response, null, 2));
-
       if (response.success && response.data) {
-        const rawData = response.data;
-        
-        console.log('🔍 INSPECIONANDO PORCENTAGENS NO DATA:');
-        console.log('   Todas as chaves:', Object.keys(rawData));
-        console.log('   fieldGoalPercentage:', rawData.fieldGoalPercentage);
-        console.log('   fgPercentage:', rawData.fgPercentage);
-        console.log('   threePointPercentage:', rawData.threePointPercentage);
-        console.log('   freeThrowPercentage:', rawData.freeThrowPercentage);
-        console.log('   ftPercentage:', rawData.ftPercentage);
-        
-        // ⚠️ NORMALIZAR: Mapear TODAS as variantes possíveis
-        const stats: PlayerSeasonStats = {
-          ...rawData,
-          // FG% - tentar TODAS as variantes
-          fgPercentage: rawData.fgPercentage ?? rawData.fieldGoalPercentage ?? null,
-          fieldGoalPercentage: rawData.fieldGoalPercentage ?? rawData.fgPercentage ?? null,
-          // FT% - tentar TODAS as variantes
-          ftPercentage: rawData.ftPercentage ?? rawData.freeThrowPercentage ?? null,
-          freeThrowPercentage: rawData.freeThrowPercentage ?? rawData.ftPercentage ?? null,
-          // 3P% - geralmente funciona, mas garantir
-          threePointPercentage: rawData.threePointPercentage ?? null
-        };
-
-        console.log('✅ STATS NORMALIZADAS:', {
-          season: stats.season,
-          gamesPlayed: stats.gamesPlayed,
-          ppg: stats.ppg,
-          fgPercentage: stats.fgPercentage,
-          fieldGoalPercentage: stats.fieldGoalPercentage,
-          threePointPercentage: stats.threePointPercentage,
-          ftPercentage: stats.ftPercentage,
-          freeThrowPercentage: stats.freeThrowPercentage
-        });
-
-        return stats;
+        return this.normalizeStats(response.data);
       }
 
-      console.warn('⚠️ API retornou success=false ou data=null');
       return null;
     } catch (error) {
       console.error('❌ Erro ao buscar stats da temporada:', error);
@@ -134,37 +101,97 @@ export class PlayerStatsApiService {
 
   async getPlayerAllSeasons(playerId: number): Promise<PlayerSeasonStats[] | null> {
     try {
-      console.log(`📡 API: GET /playerstats/${playerId}/seasons`);
-      
+      console.log(`📡 API: GET /playerstats/${playerId}/career`);
+
       const response = await firstValueFrom(
-        this.http.get<ApiResponse<PlayerSeasonStats[]>>(
-          `${this.apiUrl}/${playerId}/seasons`
+        this.http.get<ApiResponse<any>>(
+          `${this.apiUrl}/${playerId}/career`
         )
       );
 
-      console.log('📡 API Response (all seasons):', response);
-
-      if (response.success && response.data) {
-        console.log(`✅ ${response.data.length} temporadas retornadas`);
-        
-        // Processar aliases para cada temporada
-        response.data.forEach(stats => {
-          if (stats.fieldGoalPercentage !== undefined && stats.fgPercentage === undefined) {
-            stats.fgPercentage = stats.fieldGoalPercentage;
-          }
-          if (stats.freeThrowPercentage !== undefined && stats.ftPercentage === undefined) {
-            stats.ftPercentage = stats.freeThrowPercentage;
-          }
-        });
-
-        return response.data;
+      if (response.success && response.data && response.data.seasonStats) {
+        const seasonStats = response.data.seasonStats as any[];
+        return seasonStats.map(stats => this.normalizeStats(stats));
       }
 
-      console.warn('⚠️ API retornou success=false ou data=null');
       return null;
     } catch (error) {
-      console.error('❌ Erro ao buscar todas as temporadas:', error);
+      console.error('❌ Erro ao buscar temporadas via /career:', error);
       return null;
     }
+  }
+
+  private normalizeStats(rawData: any): PlayerSeasonStats {
+    // Função auxiliar que retorna undefined se não encontrar a chave, permitindo fallbacks
+    const getValueRaw = (obj: any, key: string) => {
+      if (!obj) return undefined;
+      const pascalKey = key.charAt(0).toUpperCase() + key.slice(1);
+      const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+      return obj[camelKey] ?? obj[pascalKey] ?? obj[key];
+    };
+
+    const getNum = (obj: any, key: string, defaultValue = 0) => {
+      const val = getValueRaw(obj, key);
+      return (val !== null && val !== undefined) ? Number(val) : defaultValue;
+    };
+
+    const stats: PlayerSeasonStats = {
+      season: getNum(rawData, 'season'),
+      teamName: getValueRaw(rawData, 'teamName') || 'Unknown',
+      gamesPlayed: getNum(rawData, 'gamesPlayed'),
+      gamesStarted: getNum(rawData, 'gamesStarted'),
+      seasonType: getNum(rawData, 'seasonType'),
+      isPlayoffs: getValueRaw(rawData, 'isPlayoffs') ?? (getNum(rawData, 'seasonType') === 3),
+
+      // Médias (Tenta ppg, depois avgPoints, etc)
+      ppg: getNum(rawData, 'ppg') || getNum(rawData, 'avgPoints'),
+      rpg: getNum(rawData, 'rpg') || getNum(rawData, 'avgRebounds'),
+      apg: getNum(rawData, 'apg') || getNum(rawData, 'avgAssists'),
+      spg: getNum(rawData, 'spg') || getNum(rawData, 'avgSteals'),
+      bpg: getNum(rawData, 'bpg') || getNum(rawData, 'avgBlocks'),
+      mpg: getNum(rawData, 'mpg') || getNum(rawData, 'avgMinutes'),
+      tpg: getNum(rawData, 'tpg') || getNum(rawData, 'avgTurnovers'),
+      fpg: getNum(rawData, 'fpg') || getNum(rawData, 'avgFouls'),
+
+      // Porcentagens
+      fgPercentage: getValueRaw(rawData, 'fgPercentage') ?? getValueRaw(rawData, 'fieldGoalPercentage') ?? null,
+      fieldGoalPercentage: getValueRaw(rawData, 'fieldGoalPercentage') ?? getValueRaw(rawData, 'fgPercentage') ?? null,
+      threePointPercentage: getValueRaw(rawData, 'threePointPercentage') ?? null,
+      ftPercentage: getValueRaw(rawData, 'ftPercentage') ?? getValueRaw(rawData, 'freeThrowPercentage') ?? null,
+      freeThrowPercentage: getValueRaw(rawData, 'freeThrowPercentage') ?? getValueRaw(rawData, 'ftPercentage') ?? null,
+
+      // Totais
+      totalPoints: getNum(rawData, 'totalPoints') || getNum(rawData, 'points'),
+      totalRebounds: getNum(rawData, 'totalRebounds'),
+      totalAssists: getNum(rawData, 'totalAssists') || getNum(rawData, 'assists'),
+
+      // Arremessos
+      fieldGoalsMade: getNum(rawData, 'fieldGoalsMade'),
+      fieldGoalsAttempted: getNum(rawData, 'fieldGoalsAttempted'),
+      threePointersMade: getNum(rawData, 'threePointersMade'),
+      threePointersAttempted: getNum(rawData, 'threePointersAttempted'),
+      freeThrowsMade: getNum(rawData, 'freeThrowsMade'),
+      freeThrowsAttempted: getNum(rawData, 'freeThrowsAttempted'),
+
+      // Detalhes extras
+      offensiveRebounds: getNum(rawData, 'offensiveRebounds'),
+      defensiveRebounds: getNum(rawData, 'defensiveRebounds'),
+      steals: getNum(rawData, 'steals'),
+      blocks: getNum(rawData, 'blocks'),
+      turnovers: getNum(rawData, 'turnovers'),
+      personalFouls: getNum(rawData, 'personalFouls'),
+      minutesPlayed: getNum(rawData, 'minutesPlayed'),
+      points: getNum(rawData, 'totalPoints') || getNum(rawData, 'points'), // Usar total se points for 0
+
+      // Aliases redundantes para segurança
+      avgPoints: getNum(rawData, 'avgPoints') || getNum(rawData, 'ppg'),
+      avgRebounds: getNum(rawData, 'avgRebounds') || getNum(rawData, 'rpg'),
+      avgAssists: getNum(rawData, 'avgAssists') || getNum(rawData, 'apg'),
+      avgMinutes: getNum(rawData, 'avgMinutes') || getNum(rawData, 'mpg'),
+      avgTurnovers: getNum(rawData, 'avgTurnovers') || getNum(rawData, 'tpg'),
+      avgFouls: getNum(rawData, 'avgFouls') || getNum(rawData, 'fpg'),
+    };
+
+    return stats;
   }
 }

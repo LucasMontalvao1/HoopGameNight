@@ -12,6 +12,7 @@ namespace HoopGameNight.Infrastructure.Jobs
     public class SyncJobs
     {
         private readonly IGameService _gameService;
+        private readonly IGameSyncService _gameSyncService;
         private readonly ITeamService _teamService;
         private readonly IPlayerStatsSyncService _playerStatsSyncService;
         private readonly IDistributedLockFactory? _lockFactory;
@@ -19,12 +20,14 @@ namespace HoopGameNight.Infrastructure.Jobs
 
         public SyncJobs(
             IGameService gameService,
+            IGameSyncService gameSyncService,
             ITeamService teamService,
             IPlayerStatsSyncService playerStatsSyncService,
             ILogger<SyncJobs> logger,
             IDistributedLockFactory? lockFactory = null)
         {
             _gameService = gameService;
+            _gameSyncService = gameSyncService;
             _teamService = teamService;
             _playerStatsSyncService = playerStatsSyncService;
             _lockFactory = lockFactory;
@@ -67,10 +70,9 @@ namespace HoopGameNight.Infrastructure.Jobs
                 await _teamService.SyncAllTeamsAsync();
             }
 
-            // Sincronizar Jogos de Ontem, Hoje e Próximos 7 dias
-            await _gameService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
-            await _gameService.SyncTodayGamesAsync();
-            await _gameService.SyncFutureGamesAsync(7);
+            await _gameSyncService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
+            await _gameSyncService.SyncTodayGamesAsync();
+            await _gameSyncService.SyncFutureGamesAsync(7);
 
             _logger.LogInformation("Sincronização de Jogos concluída com sucesso");
         }
