@@ -22,6 +22,11 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
 
   // Cache de todos os dados de temporada do jogador
   private _allStatsData: PlayerSeasonStats[] = [];
+  
+  // Getter para a tabela da carreira
+  get allCareerStats(): PlayerSeasonStats[] {
+    return this._allStatsData.sort((a, b) => b.season - a.season);
+  }
 
   // Getters públicos
   readonly selectedSeason = this._selectedSeason.asReadonly();
@@ -37,7 +42,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     public readonly router: Router
   ) { }
 
-  protected readonly activeTab = signal<'stats' | 'gamelog'>('stats');
+  protected readonly activeTab = signal<'stats' | 'gamelog' | 'career'>('stats');
 
   onSeasonChange(event: Event): void {
     const select = event.target as HTMLSelectElement;
@@ -94,64 +99,60 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     img.style.display = 'none';
   }
 
-  // ===== MÉTODOS DE ESTATÍSTICAS =====
-
   private async loadPlayerStats(playerId: number): Promise<void> {
     try {
       console.log(`🏀 PLAYER DETAILS: Iniciando carregamento de stats para jogador ${playerId}`);
       this._loadingStats.set(true);
 
-      // Buscar todas as temporadas disponíveis via /career (ESPN Data - Mais completo)
+      // Buscar todas as temporadas disponíveis via /career
       console.log(`→ Chamando playerStatsService.getPlayerAllSeasons(${playerId})`);
       const allSeasons = await this.playerStatsService.getPlayerAllSeasons(playerId);
 
       this._allStatsData = allSeasons || [];
-      console.log(`✅ Recebido ${this._allStatsData.length} registros de temporada:`, this._allStatsData);
+      console.log(`Recebido ${this._allStatsData.length} registros de temporada:`, this._allStatsData);
 
       if (this._allStatsData.length > 0) {
-        // Extrair anos únicos das temporadas e ordenar (mais recente primeiro)
         const seasons = this._allStatsData
           .map(s => s.season)
           .filter((v, i, a) => a.indexOf(v) === i)
           .sort((a, b) => b - a);
 
-        console.log(`📅 Temporadas únicas:`, seasons);
+        console.log(`Temporadas únicas:`, seasons);
         this._availableSeasons.set(seasons);
 
         // Selecionar a temporada mais recente
         const latestSeason = seasons[0];
-        console.log(`→ Selecionando temporada inicial: ${latestSeason}`);
+        console.log(`Selecionando temporada inicial: ${latestSeason}`);
         await this.selectSeason(latestSeason);
       } else {
-        console.warn('⚠️ Nenhuma estatística disponível via API de carreira');
+        console.warn('Nenhuma estatística disponível via API de carreira');
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar estatísticas:', error);
+      console.error('Erro ao carregar estatísticas:', error);
     } finally {
       this._loadingStats.set(false);
     }
   }
 
   async selectSeason(season: number): Promise<void> {
-    console.log(`📅 Selecionando temporada: ${season}`);
+    console.log(`Selecionando temporada: ${season}`);
     this._selectedSeason.set(season);
 
     // Prioridade 1: Procurar nos dados de carreira (ESPN) que já carregamos
-    // Preferimos a Regular Season (isPlayoffs === false)
     const statsFromCareer = this._allStatsData.find(s => s.season === season && s.isPlayoffs === false)
       || this._allStatsData.find(s => s.season === season);
 
     if (statsFromCareer) {
-      console.log('✅ Usando stats do cache de carreira (ESPN):', statsFromCareer);
+      console.log('Usando stats do cache de carreira (ESPN):', statsFromCareer);
       this._seasonStats.set(statsFromCareer);
     } else {
       // Prioridade 2: Buscar do nosso banco de dados (Calculado via View)
-      console.log(`🔍 Stats não encontradas no cache. Buscando via API para season ${season}`);
+      console.log(`Stats não encontradas no cache. Buscando via API para season ${season}`);
       await this.loadSeasonStatsFromDb(season);
     }
   }
 
-  async setTab(tab: 'stats' | 'gamelog'): Promise<void> {
+  async setTab(tab: 'stats' | 'gamelog' | 'career'): Promise<void> {
     this.activeTab.set(tab);
     if (tab === 'gamelog') {
       await this.loadRecentGamelog();
@@ -165,10 +166,6 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Busca estatísticas agregadas da nossa VIEW local no banco de dados.
-   * Usado como fallback ou quando queremos dados locais granulares.
-   */
   private async loadSeasonStatsFromDb(season: number): Promise<void> {
     const playerId = this._currentPlayerId();
     if (!playerId) return;
@@ -186,15 +183,12 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ⚠️ FORMATAÇÃO DE PORCENTAGENS
   formatPercentage(value: number | null | undefined): string {
     if (value === null || value === undefined) return '-';
 
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(numValue)) return '-';
 
-    // O backend envia percentuais tanto como 0.55 quanto 55.0
-    // Regra: se for < 1 (e não for zero puro), multiplicamos por 100
     let percentage = numValue;
     if (numValue > 0 && numValue < 1) {
       percentage = numValue * 100;

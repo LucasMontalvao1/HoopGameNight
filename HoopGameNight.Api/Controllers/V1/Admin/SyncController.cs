@@ -16,31 +16,40 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
     /// Gerencia as operações de sincronização de dados (times e jogos) e fornece métricas de saúde do sistema.
     /// </summary>
     [Route(ApiConstants.Routes.SYNC)]
-    [ApiExplorerSettings(GroupName = "Admin")]
+    [ApiExplorerSettings(GroupName = "admin")]
     public class SyncController : BaseApiController
     {
         private readonly IGameService _gameService;
         private readonly IGameSyncService _gameSyncService;
         private readonly ITeamService _teamService;
+        private readonly IPlayerService _playerService;
+        private readonly IPlayerStatsService _playerStatsService;
         private readonly ISyncMetricsService _syncMetricsService;
         private readonly ICacheService _cacheService;
         private readonly ISyncHealthService _healthService;
+        private readonly IBackgroundSyncService _backgroundSyncService;
 
         public SyncController(
             IGameService gameService,
             IGameSyncService gameSyncService,
             ITeamService teamService,
+            IPlayerService playerService,
+            IPlayerStatsService playerStatsService,
             ISyncMetricsService syncMetricsService,
             ICacheService cacheService,
             ISyncHealthService healthService,
+            IBackgroundSyncService backgroundSyncService,
             ILogger<SyncController> logger) : base(logger)
         {
             _gameService = gameService;
             _gameSyncService = gameSyncService;
             _teamService = teamService;
+            _playerService = playerService;
+            _playerStatsService = playerStatsService;
             _syncMetricsService = syncMetricsService;
             _cacheService = cacheService;
             _healthService = healthService;
+            _backgroundSyncService = backgroundSyncService;
         }
 
         /// <summary>
@@ -105,6 +114,106 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                 };
 
                 return Ok(result, success ? "Essential sync completed" : "Sync completed with errors");
+            });
+        }
+
+        /// <summary>
+        /// Realiza a sincronização completa do sistema: Times, Jogadores, Estatísticas de Carreira e Jogos de hoje.
+        /// </summary>
+        [HttpPost("full")]
+        [ProducesResponseType(typeof(ApiResponse<SyncResult>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<SyncResult>>> SyncFull()
+        {
+            return await ExecuteAsync(async () =>
+            {
+                var startTime = DateTime.UtcNow;
+                var errors = new List<string>();
+                int teamsCount = 0;
+                int gamesCount = 0;
+                int playersCount = 0;
+                int statsSyncedCount = 0;
+
+                Logger.LogInformation("Iniciando sincronização TOTAL do sistema...");
+
+                // 1. Sincronizar Times
+                try
+                {
+                    await _teamService.SyncAllTeamsAsync();
+                    var teams = await _teamService.GetAllTeamsAsync();
+                    teamsCount = teams.Count;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Teams sync failed: {ex.Message}");
+                }
+
+                // 2. Sincronizar Jogadores (Todos os elenco da liga)
+                try
+                {
+                    await _playerService.SyncPlayersAsync(null);
+                    var (players, total) = await _playerService.GetAllPlayersAsync(1, 1000);
+                    playersCount = total;
+
+                    Logger.LogInformation("Sincronizando estatísticas para {Count} jogadores...", playersCount);
+                    
+                    // 3. Sincronizar Estatísticas de Carreira e Jogos Recentes para cada jogador
+
+            foreach (var p in players)
+            {
+                try 
+                {
+                    // Career Stats
+                    await _playerStatsService.GetPlayerCareerStatsFromEspnAsync(p.Id);
+                    
+                    // Recent Games (Last 20)
+                    await _playerStatsService.GetPlayerGamelogFromEspnAsync(p.Id);
+
+                    statsSyncedCount++;
+                    
+                    if (statsSyncedCount % 50 == 0)
+                        Logger.LogInformation("Sincronização de estatísticas/jogos: {Count}/{Total} concluídos", statsSyncedCount, playersCount);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning("Falha ao sincronizar dados do jogador {PlayerId}: {Error}", p.Id, ex.Message);
+                }
+            }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Players/Stats sync failed: {ex.Message}");
+                }
+
+                // 4. Sincronizar Jogos de Hoje
+                try
+                {
+                    await _gameSyncService.SyncTodayGamesAsync();
+                    var games = await _gameService.GetTodayGamesAsync();
+                    gamesCount = games.Count;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Games sync failed: {ex.Message}");
+                }
+
+                var duration = DateTime.UtcNow - startTime;
+                var success = errors.Count == 0;
+
+                _cacheService.Clear();
+
+                var result = new SyncResult
+                {
+                    Success = success,
+                    Duration = duration,
+                    TeamsCount = teamsCount,
+                    GamesCount = gamesCount,
+                    PlayersCount = playersCount,
+                    StatsSyncedCount = statsSyncedCount,
+                    Errors = errors,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                return Ok(result, success ? "Full sync completed successfully" : "Full sync completed with errors");
             });
         }
 
@@ -334,6 +443,54 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                 }
             });
         }
+
+        /// <summary>
+        /// Realiza a análise de gaps para encontrar jogos finalizados sem estatísticas e corrigi-los.
+        /// </summary>
+        [HttpPost("gap-analysis")]
+        [ProducesResponseType(typeof(ApiResponse<SyncOperationResult>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<SyncOperationResult>>> GapAnalysis()
+        {
+            return await ExecuteAsync<SyncOperationResult>(async () =>
+            {
+                var startTime = DateTime.UtcNow;
+                Logger.LogInformation("Iniciando Gap Analysis manual...");
+
+                await _backgroundSyncService.SyncMissingGamesStatsAsync();
+
+                var duration = DateTime.UtcNow - startTime;
+                return Ok(new SyncOperationResult
+                {
+                    Message = "Gap analysis completed",
+                    DurationSeconds = duration.TotalSeconds,
+                    Timestamp = DateTime.UtcNow
+                }, "Gap analysis sync process triggered");
+            });
+        }
+
+        /// <summary>
+        /// Força a renovação do cache de dados semi-estáticos (Times/Jogadores).
+        /// </summary>
+        [HttpPost("cache-refresh")]
+        [ProducesResponseType(typeof(ApiResponse<SyncOperationResult>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<SyncOperationResult>>> CacheRefresh()
+        {
+            return await ExecuteAsync<SyncOperationResult>(async () =>
+            {
+                var startTime = DateTime.UtcNow;
+                Logger.LogInformation("Iniciando Background Cache Refresh manual...");
+
+                await _backgroundSyncService.RefreshStaticDataCacheAsync();
+
+                var duration = DateTime.UtcNow - startTime;
+                return Ok(new SyncOperationResult
+                {
+                    Message = "Background cache refresh completed",
+                    DurationSeconds = duration.TotalSeconds,
+                    Timestamp = DateTime.UtcNow
+                }, "Cache refresh process triggered");
+            });
+        }
     }
 
     #region DTOs
@@ -344,6 +501,8 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         public TimeSpan Duration { get; set; }
         public int TeamsCount { get; set; }
         public int GamesCount { get; set; }
+        public int PlayersCount { get; set; }
+        public int StatsSyncedCount { get; set; }
         public List<string> Errors { get; set; } = new();
         public DateTime Timestamp { get; set; }
     }
@@ -435,6 +594,13 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         public int DaysAhead { get; set; }
         public TimeSpan Duration { get; set; }
         public string? Error { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
+
+    public class SyncOperationResult
+    {
+        public string Message { get; set; } = string.Empty;
+        public double DurationSeconds { get; set; }
         public DateTime Timestamp { get; set; }
     }
 

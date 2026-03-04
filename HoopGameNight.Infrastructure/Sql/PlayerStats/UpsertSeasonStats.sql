@@ -5,7 +5,7 @@
     free_throws_made, free_throws_attempted,
     offensive_rebounds, defensive_rebounds, total_rebounds,
     assists, steals, blocks, turnovers, personal_fouls,
-    avg_points, avg_rebounds, avg_assists, avg_minutes,
+    avg_points, avg_rebounds, avg_assists, avg_steals, avg_blocks, avg_turnovers, avg_fouls, avg_minutes,
     field_goal_percentage, three_point_percentage, free_throw_percentage,
     created_at, updated_at
 ) VALUES (
@@ -15,7 +15,7 @@
     @FreeThrowsMade, @FreeThrowsAttempted,
     @OffensiveRebounds, @DefensiveRebounds, @TotalRebounds,
     @Assists, @Steals, @Blocks, @Turnovers, @PersonalFouls,
-    @AvgPoints, @AvgRebounds, @AvgAssists, @AvgMinutes,
+    @AvgPoints, @AvgRebounds, @AvgAssists, @AvgSteals, @AvgBlocks, @AvgTurnovers, @AvgFouls, @AvgMinutes,
     @FieldGoalPercentage, @ThreePointPercentage, @FreeThrowPercentage,
     NOW(), NOW()
 ) ON DUPLICATE KEY UPDATE
@@ -41,6 +41,10 @@
     avg_points = VALUES(avg_points),
     avg_rebounds = VALUES(avg_rebounds),
     avg_assists = VALUES(avg_assists),
+    avg_steals = VALUES(avg_steals),
+    avg_blocks = VALUES(avg_blocks),
+    avg_turnovers = VALUES(avg_turnovers),
+    avg_fouls = VALUES(avg_fouls),
     avg_minutes = VALUES(avg_minutes),
     field_goal_percentage = VALUES(field_goal_percentage),
     three_point_percentage = VALUES(three_point_percentage),

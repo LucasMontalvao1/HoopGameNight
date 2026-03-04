@@ -1,5 +1,3 @@
-USE hoop_game_night;
-
 DROP VIEW IF EXISTS vw_player_game_stats_detailed;
 
 CREATE VIEW vw_player_game_stats_detailed AS
@@ -120,11 +118,4 @@ INNER JOIN teams t ON pgs.team_id = t.id
 LEFT JOIN teams ht ON g.home_team_id = ht.id
 LEFT JOIN teams vt ON g.visitor_team_id = vt.id;
 
-SELECT 'VIEW vw_player_game_stats_detailed criada com sucesso!' AS Status;
-SELECT COUNT(*) AS total_registros FROM vw_player_game_stats_detailed;
 
--- SELECT * FROM vw_player_game_stats_detailed WHERE player_id = 1 AND game_id = 1;
--- SELECT * FROM vw_player_game_stats_detailed WHERE player_id = 1 ORDER BY game_date DESC LIMIT 10;
--- SELECT * FROM vw_player_game_stats_detailed WHERE game_id = 1 ORDER BY team_id, is_starter DESC, points DESC;
--- SELECT * FROM vw_player_game_stats_detailed WHERE double_double = 1 ORDER BY game_date DESC LIMIT 20;
--- SELECT * FROM vw_player_game_stats_detailed WHERE triple_double = 1 ORDER BY game_date DESC;

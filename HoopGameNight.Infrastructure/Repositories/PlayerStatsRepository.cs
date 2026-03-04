@@ -114,6 +114,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                 return false;
 
             using var connection = GetConnection();
+            connection.Open();
             using var transaction = connection.BeginTransaction();
 
             try
@@ -141,6 +142,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                 return false;
 
             using var connection = GetConnection();
+            connection.Open();
             using var transaction = connection.BeginTransaction();
 
             try

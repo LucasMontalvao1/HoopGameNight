@@ -9,14 +9,16 @@ namespace HoopGameNight.Core.DTOs.Response
         public T? Data { get; set; }
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
         public string? RequestId { get; set; }
+        public bool IsSyncing { get; set; } = false;
 
-        public static ApiResponse<T> SuccessResult(T data, string message = "Success")
+        public static ApiResponse<T> SuccessResult(T data, string message = "Success", bool isSyncing = false)
         {
             return new ApiResponse<T>
             {
                 Success = true,
                 Message = message,
-                Data = data
+                Data = data,
+                IsSyncing = isSyncing
             };
         }
 

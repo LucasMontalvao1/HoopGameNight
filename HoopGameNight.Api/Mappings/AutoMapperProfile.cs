@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using AutoMapper;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Enums;
@@ -88,11 +88,11 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.PPG, opt => opt.MapFrom(src => src.AvgPoints))
                 .ForMember(dest => dest.RPG, opt => opt.MapFrom(src => src.AvgRebounds))
                 .ForMember(dest => dest.APG, opt => opt.MapFrom(src => src.AvgAssists))
-                .ForMember(dest => dest.SPG, opt => opt.MapFrom(src =>
-                    src.GamesPlayed > 0 ? Math.Round((decimal)src.Steals / src.GamesPlayed, 1) : 0))
-                .ForMember(dest => dest.BPG, opt => opt.MapFrom(src =>
-                    src.GamesPlayed > 0 ? Math.Round((decimal)src.Blocks / src.GamesPlayed, 1) : 0))
+                .ForMember(dest => dest.SPG, opt => opt.MapFrom(src => src.AvgSteals))
+                .ForMember(dest => dest.BPG, opt => opt.MapFrom(src => src.AvgBlocks))
                 .ForMember(dest => dest.MPG, opt => opt.MapFrom(src => src.AvgMinutes))
+                .ForMember(dest => dest.TPG, opt => opt.MapFrom(src => src.AvgTurnovers))
+                .ForMember(dest => dest.FPG, opt => opt.MapFrom(src => src.AvgFouls))
                 .ForMember(dest => dest.FGPercentage, opt => opt.MapFrom(src => src.FieldGoalPercentage ?? 0))
                 .ForMember(dest => dest.ThreePointPercentage, opt => opt.MapFrom(src => src.ThreePointPercentage ?? 0))
                 .ForMember(dest => dest.FTPercentage, opt => opt.MapFrom(src => src.FreeThrowPercentage ?? 0))
@@ -114,10 +114,22 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.Opponent, opt => opt.Ignore())
                 .ForMember(dest => dest.IsHome, opt => opt.Ignore())
                 .ForMember(dest => dest.Result, opt => opt.Ignore())
+                .ForMember(dest => dest.Rebounds, opt => opt.MapFrom(src => src.TotalRebounds))
                 .ForMember(dest => dest.Minutes, opt => opt.MapFrom(src => src.MinutesFormatted))
                 .ForMember(dest => dest.FieldGoals, opt => opt.MapFrom(src => src.FieldGoalsFormatted))
                 .ForMember(dest => dest.ThreePointers, opt => opt.MapFrom(src => src.ThreePointersFormatted))
                 .ForMember(dest => dest.FreeThrows, opt => opt.MapFrom(src => src.FreeThrowsFormatted))
+                .ForMember(dest => dest.FieldGoalsMade, opt => opt.MapFrom(src => src.FieldGoalsMade))
+                .ForMember(dest => dest.FieldGoalsAttempted, opt => opt.MapFrom(src => src.FieldGoalsAttempted))
+                .ForMember(dest => dest.ThreePointersMade, opt => opt.MapFrom(src => src.ThreePointersMade))
+                .ForMember(dest => dest.ThreePointersAttempted, opt => opt.MapFrom(src => src.ThreePointersAttempted))
+                .ForMember(dest => dest.FreeThrowsMade, opt => opt.MapFrom(src => src.FreeThrowsMade))
+                .ForMember(dest => dest.FreeThrowsAttempted, opt => opt.MapFrom(src => src.FreeThrowsAttempted))
+                .ForMember(dest => dest.FieldGoalPercentage, opt => opt.MapFrom(src => src.FieldGoalPercentage))
+                .ForMember(dest => dest.ThreePointPercentage, opt => opt.MapFrom(src => src.ThreePointPercentage))
+                .ForMember(dest => dest.FreeThrowPercentage, opt => opt.MapFrom(src => src.FreeThrowPercentage))
+                .ForMember(dest => dest.OffensiveRebounds, opt => opt.MapFrom(src => src.OffensiveRebounds))
+                .ForMember(dest => dest.DefensiveRebounds, opt => opt.MapFrom(src => src.DefensiveRebounds))
                 .ForMember(dest => dest.DoubleDouble, opt => opt.MapFrom(src => src.DoubleDouble))
                 .ForMember(dest => dest.TripleDouble, opt => opt.MapFrom(src => src.TripleDouble));
 
@@ -128,6 +140,17 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.FieldGoals, opt => opt.MapFrom(src => src.FieldGoalsFormatted))
                 .ForMember(dest => dest.ThreePointers, opt => opt.MapFrom(src => src.ThreePointersFormatted))
                 .ForMember(dest => dest.FreeThrows, opt => opt.MapFrom(src => src.FreeThrowsFormatted))
+                .ForMember(dest => dest.FieldGoalsMade, opt => opt.MapFrom(src => src.FieldGoalsMade))
+                .ForMember(dest => dest.FieldGoalsAttempted, opt => opt.MapFrom(src => src.FieldGoalsAttempted))
+                .ForMember(dest => dest.ThreePointersMade, opt => opt.MapFrom(src => src.ThreePointersMade))
+                .ForMember(dest => dest.ThreePointersAttempted, opt => opt.MapFrom(src => src.ThreePointersAttempted))
+                .ForMember(dest => dest.FreeThrowsMade, opt => opt.MapFrom(src => src.FreeThrowsMade))
+                .ForMember(dest => dest.FreeThrowsAttempted, opt => opt.MapFrom(src => src.FreeThrowsAttempted))
+                .ForMember(dest => dest.FieldGoalPercentage, opt => opt.MapFrom(src => src.FieldGoalPercentage))
+                .ForMember(dest => dest.ThreePointPercentage, opt => opt.MapFrom(src => src.ThreePointPercentage))
+                .ForMember(dest => dest.FreeThrowPercentage, opt => opt.MapFrom(src => src.FreeThrowPercentage))
+                .ForMember(dest => dest.OffensiveRebounds, opt => opt.MapFrom(src => src.OffensiveRebounds))
+                .ForMember(dest => dest.DefensiveRebounds, opt => opt.MapFrom(src => src.DefensiveRebounds))
                 .ForMember(dest => dest.Opponent, opt => opt.MapFrom(src => src.OpponentAbbreviation));
         }
 

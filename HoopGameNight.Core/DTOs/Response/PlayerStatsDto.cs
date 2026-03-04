@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace HoopGameNight.Core.DTOs.Response
@@ -50,8 +50,8 @@ namespace HoopGameNight.Core.DTOs.Response
         public decimal SPG { get; set; }
         public decimal BPG { get; set; }
         public decimal MPG { get; set; }
-        public decimal TPG { get; set; } // Turnovers Per Game
-        public decimal FPG { get; set; } // Fouls Per Game
+        public decimal TPG { get; set; } 
+        public decimal FPG { get; set; } 
 
         // Porcentagens
         public decimal FGPercentage { get; set; }
@@ -90,6 +90,11 @@ namespace HoopGameNight.Core.DTOs.Response
         public decimal AvgMinutes => MPG;
         public decimal AvgTurnovers => TPG;
         public decimal AvgFouls => FPG;
+
+        // Percentagens com nomes completos para o frontend
+        public decimal FieldGoalPercentage => FGPercentage;
+        public decimal ThreePointPercentageFull => ThreePointPercentage; 
+        public decimal FreeThrowPercentage => FTPercentage;
     }
 
     public class PlayerCareerStatsResponse
@@ -128,16 +133,51 @@ namespace HoopGameNight.Core.DTOs.Response
         public string Opponent { get; set; } = string.Empty;
         public bool IsHome { get; set; }
         public string Result { get; set; } = string.Empty;
+
+        // Core box score
         public int Points { get; set; }
         public int Rebounds { get; set; }
         public int Assists { get; set; }
         public int Steals { get; set; }
         public int Blocks { get; set; }
+        public int Turnovers { get; set; }
+        public int PersonalFouls { get; set; }
+
+        // Time on court
         public string Minutes { get; set; } = string.Empty;
+
+        // Shooting splits (formatted, e.g. "10/20")
         public string FieldGoals { get; set; } = string.Empty;
         public string ThreePointers { get; set; } = string.Empty;
         public string FreeThrows { get; set; } = string.Empty;
+
+        // Shooting splits (numeric for analytics UI)
+        public int FieldGoalsMade { get; set; }
+        public int FieldGoalsAttempted { get; set; }
+        public int ThreePointersMade { get; set; }
+        public int ThreePointersAttempted { get; set; }
+        public int FreeThrowsMade { get; set; }
+        public int FreeThrowsAttempted { get; set; }
+        public decimal FieldGoalPercentage { get; set; }
+        public decimal ThreePointPercentage { get; set; }
+        public decimal FreeThrowPercentage { get; set; }
+
+        // Rebounds breakdown
+        public int OffensiveRebounds { get; set; }
+        public int DefensiveRebounds { get; set; }
+
+        // On/off impact
         public int PlusMinus { get; set; }
+
+        // ESPN / opponent metadata
+        public string EventId { get; set; } = string.Empty;
+        public string OpponentId { get; set; } = string.Empty;
+        public string OpponentAbbreviation { get; set; } = string.Empty;
+        public string OpponentLogo { get; set; } = string.Empty;
+        public string Score { get; set; } = string.Empty;
+        public int TeamId { get; set; }
+
+        // Performance flags
         public bool DoubleDouble { get; set; }
         public bool TripleDouble { get; set; }
     }

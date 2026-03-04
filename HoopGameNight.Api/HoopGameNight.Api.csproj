@@ -1,10 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-	</PropertyGroup>
+	  <UserSecretsId>73f9fdd7-1fe5-4d5f-8bf5-0a8086edfd9b</UserSecretsId>
+  </PropertyGroup>
 
 	<ItemGroup>
 		<!-- API Versioning -->
@@ -41,7 +42,7 @@
 		<!-- Caching -->
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.6" />
 		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="9.0.0" />
-		<PackageReference Include="StackExchange.Redis" Version="2.8.16" />
+		<PackageReference Include="StackExchange.Redis" Version="2.11.8" />
 
 		<!-- Logging -->
 		<PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />

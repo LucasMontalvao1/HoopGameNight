@@ -38,16 +38,16 @@ namespace HoopGameNight.Api.Middleware
                 {
                     _logger.LogWarning("Rate limit exceeded for client {ClientId}", clientId);
                     context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
-                    context.Response.Headers.Add("Retry-After", _timeWindow.TotalSeconds.ToString());
+                    context.Response.Headers.Append("Retry-After", _timeWindow.TotalSeconds.ToString());
                     return;
                 }
 
                 requestTimes.Add(now);
             }
 
-            context.Response.Headers.Add("X-RateLimit-Limit", _requestLimit.ToString());
-            context.Response.Headers.Add("X-RateLimit-Remaining", (_requestLimit - requestTimes.Count).ToString());
-            context.Response.Headers.Add("X-RateLimit-Reset", DateTimeOffset.UtcNow.Add(_timeWindow).ToUnixTimeSeconds().ToString());
+            context.Response.Headers.Append("X-RateLimit-Limit", _requestLimit.ToString());
+            context.Response.Headers.Append("X-RateLimit-Remaining", (_requestLimit - requestTimes.Count).ToString());
+            context.Response.Headers.Append("X-RateLimit-Reset", DateTimeOffset.UtcNow.Add(_timeWindow).ToUnixTimeSeconds().ToString());
 
             await _next(context);
         }

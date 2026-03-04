@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using AutoMapper;
 using HoopGameNight.Core.Configuration;
 using HoopGameNight.Core.Constants;
@@ -43,7 +44,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Busca jogadores com cache (Redis → Banco → ESPN)
+        /// Search players with cache support (Redis → DB → ESPN)
         /// </summary>
         public async Task<(List<PlayerResponse> Players, int TotalCount)> SearchPlayersAsync(SearchPlayerRequest request)
         {
@@ -54,7 +55,7 @@ namespace HoopGameNight.Core.Services
 
                 _logger.LogInformation("SEARCH PLAYERS: {@Request}", request);
 
-                // 1. Tentar cache (Redis → Memory)
+                // 1. Try cache (Redis → Memory)
                 var cachedData = await _cacheService.GetAsync<PlayerSearchCacheResult>(cacheKey);
                 if (cachedData != null)
                 {
@@ -66,7 +67,7 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("Consultando BANCO...");
                 var (players, totalCount) = await _playerRepository.SearchPlayersAsync(request);
 
-                // 3. Se não encontrou e tem busca por nome, sincronizar da ESPN
+                // 3. If not found and searching by name, sync from ESPN
                 if (!players.Any() && !string.IsNullOrWhiteSpace(request.Search))
                 {
                     _logger.LogInformation("BANCO vazio para busca '{Search}', sincronizando da ESPN...", request.Search);
@@ -77,13 +78,13 @@ namespace HoopGameNight.Core.Services
                     _logger.LogInformation("Após SYNC: {Count} jogadores encontrados", players.Count());
                 }
 
-                // 4. Se busca por time e não encontrou, sincronizar roster daquele time
+                // 4. If team search yields no results, sync team roster
                 if (!players.Any() && request.TeamId.HasValue)
                 {
                     _logger.LogInformation("BANCO vazio para time {TeamId}, sincronizando roster...", request.TeamId);
                     await SyncTeamRosterAsync(request.TeamId.Value);
 
-                    // Tentar novamente
+                    // Retry
                     (players, totalCount) = await _playerRepository.SearchPlayersAsync(request);
                     _logger.LogInformation("Após SYNC: {Count} jogadores encontrados", players.Count());
                 }
@@ -92,7 +93,7 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("BANCO: Encontrou {Count} jogadores (total: {Total})",
                     response.Count, totalCount);
 
-                // 5. Salvar em cache
+                // 5. Save to cache
                 var cacheResult = new PlayerSearchCacheResult
                 {
                     Players = response,
@@ -110,7 +111,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Busca jogadores por time (Redis → Banco → ESPN)
+        /// Fetch players by team with cache (Redis → DB → ESPN)
         /// </summary>
         public async Task<(List<PlayerResponse> Players, int TotalCount)> GetPlayersByTeamAsync(
             int teamId,
@@ -136,7 +137,7 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("Consultando BANCO para time {TeamId}...", teamId);
                 var (players, totalCount) = await _playerRepository.GetPlayersByTeamAsync(teamId, page, pageSize);
 
-                // 3. Se não encontrou, sincronizar da ESPN
+                // 3. If missing, sync from ESPN
                 if (!players.Any())
                 {
                     _logger.LogInformation("BANCO vazio para time {TeamId}, sincronizando da ESPN...", teamId);
@@ -148,7 +149,9 @@ namespace HoopGameNight.Core.Services
                 }
 
                 var response = _mapper.Map<List<PlayerResponse>>(players);
-                _logger.LogInformation("BANCO: {Count} jogadores para time {TeamId}", response.Count, teamId);
+                _logger.LogInformation("BANCO: {Count} jogadores para time {TeamId}. IDs: {Ids}", 
+                    response.Count, teamId, 
+                    string.Join(",", response.Take(5).Select(p => $"{p.FullName}={p.Id}")));
 
                 // 4. Salvar em cache
                 var cacheResult = new PlayerSearchCacheResult
@@ -168,7 +171,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Lista todos os jogadores com paginação (Redis → Banco → ESPN)
+        /// List all players with pagination (Redis → DB → ESPN)
         /// </summary>
         public async Task<(List<PlayerResponse> Players, int TotalCount)> GetAllPlayersAsync(
             int page,
@@ -192,7 +195,7 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("Consultando BANCO para todos os jogadores...");
                 var (players, totalCount) = await _playerRepository.GetAllPlayersAsync(page, pageSize);
 
-                // 3. Se não encontrou nenhum, sincronizar da ESPN
+                // 3. If none found, sync all rosters from ESPN
                 if (!players.Any())
                 {
                     _logger.LogInformation("BANCO vazio, sincronizando todos os rosters da ESPN...");
@@ -224,7 +227,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Busca jogador por ID (Redis → Banco)
+        /// Get player by ID (Redis → DB)
         /// </summary>
         public async Task<PlayerResponse?> GetPlayerByIdAsync(int id)
         {
@@ -268,7 +271,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Sincroniza jogadores da ESPN API para o banco local
+        /// Synchronizes players from ESPN API to local database
         /// </summary>
         public async Task SyncPlayersAsync(string? searchTerm = null)
         {
@@ -282,11 +285,11 @@ namespace HoopGameNight.Core.Services
             }
             else
             {
-                // Sincronizar jogadores de todos os times (não tem busca por nome na ESPN)
+                // Sincronizar jogadores de todos os times 
                 await SyncAllTeamRostersAsync();
             }
 
-            // Limpar cache
+            // Clear cache
             await _cacheService.RemoveByPatternAsync(CacheKeys.AllPlayersPattern);
             _logger.LogInformation("SYNC PLAYERS: Sincronização concluída, cache limpo");
         }
@@ -294,13 +297,12 @@ namespace HoopGameNight.Core.Services
         #region Métodos Privados - Sincronização ESPN
 
         /// <summary>
-        /// Sincroniza roster de um time específico
+        /// Sync roster for a specific team
         /// </summary>
         private async Task SyncTeamRosterAsync(int teamId)
         {
             try
             {
-                // Buscar time para obter ExternalId
                 var team = await _teamRepository.GetByIdAsync(teamId);
                 if (team == null)
                 {
@@ -332,7 +334,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Sincroniza rosters de todos os times
+        /// Sync rosters for all teams
         /// </summary>
         private async Task SyncAllTeamRostersAsync()
         {
@@ -360,7 +362,6 @@ namespace HoopGameNight.Core.Services
                         _logger.LogDebug("Sincronizado roster de {TeamName}: {Count} jogadores",
                             team.FullName, roster.Count);
 
-                        // Pequeno delay para não sobrecarregar a API
                         await Task.Delay(100);
                     }
                     catch (Exception ex)
@@ -378,7 +379,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Salva jogador ESPN no banco
+        /// Saves ESPN player details to database
         /// </summary>
         private async Task<bool> SaveEspnPlayerAsync(EspnPlayerDetailsDto espnPlayer, int teamId)
         {
@@ -391,24 +392,48 @@ namespace HoopGameNight.Core.Services
 
                 var externalId = int.Parse(espnPlayer.Id);
 
-                // Verificar se já existe
-                var exists = await _playerRepository.ExistsAsync(externalId);
-                if (exists)
+                var existingPlayer = await _playerRepository.GetByExternalIdAsync(externalId);
+                
+                int heightFeet = 0, heightInches = 0, weightPounds = 0;
+
+                if (espnPlayer.Height > 0)
                 {
-                    _logger.LogDebug("Jogador já existe: {PlayerName} (ID: {ExternalId})",
-                        espnPlayer.FullName, externalId);
+                    var totalInches = (int)espnPlayer.Height;
+                    heightFeet = totalInches / 12;
+                    heightInches = totalInches % 12;
+                }
+                else if (!string.IsNullOrEmpty(espnPlayer.DisplayHeight))
+                {
+                    var match = Regex.Match(espnPlayer.DisplayHeight, @"(\d+)'\s*(\d+)\""");
+                    if (match.Success)
+                    {
+                        heightFeet = int.Parse(match.Groups[1].Value);
+                        heightInches = int.Parse(match.Groups[2].Value);
+                    }
+                }
+
+                weightPounds = (int)espnPlayer.Weight;
+                if (weightPounds == 0 && !string.IsNullOrEmpty(espnPlayer.DisplayWeight))
+                {
+                    var match = Regex.Match(espnPlayer.DisplayWeight, @"(\d+)");
+                    if (match.Success) weightPounds = int.Parse(match.Groups[1].Value);
+                }
+
+                var position = ParsePosition(espnPlayer.Position?.Abbreviation);
+
+                if (existingPlayer != null)
+                {
+                    _logger.LogDebug("Atualizando biometria do jogador existente: {PlayerName}", espnPlayer.FullName);
+                    existingPlayer.HeightFeet = heightFeet > 0 ? heightFeet : existingPlayer.HeightFeet;
+                    existingPlayer.HeightInches = heightInches > 0 || (heightFeet > 0) ? heightInches : existingPlayer.HeightInches;
+                    existingPlayer.WeightPounds = weightPounds > 0 ? weightPounds : existingPlayer.WeightPounds;
+                    existingPlayer.Position = position ?? existingPlayer.Position;
+                    existingPlayer.TeamId = teamId; 
+
+                    await _playerRepository.UpdateAsync(existingPlayer);
                     return true;
                 }
 
-                // Converter altura de polegadas para feet/inches
-                var totalInches = (int)espnPlayer.Height;
-                var heightFeet = totalInches / 12;
-                var heightInches = totalInches % 12;
-
-                // Converter posição string para enum
-                var position = ParsePosition(espnPlayer.Position?.Abbreviation);
-
-                // Criar novo jogador
                 var player = new Player
                 {
                     ExternalId = externalId,
@@ -417,7 +442,7 @@ namespace HoopGameNight.Core.Services
                     Position = position,
                     HeightFeet = heightFeet,
                     HeightInches = heightInches,
-                    WeightPounds = (int)espnPlayer.Weight,
+                    WeightPounds = weightPounds,
                     TeamId = teamId,
                     EspnId = espnPlayer.Id
                 };
@@ -435,7 +460,7 @@ namespace HoopGameNight.Core.Services
         }
 
         /// <summary>
-        /// Converte string de posição para enum PlayerPosition
+        /// Maps position abbreviation to PlayerPosition enum
         /// </summary>
         private static PlayerPosition? ParsePosition(string? positionAbbreviation)
         {
@@ -479,7 +504,7 @@ namespace HoopGameNight.Core.Services
     }
 
     /// <summary>
-    /// DTO para cache de resultado de busca
+    /// Search results cache DTO
     /// </summary>
     internal class PlayerSearchCacheResult
     {

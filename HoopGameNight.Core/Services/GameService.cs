@@ -69,8 +69,11 @@ namespace HoopGameNight.Core.Services
                 var games = await _gameRepository.GetTodayGamesAsync();
                 var response = _mapper.Map<List<GameResponse>>(games);
 
-                await _cacheService.SetAsync(cacheKey, response, CacheDurations.TodayGames);
-                _logger.LogInformation("Recuperados {Count} jogos de hoje do BANCO DE DADOS", response.Count);
+                var hasLiveGames = response.Any(g => g.IsLive);
+                var cacheDuration = hasLiveGames ? TimeSpan.FromSeconds(30) : CacheDurations.TodayGames;
+
+                await _cacheService.SetAsync(cacheKey, response, cacheDuration);
+                _logger.LogInformation("Recuperados {Count} jogos de hoje do BANCO DE DADOS (TTL: {TTL}s)", response.Count, cacheDuration.TotalSeconds);
 
                 return response;
             }
@@ -381,8 +384,11 @@ namespace HoopGameNight.Core.Services
             var result = await GetGamesForMultipleTeamsAsync(request);
             var games = result.AllGames.OrderBy(g => g.Date).ToList();
 
-            await _cacheService.SetAsync(cacheKey, games, TimeSpan.FromMinutes(10));
-            _logger.LogInformation("Salvos {Count} próximos jogos do time {TeamId} no Redis", games.Count, teamId);
+            var hasActiveGames = games.Any(g => g.IsLive || g.Date.Date == DateTime.Today);
+            var cacheDuration = hasActiveGames ? TimeSpan.FromMinutes(2) : TimeSpan.FromHours(12);
+
+            await _cacheService.SetAsync(cacheKey, games, cacheDuration);
+            _logger.LogInformation("Salvos {Count} próximos jogos do time {TeamId} no Redis com TTL de {TTL} min", games.Count, teamId, cacheDuration.TotalMinutes);
 
             return games;
         }
@@ -411,8 +417,11 @@ namespace HoopGameNight.Core.Services
             var result = await GetGamesForMultipleTeamsAsync(request);
             var games = result.AllGames.OrderByDescending(g => g.Date).ToList();
 
-            await _cacheService.SetAsync(cacheKey, games, TimeSpan.FromMinutes(5));
-            _logger.LogInformation("Salvos {Count} jogos recentes do time {TeamId} no Redis", games.Count, teamId);
+            var hasActiveOrTodayGames = games.Any(g => g.IsLive || (!g.IsCompleted && g.Date >= DateTime.Today));
+            var cacheDuration = hasActiveOrTodayGames ? TimeSpan.FromMinutes(2) : TimeSpan.FromHours(24);
+
+            await _cacheService.SetAsync(cacheKey, games, cacheDuration);
+            _logger.LogInformation("Salvos {Count} jogos recentes do time {TeamId} no Redis com TTL de {TTL} min", games.Count, teamId, cacheDuration.TotalMinutes);
 
             return games;
         }
@@ -423,37 +432,63 @@ namespace HoopGameNight.Core.Services
 
         private async Task<List<GameResponse>> GetGamesFromDatabaseAsync(List<int> teamIds, DateTime startDate, DateTime endDate)
         {
-            var allGames = await _gameRepository.GetByDateRangeAsync(startDate, endDate);
+            _logger.LogInformation("FETCHING GAMES: Database query for {TeamCount} teams between {Start} and {End}",
+                teamIds.Count, startDate.ToShortDateString(), endDate.ToShortDateString());
 
-            var filtered = allGames
-                .Where(g => teamIds.Contains(g.HomeTeamId) || teamIds.Contains(g.VisitorTeamId))
-                .ToList();
-
-            return _mapper.Map<List<GameResponse>>(filtered);
+            var games = await _gameRepository.GetByDateRangeAndTeamsAsync(startDate, endDate, teamIds);
+            
+            _logger.LogInformation("DATABASE RESULT: Found {Count} games", games.Count());
+            
+            return _mapper.Map<List<GameResponse>>(games.ToList());
         }
 
         private async Task<List<GameResponse>> GetFutureGamesFromEspnAsync(List<int> teamIds, DateTime startDate, DateTime endDate)
         {
-            var allGames = new List<GameResponse>();
+            var allTeams = await _teamRepository.GetAllAsync();
+            var targetTeams = allTeams.Where(t => teamIds.Contains(t.Id)).ToList();
+            var targetEspnIds = targetTeams.Select(t => t.ExternalId.ToString()).ToHashSet();
+            var targetAbbrs = targetTeams.Select(t => t.Abbreviation).ToHashSet();
 
-            var tasks = teamIds.Select(async teamId =>
+            var allEspnGames = new List<EspnGameDto>();
+            
+            // Parallelize ESPN requests for each date in the range
+            var dateRange = Enumerable.Range(0, (int)(endDate - startDate).TotalDays + 1)
+                                      .Select(offset => startDate.AddDays(offset))
+                                      .ToList();
+
+            _logger.LogInformation("PARALLEL ESPN FETCH: Requesting {Days} days of games in parallel", dateRange.Count);
+
+            var tasks = dateRange.Select(async d =>
             {
                 try
                 {
-                    var espnGames = await _espnService.GetTeamScheduleAsync(teamId, startDate, endDate);
-                    return await ConvertEspnGamesToResponseAsync(espnGames);
+                    var gamesForDate = await _espnService.GetGamesByDateAsync(d);
+                    if (gamesForDate != null)
+                    {
+                        var filteredGames = gamesForDate.Where(g =>
+                            targetEspnIds.Contains(g.HomeTeamId) || targetEspnIds.Contains(g.AwayTeamId) ||
+                            targetAbbrs.Contains(g.HomeTeamAbbreviation) || targetAbbrs.Contains(g.AwayTeamAbbreviation)
+                        ).ToList();
+                        
+                        return filteredGames;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error fetching ESPN games for team {TeamId}", teamId);
-                    return new List<GameResponse>();
+                    _logger.LogError(ex, "Error fetching ESPN future games for Date {Date}", d.ToString("yyyy-MM-dd"));
                 }
+                return new List<EspnGameDto>();
             });
 
             var results = await Task.WhenAll(tasks);
-            allGames = results.SelectMany(r => r).ToList();
+            foreach (var gamesList in results)
+            {
+                allEspnGames.AddRange(gamesList);
+            }
 
-            return allGames
+            var mappedGames = await ConvertEspnGamesToResponseAsync(allEspnGames);
+
+            return mappedGames
                 .GroupBy(g => new { Date = g.Date.Date, HomeTeamId = g.HomeTeam.Id, VisitorTeamId = g.VisitorTeam.Id })
                 .Select(g => g.First())
                 .ToList();

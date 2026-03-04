@@ -32,7 +32,7 @@ namespace HoopGameNight.Api.Controllers.V1
             return await ExecuteAsync<PlayerSeasonStatsResponse>(async () =>
             {
                 var stats = await _playerStatsService.GetPlayerSeasonStatsAsync(playerId, season);
-                if (stats == null) return NotFound<PlayerSeasonStatsResponse>("Estatísticas da temporada não encontradas ou jogador inexistente.");
+                if (stats == null) return Ok(new PlayerSeasonStatsResponse(), "Sincronizando estatísticas...", true);
                 return Ok(stats);
             });
         }
@@ -45,7 +45,7 @@ namespace HoopGameNight.Api.Controllers.V1
             return await ExecuteAsync<PlayerGameStatsDetailedResponse>(async () =>
             {
                 var stats = await _playerStatsService.GetPlayerGameStatsAsync(playerId, gameId);
-                if (stats == null) return NotFound<PlayerGameStatsDetailedResponse>("Estatísticas do jogo não encontradas.");
+                if (stats == null) return Ok(new PlayerGameStatsDetailedResponse(), "Sincronizando estatísticas...", true);
                 return Ok(stats);
             });
         }
@@ -57,12 +57,11 @@ namespace HoopGameNight.Api.Controllers.V1
             return await ExecuteAsync<PlayerGamelogResponse>(async () =>
             {
                 var stats = await _playerStatsService.GetPlayerRecentGamesAsync(playerId, limit);
-                if (stats == null) return NotFound<PlayerGamelogResponse>("Recent games not found");
+                if (stats == null) return Ok(new PlayerGamelogResponse(), "Sincronizando estatísticas...", true);
                 return Ok(stats);
             });
         }
 
-        // === DIRECT ESPN ENDPOINTS (CACHE -> ESPN) ===
 
         [HttpGet("{playerId}/gamelog")]
         [ProducesResponseType(typeof(ApiResponse<PlayerGamelogResponse>), StatusCodes.Status200OK)]

@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Threading;
+using StackExchange.Redis;
 
 namespace HoopGameNight.Infrastructure.Services
 {
@@ -20,9 +21,9 @@ namespace HoopGameNight.Infrastructure.Services
     {
         private readonly IMemoryCache _memoryCache;
         private readonly IDistributedCache? _distributedCache;
+        private readonly IConnectionMultiplexer? _connectionMultiplexer;
         private readonly ILogger<CacheService> _logger;
 
-        // Estatísticas do cache
         private long _redisHits = 0;
         private long _redisMisses = 0;
         private long _memoryHits = 0;
@@ -32,11 +33,13 @@ namespace HoopGameNight.Infrastructure.Services
         public CacheService(
             IMemoryCache memoryCache,
             ILogger<CacheService> logger,
-            IDistributedCache? distributedCache = null)
+            IDistributedCache? distributedCache = null,
+            IConnectionMultiplexer? connectionMultiplexer = null)
         {
             _memoryCache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _distributedCache = distributedCache;
+            _connectionMultiplexer = connectionMultiplexer;
 
             if (_distributedCache == null)
             {
@@ -87,7 +90,6 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                // 1️⃣ Tentar Redis primeiro (se disponível)
                 if (_distributedCache != null)
                 {
                     var redisData = await _distributedCache.GetStringAsync(key);
@@ -141,11 +143,17 @@ namespace HoopGameNight.Infrastructure.Services
                 throw new ArgumentNullException(nameof(value));
 
             var ttl = expiration ?? CacheDurations.Default;
+            TimeSpan? finalTtl = ttl == Timeout.InfiniteTimeSpan ? null : ttl;
 
             try
             {
-                _memoryCache.Set(key, value, ttl);
-                _logger.LogDebug("MEMORY SET (sync): {Key} (TTL: {TTL})", key, ttl);
+                var options = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = finalTtl
+                };
+                
+                _memoryCache.Set(key, value, options);
+                _logger.LogDebug("MEMORY SET (sync): {Key} (TTL: {TTL})", key, finalTtl?.ToString() ?? "Infinite");
             }
             catch (Exception ex)
             {
@@ -166,6 +174,7 @@ namespace HoopGameNight.Infrastructure.Services
                 throw new ArgumentNullException(nameof(value));
 
             var ttl = expiration ?? CacheDurations.Default;
+            TimeSpan? finalTtl = ttl == Timeout.InfiniteTimeSpan ? null : ttl;
 
             try
             {
@@ -174,20 +183,20 @@ namespace HoopGameNight.Infrastructure.Services
                     var json = JsonSerializer.Serialize(value);
                     var options = new DistributedCacheEntryOptions
                     {
-                        AbsoluteExpirationRelativeToNow = ttl
+                        AbsoluteExpirationRelativeToNow = finalTtl
                     };
 
                     await _distributedCache.SetStringAsync(key, json, options);
-                    _logger.LogDebug("REDIS SET: {Key} (TTL: {TTL})", key, ttl);
+                    _logger.LogDebug("REDIS SET: {Key} (TTL: {TTL})", key, finalTtl?.ToString() ?? "Infinite");
                 }
 
                 var cacheOptions = new MemoryCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = ttl
+                    AbsoluteExpirationRelativeToNow = finalTtl
                 };
 
                 _memoryCache.Set(key, value, cacheOptions);
-                _logger.LogDebug("MEMORY SET: {Key} (TTL: {TTL})", key, ttl);
+                _logger.LogDebug("MEMORY SET: {Key} (TTL: {TTL})", key, finalTtl?.ToString() ?? "Infinite");
             }
             catch (Exception ex)
             {
@@ -248,12 +257,28 @@ namespace HoopGameNight.Infrastructure.Services
             if (string.IsNullOrWhiteSpace(pattern))
                 throw new ArgumentException("Pattern cannot be null or empty", nameof(pattern));
 
-            _logger.LogWarning("RemoveByPatternAsync('{Pattern}') requer Redis Server commands (KEYS/SCAN). " +
-                               "Funcionalidade limitada com IDistributedCache. " +
-                               "Considere implementar usando StackExchange.Redis diretamente.", pattern);
+            _logger.LogInformation("Removing keys by pattern: {Pattern}", pattern);
 
-
-            await Task.CompletedTask;
+            try
+            {
+                if (_connectionMultiplexer != null)
+                {
+                    var endpoints = _connectionMultiplexer.GetEndPoints();
+                    foreach (var endpoint in endpoints)
+                    {
+                        var server = _connectionMultiplexer.GetServer(endpoint);
+                        foreach (var key in server.Keys(pattern: pattern))
+                        {
+                            await _distributedCache!.RemoveAsync(key!);
+                            _memoryCache.Remove(key!); 
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing keys by pattern: {Pattern}", pattern);
+            }
         }
 
         /// <summary>
@@ -303,14 +328,20 @@ namespace HoopGameNight.Infrastructure.Services
 
         /// <summary>
         /// Tenta realizar a limpeza total do cache local. 
-        /// Nota: IMemoryCache não fornece um método nativo para FlushAll; considere utilizar invalidação por padrão.
         /// </summary>
         public void Clear()
         {
             try
             {
-                _logger.LogWarning("Clear() chamado mas IMemoryCache não suporta limpeza total. " +
-                                   "Use RemoveByPatternAsync para invalidações específicas.");
+                if (_memoryCache is MemoryCache concreteCache)
+                {
+                    concreteCache.Compact(1.0);
+                    _logger.LogInformation("Memory Cache limpo com sucesso via Compact(1.0).");
+                }
+                else
+                {
+                    _logger.LogWarning("Clear() chamado mas IMemoryCache não suporta limpeza total ou não é do tipo esperado.");
+                }
             }
             catch (Exception ex)
             {

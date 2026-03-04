@@ -260,19 +260,34 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
 
         [JsonPropertyName("events")]
         public Dictionary<string, System.Text.Json.JsonElement>? Events { get; set; }
+
+        [JsonPropertyName("entries")]
+        public List<EspnGamelogEventDto>? Entries { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
+
+        [JsonPropertyName("names")]
+        public List<string>? Names { get; set; }
     }
     
     public class EspnSeasonGamelogDto
     {
+        [JsonPropertyName("displayName")]
         public string? DisplayName { get; set; }
+        [JsonPropertyName("categories")]
         public List<EspnGamelogCategoryDto>? Categories { get; set; }
+        [JsonPropertyName("events")]
         public List<EspnGamelogEventDto>? Events { get; set; }
     }
 
     public class EspnGamelogCategoryDto
     {
+        [JsonPropertyName("name")]
         public string? Name { get; set; }
+        [JsonPropertyName("displayName")]
         public string? DisplayName { get; set; }
+        [JsonPropertyName("events")]
         public List<EspnGamelogEventDto>? Events { get; set; }
     }
 
@@ -298,7 +313,15 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
 
     public class EspnGamelogEventDto
     {
+        [JsonPropertyName("id")]
+        public string? Id { get; set; }
+
+        [JsonPropertyName("eventId")]
         public string? EventId { get; set; }
+
+        [JsonPropertyName("gameDate")]
+        public string? GameDate { get; set; }
+
         [JsonPropertyName("stats")]
         public List<string>? Stats { get; set; } 
     }
@@ -573,19 +596,15 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         
     public class EspnPlayerStatsSplitDto
     {
-        [JsonIgnore]
         [JsonPropertyName("id")]
         public string Id { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("abbreviation")]
         public string Abbreviation { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("type")]
         public string Type { get; set; } = string.Empty;
 
@@ -601,15 +620,18 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         [JsonPropertyName("displayName")]
         public string DisplayName { get; set; } = string.Empty;
 
-        [JsonIgnore]
+        [JsonPropertyName("names")]
+        public List<string>? Names { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
+
         [JsonPropertyName("shortDisplayName")]
         public string ShortDisplayName { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("abbreviation")]
         public string Abbreviation { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("summary")]
         public string Summary { get; set; } = string.Empty;
 
@@ -622,23 +644,18 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("displayName")]
         public string DisplayName { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("shortDisplayName")]
         public string ShortDisplayName { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("description")]
         public string Description { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("abbreviation")]
         public string Abbreviation { get; set; } = string.Empty;
 
-        [JsonIgnore]
         [JsonPropertyName("label")]
         public string? Label { get; set; }
 
@@ -646,8 +663,7 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         public double Value { get; set; }
 
         [JsonPropertyName("displayValue")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string DisplayValue { get; set; } = string.Empty;
+        public string? DisplayValue { get; set; }
     }
 
     public class EspnStatisticsRefDto
@@ -682,5 +698,65 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
         [JsonPropertyName("type")]
         public int Type { get; set; }
     }
+    public class EspnPlayerCareerStatsDto
+    {
+        [JsonPropertyName("teams")]
+        public Dictionary<string, EspnTeamRefDto>? Teams { get; set; }
 
+        [JsonPropertyName("categories")]
+        public List<EspnCareerCategoryDto>? Categories { get; set; }
+
+        [JsonPropertyName("seasonTypes")]
+        public List<EspnCareerSeasonTypeDto>? SeasonTypes { get; set; }
+    }
+
+    public class EspnCareerCategoryDto
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; set; }
+
+        [JsonPropertyName("labels")]
+        public List<string>? Labels { get; set; }
+
+        [JsonPropertyName("names")]
+        public List<string>? Names { get; set; }
+
+        [JsonPropertyName("statistics")]
+        public List<EspnCareerStatisticDto>? Statistics { get; set; }
+    }
+
+    public class EspnCareerStatisticDto
+    {
+        [JsonPropertyName("season")]
+        public EspnSeasonRefDto? Season { get; set; }
+
+        [JsonPropertyName("type")]
+        public EspnSeasonTypeDto? Type { get; set; }
+
+        [JsonPropertyName("teamId")]
+        public string? TeamId { get; set; }
+
+        [JsonPropertyName("teamName")]
+        public string? TeamName { get; set; }
+
+        [JsonPropertyName("teamSlug")]
+        public string? TeamSlug { get; set; }
+
+        [JsonPropertyName("stats")]
+        public List<string>? Stats { get; set; }
+    }
+
+    public class EspnCareerSeasonTypeDto
+    {
+        [JsonPropertyName("year")]
+        public int Year { get; set; }
+        [JsonPropertyName("type")]
+        public int Type { get; set; }
+        [JsonPropertyName("teamId")]
+        public string? TeamId { get; set; }
+        [JsonPropertyName("teamName")]
+        public string? TeamName { get; set; }
+        [JsonPropertyName("categories")]
+        public List<EspnStatsCategoryDto>? Categories { get; set; }
+    }
 }

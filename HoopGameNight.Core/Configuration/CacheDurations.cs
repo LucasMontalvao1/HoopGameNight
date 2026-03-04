@@ -8,6 +8,11 @@ namespace HoopGameNight.Core.Configuration
     /// </summary>
     public static class CacheDurations
     {
+        /// <summary>
+        /// Indica que o cache não deve expirar automaticamente por tempo
+        /// </summary>
+        public static TimeSpan NoExpiration => System.Threading.Timeout.InfiniteTimeSpan;
+
         // ===== GAMES =====
 
         /// <summary>
@@ -23,82 +28,77 @@ namespace HoopGameNight.Core.Configuration
         public static TimeSpan GamesByDate => TimeSpan.FromMinutes(15);
 
         /// <summary>
-        /// Cache para jogos passados (1 hora)
-        /// TTL longo pois dados históricos não mudam
+        /// Cache para jogos passados (Infinito - Imutável)
         /// </summary>
-        public static TimeSpan PastGames => TimeSpan.FromHours(1);
+        public static TimeSpan PastGames => NoExpiration;
 
         /// <summary>
         /// Cache para jogos futuros (30 minutos)
-        /// TTL médio pois horários podem ser alterados
         /// </summary>
         public static TimeSpan FutureGames => TimeSpan.FromMinutes(30);
 
         /// <summary>
-        /// Cache para jogos ao vivo (2 minutos)
-        /// TTL muito curto para atualização frequente de placares
+        /// Cache para jogos ao vivo (30 segundos)
+        /// TTL muito curto para atualização de polling
         /// </summary>
-        public static TimeSpan LiveGames => TimeSpan.FromMinutes(2);
+        public static TimeSpan LiveGames => TimeSpan.FromSeconds(30);
 
         // ===== TEAMS =====
 
         /// <summary>
-        /// Cache para todos os times (24 horas)
-        /// TTL longo pois lista de times muda raramente
+        /// Cache para todos os times (Infinito - Imutável)
+        /// Atualizado via background job
         /// </summary>
-        public static TimeSpan AllTeams => TimeSpan.FromHours(24);
+        public static TimeSpan AllTeams => NoExpiration;
 
         /// <summary>
-        /// Cache para um time específico (2 horas)
-        /// TTL longo pois dados de time mudam raramente
+        /// Cache para um time específico (Infinito - Imutável)
         /// </summary>
-        public static TimeSpan SingleTeam => TimeSpan.FromHours(2);
+        public static TimeSpan SingleTeam => NoExpiration;
 
         /// <summary>
-        /// Cache para times por conferência (12 horas)
-        /// TTL longo pois conferências não mudam durante temporada
+        /// Cache para times por conferência (Infinito)
         /// </summary>
-        public static TimeSpan TeamsByConference => TimeSpan.FromHours(12);
+        public static TimeSpan TeamsByConference => NoExpiration;
 
         // ===== PLAYERS =====
 
         /// <summary>
-        /// Cache para um jogador específico (1 hora)
-        /// TTL médio pois dados podem ser atualizados (lesões, trocas)
+        /// Cache para um jogador específico (7 dias)
+        /// Quase Estático
         /// </summary>
-        public static TimeSpan Player => TimeSpan.FromHours(1);
+        public static TimeSpan Player => TimeSpan.FromDays(7);
 
         /// <summary>
-        /// Cache para jogadores de um time (30 minutos)
-        /// TTL médio pois roster pode mudar (call-ups, trades)
+        /// Cache para jogadores de um time (7 dias)
+        /// Quase estático, invalidado sob detecção de trade
         /// </summary>
-        public static TimeSpan PlayersByTeam => TimeSpan.FromMinutes(30);
+        public static TimeSpan PlayersByTeam => TimeSpan.FromDays(7);
 
         /// <summary>
-        /// Cache para busca de jogadores (15 minutos)
-        /// TTL curto pois resultados dependem de dados frescos
+        /// Cache para busca de jogadores (1 hora)
         /// </summary>
-        public static TimeSpan PlayersSearch => TimeSpan.FromMinutes(15);
+        public static TimeSpan PlayersSearch => TimeSpan.FromHours(1);
 
         // ===== STATISTICS =====
 
         /// <summary>
-        /// Cache para estatísticas de jogador (15 minutos)
-        /// TTL curto pois stats mudam após cada jogo
+        /// Cache para estatísticas de jogador na Temporada (Infinito)
+        /// Limpo pelo sync pós jogo
         /// </summary>
-        public static TimeSpan PlayerStats => TimeSpan.FromMinutes(15);
+        public static TimeSpan PlayerStats => NoExpiration;
 
         /// <summary>
-        /// Cache para estatísticas da temporada (1 hora)
-        /// TTL médio pois stats agregadas mudam menos frequentemente
+        /// Cache para estatísticas da temporada (Infinito)
+        /// Limpo pelo Sync Noturno
         /// </summary>
-        public static TimeSpan SeasonStats => TimeSpan.FromHours(1);
+        public static TimeSpan SeasonStats => NoExpiration;
 
         /// <summary>
-        /// Cache para estatísticas de carreira (24 horas)
-        /// TTL longo pois dados históricos são estáveis
+        /// Cache para estatísticas de carreira (Infinito)
+        /// Limpo pelo sync pós jogo
         /// </summary>
-        public static TimeSpan CareerStats => TimeSpan.FromHours(24);
+        public static TimeSpan CareerStats => NoExpiration;
 
         // ===== SYNC & METADATA =====
 

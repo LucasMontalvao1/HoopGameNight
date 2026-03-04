@@ -27,6 +27,7 @@ namespace HoopGameNight.Core.Services
         private readonly ITeamService _teamService;
         private readonly ICacheService _cacheService;
         private readonly IEspnParser _espnParser;
+        private readonly IBackgroundSyncQueue _backgroundSyncQueue;
         private readonly ILogger<GameSyncService> _logger;
 
         public GameSyncService(
@@ -36,6 +37,7 @@ namespace HoopGameNight.Core.Services
             ITeamService teamService,
             ICacheService cacheService,
             IEspnParser espnParser,
+            IBackgroundSyncQueue backgroundSyncQueue,
             ILogger<GameSyncService> logger)
         {
             _gameRepository = gameRepository;
@@ -44,6 +46,7 @@ namespace HoopGameNight.Core.Services
             _teamService = teamService;
             _cacheService = cacheService;
             _espnParser = espnParser;
+            _backgroundSyncQueue = backgroundSyncQueue;
             _logger = logger;
         }
 
@@ -77,6 +80,7 @@ namespace HoopGameNight.Core.Services
                     return 0;
                 }
 
+                var affectedTeamIds = new HashSet<int>();
                 foreach (var espnGame in espnGames)
                 {
                     try
@@ -84,25 +88,7 @@ namespace HoopGameNight.Core.Services
                         var homeTeamId = await _teamService.MapEspnTeamToSystemIdAsync(espnGame.HomeTeamId, espnGame.HomeTeamAbbreviation);
                         var visitorTeamId = await _teamService.MapEspnTeamToSystemIdAsync(espnGame.AwayTeamId, espnGame.AwayTeamAbbreviation);
 
-                        if (homeTeamId == 0 || visitorTeamId == 0)
-                        {
-                            _logger.LogWarning(
-                                "Jogo ignorado - mapeamento falhou | ESPN: {Away}({AwayId}) @ {Home}({HomeId})",
-                                espnGame.AwayTeamAbbreviation, espnGame.AwayTeamId,
-                                espnGame.HomeTeamAbbreviation, espnGame.HomeTeamId);
-                            continue;
-                        }
-
-                        var homeTeam = await _teamRepository.GetByIdAsync(homeTeamId);
-                        var visitorTeam = await _teamRepository.GetByIdAsync(visitorTeamId);
-
-                        if (homeTeam == null || visitorTeam == null)
-                        {
-                            _logger.LogError(
-                                "CRÍTICO: Mapeamento retornou IDs inexistentes | System IDs: Home={HomeId}, Away={VisitorId}",
-                                homeTeamId, visitorTeamId);
-                            continue;
-                        }
+                        if (homeTeamId == 0 || visitorTeamId == 0) continue;
 
                         var gameDate = espnGame.Date.Date;
                         var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate);
@@ -133,10 +119,17 @@ namespace HoopGameNight.Core.Services
 
                             await _gameRepository.InsertAsync(newGame);
                             syncCount++;
-                            _logger.LogDebug("Inserido: {Away} @ {Home}", visitorTeam.Abbreviation, homeTeam.Abbreviation);
+                            affectedTeamIds.Add(homeTeamId);
+                            affectedTeamIds.Add(visitorTeamId);
+                            
+                            if (newGame.Status == GameStatus.Final)
+                            {
+                                _backgroundSyncQueue.EnqueuePostGameProcessing(newGame.ExternalId);
+                            }
                         }
                         else
                         {
+                            var oldStatus = existingGame.Status;
                             var hasChanges = ApplyGameUpdates(existingGame, espnGame);
                             if (hasChanges)
                             {
@@ -144,6 +137,13 @@ namespace HoopGameNight.Core.Services
                                 existingGame.UpdatedAt = DateTime.UtcNow;
                                 await _gameRepository.UpdateAsync(existingGame);
                                 updateCount++;
+                                affectedTeamIds.Add(homeTeamId);
+                                affectedTeamIds.Add(visitorTeamId);
+
+                                if (oldStatus != GameStatus.Final && existingGame.Status == GameStatus.Final)
+                                {
+                                    _backgroundSyncQueue.EnqueuePostGameProcessing(existingGame.ExternalId);
+                                }
                             }
                         }
                     }
@@ -154,6 +154,10 @@ namespace HoopGameNight.Core.Services
                 }
 
                 await InvalidateCacheForDate(date);
+                foreach (var teamId in affectedTeamIds)
+                {
+                    await InvalidateCacheForDate(date, teamId);
+                }
 
                 _logger.LogInformation("Sincronização concluída para {Date}: {New} novos, {Updated} atualizados",
                     date.ToShortDateString(), syncCount, updateCount);
@@ -280,10 +284,21 @@ namespace HoopGameNight.Core.Services
 
                     if (hasChanges)
                     {
+                        var oldStatus = existingGame.Status;
+                        existingGame.Status = status; // Already assigned in the block before, but let's be safe
                         existingGame.DateTime = gameDate;
                         existingGame.UpdatedAt = DateTime.UtcNow;
                         await _gameRepository.UpdateAsync(existingGame);
                         _logger.LogInformation("Jogo {GameId} atualizado via sync individual.", gameId);
+
+                        // Trigger: Mudou para Final
+                        if (oldStatus != GameStatus.Final && existingGame.Status == GameStatus.Final)
+                        {
+                            _backgroundSyncQueue.EnqueuePostGameProcessing(gameId);
+                        }
+                        
+                        await InvalidateCacheForDate(gameDate.Date, homeTeamId);
+                        await InvalidateCacheForDate(gameDate.Date, visitorTeamId);
                     }
 
                     return 1;
@@ -380,14 +395,14 @@ namespace HoopGameNight.Core.Services
 
         private GameStatus DetermineGameStatus(EspnGameDto espnGame)
         {
+            if (!string.IsNullOrEmpty(espnGame.Status))
+                return _espnParser.MapGameStatus(espnGame.Status);
+
             if (espnGame.HomeTeamScore.HasValue && espnGame.AwayTeamScore.HasValue &&
-                espnGame.Date < DateTime.Now.AddHours(-2))
+                espnGame.Date < DateTime.Now.AddHours(-3)) 
             {
                 return GameStatus.Final;
             }
-
-            if (!string.IsNullOrEmpty(espnGame.Status))
-                return _espnParser.MapGameStatus(espnGame.Status);
 
             return espnGame.Date > DateTime.Now ? GameStatus.Scheduled : GameStatus.Final;
         }
@@ -402,12 +417,24 @@ namespace HoopGameNight.Core.Services
         }
 
         private int GetSeasonYear(DateTime date)
-            => date.Month >= 10 ? date.Year + 1 : date.Year;
+            => date.Month >= 10 ? date.Year : date.Year - 1;
 
-        private async Task InvalidateCacheForDate(DateTime date)
+        private async Task InvalidateCacheForDate(DateTime date, int? teamId = null)
         {
             await _cacheService.RemoveAsync(CacheKeys.TodayGames());
             await _cacheService.RemoveAsync(CacheKeys.GamesByDate(date));
+            
+            await _cacheService.RemoveByPatternAsync("games:range:*");
+            
+            if (teamId.HasValue)
+            {
+                await _cacheService.RemoveByPatternAsync($"games:team:{teamId.Value}:*");
+            }
+            
+            if (date.Date == DateTime.Today)
+            {
+                await _cacheService.RemoveByPatternAsync("games:today:*");
+            }
         }
 
         #endregion

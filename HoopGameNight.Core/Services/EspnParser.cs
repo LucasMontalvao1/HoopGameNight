@@ -49,6 +49,8 @@ namespace HoopGameNight.Core.Services
                     {
                         case "min":
                         case "minutes":
+                        case "avgminutes":
+                        case "mpg":
                             if (statValue.Contains(":"))
                             {
                                 var parts = statValue.Split(':');
@@ -64,9 +66,9 @@ namespace HoopGameNight.Core.Services
                             }
                             break;
 
-                        case "pts": case "points": stats.Points = SafeParseInt(statValue); break;
+                        case "pts": case "points": case "totalpoints": stats.Points = SafeParseInt(statValue); break;
                         
-                        case "fg": case "fgm/fga": case "fgm-fga":
+                        case "fg": case "fgm/fga": case "fgm-fga": case "fieldgoals":
                             var fgParts = statValue.Split(new[] { '-', '/' });
                             if (fgParts.Length == 2)
                             {
@@ -74,10 +76,10 @@ namespace HoopGameNight.Core.Services
                                 stats.FieldGoalsAttempted = SafeParseInt(fgParts[1]);
                             }
                             break;
-                        case "fgm": stats.FieldGoalsMade = SafeParseInt(statValue); break;
-                        case "fga": stats.FieldGoalsAttempted = SafeParseInt(statValue); break;
+                        case "fgm": case "fieldgoalsmade": stats.FieldGoalsMade = SafeParseInt(statValue); break;
+                        case "fga": case "fieldgoalsattempted": stats.FieldGoalsAttempted = SafeParseInt(statValue); break;
 
-                        case "3pt": case "3pm/3pa": case "3pm-3pa":
+                        case "3pt": case "3pm/3pa": case "3pm-3pa": case "threepointers": case "3p":
                             var tpParts = statValue.Split(new[] { '-', '/' });
                             if (tpParts.Length == 2)
                             {
@@ -85,10 +87,10 @@ namespace HoopGameNight.Core.Services
                                 stats.ThreePointersAttempted = SafeParseInt(tpParts[1]);
                             }
                             break;
-                        case "3pm": stats.ThreePointersMade = SafeParseInt(statValue); break;
-                        case "3pa": stats.ThreePointersAttempted = SafeParseInt(statValue); break;
+                        case "3pm": case "threepointersmade": stats.ThreePointersMade = SafeParseInt(statValue); break;
+                        case "3pa": case "threepointersattempted": stats.ThreePointersAttempted = SafeParseInt(statValue); break;
 
-                        case "ft": case "ftm/fta": case "ftm-fta":
+                        case "ft": case "ftm/fta": case "ftm-fta": case "freethrows":
                             var ftParts = statValue.Split(new[] { '-', '/' });
                             if (ftParts.Length == 2)
                             {
@@ -96,18 +98,18 @@ namespace HoopGameNight.Core.Services
                                 stats.FreeThrowsAttempted = SafeParseInt(ftParts[1]);
                             }
                             break;
-                        case "ftm": stats.FreeThrowsMade = SafeParseInt(statValue); break;
-                        case "fta": stats.FreeThrowsAttempted = SafeParseInt(statValue); break;
+                        case "ftm": case "freethrowsmade": stats.FreeThrowsMade = SafeParseInt(statValue); break;
+                        case "fta": case "freethrowsattempted": stats.FreeThrowsAttempted = SafeParseInt(statValue); break;
 
-                        case "oreb": stats.OffensiveRebounds = SafeParseInt(statValue); break;
-                        case "dreb": stats.DefensiveRebounds = SafeParseInt(statValue); break;
+                        case "oreb": case "offensiverebounds": stats.OffensiveRebounds = SafeParseInt(statValue); break;
+                        case "dreb": case "defensiverebounds": stats.DefensiveRebounds = SafeParseInt(statValue); break;
                         case "reb": case "totalrebounds": stats.TotalRebounds = SafeParseInt(statValue); break;
-                        case "ast": case "assists": stats.Assists = SafeParseInt(statValue); break;
-                        case "stl": case "steals": stats.Steals = SafeParseInt(statValue); break;
-                        case "blk": case "blocks": stats.Blocks = SafeParseInt(statValue); break;
-                        case "to": case "turnovers": stats.Turnovers = SafeParseInt(statValue); break;
-                        case "pf": case "fouls": stats.PersonalFouls = SafeParseInt(statValue); break;
-                        case "+/-": case "plusminus": stats.PlusMinus = SafeParseInt(statValue); break;
+                        case "ast": case "assists": case "totalassists": stats.Assists = SafeParseInt(statValue); break;
+                        case "stl": case "steals": case "totalsteals": stats.Steals = SafeParseInt(statValue); break;
+                        case "blk": case "blocks": case "totalblocks": stats.Blocks = SafeParseInt(statValue); break;
+                        case "to": case "tov": case "turnovers": case "totalturnovers": stats.Turnovers = SafeParseInt(statValue); break;
+                        case "pf": case "fouls": case "personalfouls": case "totalpersonalfouls": stats.PersonalFouls = SafeParseInt(statValue); break;
+                        case "+/-": case "pm": case "plusminus": stats.PlusMinus = SafeParseInt(statValue); break;
                     }
                 }
                 catch (Exception ex)
@@ -279,44 +281,150 @@ namespace HoopGameNight.Core.Services
 
             if (espnStats.Splits?.Categories == null) return stats;
 
+            decimal avgFgm = 0, avgFga = 0, avg3pm = 0, avg3pa = 0, avgFtm = 0, avgFta = 0;
+
             foreach (var category in espnStats.Splits.Categories)
             {
                 if (category.Stats == null) continue;
 
+                var categoryName = category.Name?.ToLowerInvariant() ?? "";
+                bool isAverageCategory = categoryName.Contains("average") || categoryName.Contains("pergame") || categoryName.Contains("pg");
+
                 foreach (var stat in category.Stats)
                 {
                     var name = stat.Name?.ToLowerInvariant();
-                    var val = (decimal)stat.Value;
+                    if (name == null) continue;
+                    
+                    var val = (stat.Value == 0 && !string.IsNullOrEmpty(stat.DisplayValue) && stat.DisplayValue != "0") 
+                        ? SafeParseDecimal(stat.DisplayValue) 
+                        : (decimal)stat.Value;
 
                     switch (name)
                     {
                         case "gamesplayed": case "gp": stats.GamesPlayed = (int)val; break;
                         case "gamesstarted": case "gs": stats.GamesStarted = (int)val; break;
-                        case "minutes": case "min": stats.MinutesPlayed = val; break;
-                        case "points": case "pts": stats.Points = (int)val; break;
+                        case "minutes": case "min": 
+                            if (isAverageCategory) stats.AvgMinutes = val;
+                            else stats.MinutesPlayed = val; 
+                            break;
+                        case "points": case "pts": case "totalpoints": 
+                            if (isAverageCategory) stats.AvgPoints = val;
+                            else stats.Points = (int)val; 
+                            break;
                         case "fieldgoalsmade": case "fgm": stats.FieldGoalsMade = (int)val; break;
                         case "fieldgoalsattempted": case "fga": stats.FieldGoalsAttempted = (int)val; break;
-                        case "fieldgoalpercentage": case "fg%": stats.FieldGoalPercentage = val; break;
-                        case "threepointfieldgoalsmade": case "3pm": stats.ThreePointersMade = (int)val; break;
-                        case "threepointfieldgoalsattempted": case "3pa": stats.ThreePointersAttempted = (int)val; break;
-                        case "threepointfieldgoalpercentage": case "3p%": stats.ThreePointPercentage = val; break;
+                        case "fieldgoalpercentage": case "fg%": case "fgpct": stats.FieldGoalPercentage = val; break;
+                        case "threepointfieldgoalsmade": case "3pm": case "threepointersmade": stats.ThreePointersMade = (int)val; break;
+                        case "threepointfieldgoalsattempted": case "3pa": case "threepointersattempted": stats.ThreePointersAttempted = (int)val; break;
+                        case "threepointfieldgoalpercentage": case "3p%": case "3ptpct": stats.ThreePointPercentage = val; break;
                         case "freethrowsmade": case "ftm": stats.FreeThrowsMade = (int)val; break;
                         case "freethrowsattempted": case "fta": stats.FreeThrowsAttempted = (int)val; break;
-                        case "freethrowpercentage": case "ft%": stats.FreeThrowPercentage = val; break;
+                        case "freethrowpercentage": case "ft%": case "ftpct": stats.FreeThrowPercentage = val; break;
                         case "offensiverebounds": case "oreb": stats.OffensiveRebounds = (int)val; break;
                         case "defensiverebounds": case "dreb": stats.DefensiveRebounds = (int)val; break;
-                        case "totalrebounds": case "reb": stats.TotalRebounds = (int)val; break;
-                        case "assists": case "ast": stats.Assists = (int)val; break;
-                        case "steals": case "stl": stats.Steals = (int)val; break;
-                        case "blocks": case "blk": stats.Blocks = (int)val; break;
-                        case "turnovers": case "to": stats.Turnovers = (int)val; break;
-                        case "personalfouls": case "pf": stats.PersonalFouls = (int)val; break;
-                        case "avgpoints": case "ppg": stats.AvgPoints = val; break;
-                        case "avgrebounds": case "rpg": stats.AvgRebounds = val; break;
-                        case "avgassists": case "apg": stats.AvgAssists = val; break;
-                        case "avgminutes": case "mpg": stats.AvgMinutes = val; break;
+                        case "totalrebounds": case "reb": case "totalreb": case "trb": 
+                            if (isAverageCategory) stats.AvgRebounds = val;
+                            else stats.TotalRebounds = (int)val; 
+                            break;
+                        case "assists": case "ast": 
+                            if (isAverageCategory) stats.AvgAssists = val;
+                            else stats.Assists = (int)val; 
+                            break;
+                        case "steals": case "stl": 
+                            if (isAverageCategory) stats.AvgSteals = val;
+                            else stats.Steals = (int)val; 
+                            break;
+                        case "blocks": case "blk": 
+                            if (isAverageCategory) stats.AvgBlocks = val;
+                            else stats.Blocks = (int)val; 
+                            break;
+                        case "turnovers": case "to": case "tov": 
+                            if (isAverageCategory) stats.AvgTurnovers = val;
+                            else stats.Turnovers = (int)val; 
+                            break;
+                        case "personalfouls": case "pf": 
+                            if (isAverageCategory) stats.AvgFouls = val;
+                            else stats.PersonalFouls = (int)val; 
+                            break;
+                        case "avgpoints": case "ppg": case "pointspergame": stats.AvgPoints = val; break;
+                        case "avgrebounds": case "rpg": case "reboundspergame": stats.AvgRebounds = val; break;
+                        case "avgassists": case "apg": case "assistspergame": stats.AvgAssists = val; break;
+                        case "avgminutes": case "mpg": case "minutespergame": stats.AvgMinutes = val; break;
+                        case "avgfieldgoalsmade": case "avgfgm": avgFgm = val; break;
+                        case "avgfieldgoalsattempted": case "avgfga": avgFga = val; break;
+                        case "avgthreepointfieldgoalsmade": case "avg3pm": avg3pm = val; break;
+                        case "avgthreepointfieldgoalsattempted": case "avg3pa": avg3pa = val; break;
+                        case "avgfreethrowsmade": case "avgftm": avgFtm = val; break;
+                        case "avgfreethrowsattempted": case "avgfta": avgFta = val; break;
+                        case "fieldgoals": case "fg":
+                            if (!string.IsNullOrEmpty(stat.DisplayValue))
+                            {
+                                var parts = stat.DisplayValue.Split('/', '-');
+                                if (parts.Length == 2 && int.TryParse(parts[0], out int m) && int.TryParse(parts[1], out int a))
+                                {
+                                    stats.FieldGoalsMade = m;
+                                    stats.FieldGoalsAttempted = a;
+                                }
+                            }
+                            break;
+                        case "threepointers": case "3p":
+                            if (!string.IsNullOrEmpty(stat.DisplayValue))
+                            {
+                                var parts = stat.DisplayValue.Split('/', '-');
+                                if (parts.Length == 2 && int.TryParse(parts[0], out int m) && int.TryParse(parts[1], out int a))
+                                {
+                                    stats.ThreePointersMade = m;
+                                    stats.ThreePointersAttempted = a;
+                                }
+                            }
+                            break;
+                        case "freethrows": case "ft":
+                            if (!string.IsNullOrEmpty(stat.DisplayValue))
+                            {
+                                var parts = stat.DisplayValue.Split('/', '-');
+                                if (parts.Length == 2 && int.TryParse(parts[0], out int m) && int.TryParse(parts[1], out int a))
+                                {
+                                    stats.FreeThrowsMade = m;
+                                    stats.FreeThrowsAttempted = a;
+                                }
+                            }
+                            break;
+                        case "avgsteals": case "spg": case "stealspergame": stats.AvgSteals = val; break;
+                        case "avgblocks": case "bpg": case "blockspergame": stats.AvgBlocks = val; break;
+                        case "avgturnovers": case "tpg": case "turnoverspergame": stats.AvgTurnovers = val; break;
+                        case "avgpersonalfouls": case "fpg": case "foulspergame": stats.AvgFouls = val; break;
                     }
                 }
+            }
+
+            // Post-Mapping Fallbacks (Estimating totals from averages if missing, or vice-versa)
+            if (stats.GamesPlayed > 0)
+            {
+                // If total is 0 but avg is not, calculate total
+                if (stats.Points == 0 && stats.AvgPoints > 0) stats.Points = (int)Math.Round(stats.AvgPoints * stats.GamesPlayed);
+                if (stats.TotalRebounds == 0 && stats.AvgRebounds > 0) stats.TotalRebounds = (int)Math.Round(stats.AvgRebounds * stats.GamesPlayed);
+                if (stats.Assists == 0 && stats.AvgAssists > 0) stats.Assists = (int)Math.Round(stats.AvgAssists * stats.GamesPlayed);
+                if (stats.MinutesPlayed == 0 && stats.AvgMinutes > 0) stats.MinutesPlayed = Math.Round(stats.AvgMinutes * (decimal)stats.GamesPlayed, 1);
+                
+                // If avg is 0 but total is not, calculate avg
+                if (stats.AvgPoints == 0 && stats.Points > 0) stats.AvgPoints = Math.Round((decimal)stats.Points / stats.GamesPlayed, 2);
+                if (stats.AvgRebounds == 0 && stats.TotalRebounds > 0) stats.AvgRebounds = Math.Round((decimal)stats.TotalRebounds / stats.GamesPlayed, 2);
+                if (stats.AvgAssists == 0 && stats.Assists > 0) stats.AvgAssists = Math.Round((decimal)stats.Assists / stats.GamesPlayed, 2);
+                if (stats.AvgMinutes == 0 && stats.MinutesPlayed > 0) stats.AvgMinutes = Math.Round((decimal)stats.MinutesPlayed / stats.GamesPlayed, 2);
+
+                // Shooting fallbacks
+                if (stats.FieldGoalsMade == 0 && avgFgm > 0) stats.FieldGoalsMade = (int)Math.Round(avgFgm * stats.GamesPlayed);
+                if (stats.FieldGoalsAttempted == 0 && avgFga > 0) stats.FieldGoalsAttempted = (int)Math.Round(avgFga * stats.GamesPlayed);
+                if (stats.ThreePointersMade == 0 && avg3pm > 0) stats.ThreePointersMade = (int)Math.Round(avg3pm * stats.GamesPlayed);
+                if (stats.ThreePointersAttempted == 0 && avg3pa > 0) stats.ThreePointersAttempted = (int)Math.Round(avg3pa * stats.GamesPlayed);
+                if (stats.FreeThrowsMade == 0 && avgFtm > 0) stats.FreeThrowsMade = (int)Math.Round(avgFtm * stats.GamesPlayed);
+                if (stats.FreeThrowsAttempted == 0 && avgFta > 0) stats.FreeThrowsAttempted = (int)Math.Round(avgFta * stats.GamesPlayed);
+
+                // Defensive fallbacks
+                if (stats.Steals == 0 && stats.AvgSteals > 0) stats.Steals = (int)Math.Round(stats.AvgSteals * stats.GamesPlayed);
+                if (stats.Blocks == 0 && stats.AvgBlocks > 0) stats.Blocks = (int)Math.Round(stats.AvgBlocks * stats.GamesPlayed);
+                if (stats.Turnovers == 0 && stats.AvgTurnovers > 0) stats.Turnovers = (int)Math.Round(stats.AvgTurnovers * stats.GamesPlayed);
+                if (stats.PersonalFouls == 0 && stats.AvgFouls > 0) stats.PersonalFouls = (int)Math.Round(stats.AvgFouls * stats.GamesPlayed);
             }
 
             return stats;
@@ -342,7 +450,17 @@ namespace HoopGameNight.Core.Services
 
                 if (eventElement.TryGetProperty("status", out var status))
                 {
-                    game.Status = GetPropertySafe(status, "name") ?? "Scheduled";
+                    string? statusValue = null;
+                    if (status.TryGetProperty("type", out var statusType))
+                    {
+                        statusValue = GetPropertySafe(statusType, "state");
+                        if (string.IsNullOrEmpty(statusValue))
+                            statusValue = GetPropertySafe(statusType, "name");
+                    }
+                    if (string.IsNullOrEmpty(statusValue))
+                        statusValue = GetPropertySafe(status, "name");
+
+                    game.Status = statusValue ?? "Scheduled";
                     if (status.TryGetProperty("period", out var period)) game.Period = period.GetInt32();
                     if (status.TryGetProperty("displayClock", out var clock)) game.TimeRemaining = clock.GetString();
                 }
@@ -440,7 +558,10 @@ namespace HoopGameNight.Core.Services
         public int SafeParseInt(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return 0;
-            var clean = new string(value.Where(c => char.IsDigit(c) || c == '-' || c == '+').ToArray());
+            var parts = value.Split(new[] { '-', '/', '.' });
+            var firstPart = parts[0].Trim();
+            
+            var clean = new string(firstPart.Where(c => char.IsDigit(c) || c == '-' || c == '+').ToArray());
             if (int.TryParse(clean, out int res)) return res;
             return 0;
         }
@@ -448,8 +569,12 @@ namespace HoopGameNight.Core.Services
         public decimal SafeParseDecimal(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return 0;
-            var clean = new string(value.Where(c => char.IsDigit(c) || c == '.' || c == '-' || c == '+').ToArray());
-            if (decimal.TryParse(clean, out decimal res)) return res;
+            var clean = value.Split(new[] { '-', '/' })[0].Replace("%", "").Trim();
+            clean = new string(clean.Where(c => char.IsDigit(c) || c == '.' || c == ',' || c == '-' || c == '+').ToArray());
+            
+            if (clean.Contains(",") && !clean.Contains(".")) clean = clean.Replace(",", ".");
+
+            if (decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal res)) return res;
             return 0;
         }
 
@@ -480,11 +605,15 @@ namespace HoopGameNight.Core.Services
 
             return externalStatus.Trim().ToLowerInvariant() switch
             {
-                "final" or "completed" => GameStatus.Final,
-                "in progress" or "live" or "in_progress" => GameStatus.Live,
-                "scheduled" or "pre" or "pregame" => GameStatus.Scheduled,
-                "postponed" or "delayed" => GameStatus.Postponed,
-                "cancelled" or "canceled" => GameStatus.Cancelled,
+                "in" => GameStatus.Live,
+                "post" => GameStatus.Final,
+                "pre" => GameStatus.Scheduled,
+
+                "final" or "completed" or "f/ot" or "f/2ot" => GameStatus.Final,
+                "in progress" or "live" or "in_progress" or "status_in_progress" => GameStatus.Live,
+                "scheduled" or "pregame" or "status_scheduled" => GameStatus.Scheduled,
+                "postponed" or "delayed" or "status_postponed" => GameStatus.Postponed,
+                "cancelled" or "canceled" or "status_cancelled" => GameStatus.Cancelled,
                 _ => GameStatus.Scheduled
             };
         }

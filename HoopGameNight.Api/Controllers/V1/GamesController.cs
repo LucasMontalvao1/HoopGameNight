@@ -79,11 +79,11 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 if (date > DateTime.Today)
                 {
-                    Response.Headers.Add("X-Data-Source", "ESPN");
+                    Response.Headers.Append("X-Data-Source", "ESPN");
                 }
                 else
                 {
-                    Response.Headers.Add("X-Data-Source", "Database");
+                    Response.Headers.Append("X-Data-Source", "Database");
                 }
 
                 Logger.LogInformation("Encontrados {GameCount} jogos para a data {Date}", games.Count, date.ToShortDateString());
@@ -241,14 +241,14 @@ namespace HoopGameNight.Api.Controllers.V1
                     ));
                 }
 
-                Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
-                Response.Headers.Add("X-Total-Games", result.AllGames.Count.ToString());
+                Response.Headers.Append("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
+                Response.Headers.Append("X-Total-Games", result.AllGames.Count.ToString());
 
                 var futureGames = result.AllGames.Count(g => g.Date > DateTime.Today);
                 var pastGames = result.AllGames.Count(g => g.Date <= DateTime.Today);
 
-                Response.Headers.Add("X-Future-Games", futureGames.ToString());
-                Response.Headers.Add("X-Past-Games", pastGames.ToString());
+                Response.Headers.Append("X-Future-Games", futureGames.ToString());
+                Response.Headers.Append("X-Past-Games", pastGames.ToString());
 
                 Logger.LogInformation(
                     "Recuperados com sucesso {GameCount} jogos para {TeamCount} times (Futuros: {FutureCount}, Passados: {PastCount})",
@@ -307,7 +307,7 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var upcomingGames = await _gameService.GetUpcomingGamesForTeamAsync(teamId, days);
 
-                Response.Headers.Add("X-Data-Source", upcomingGames.Any(g => g.IsFutureGame) ? "ESPN" : "Database");
+                Response.Headers.Append("X-Data-Source", upcomingGames.Any(g => g.IsFutureGame) ? "ESPN" : "Database");
 
                 if (upcomingGames.Count == 0)
                 {
@@ -370,7 +370,7 @@ namespace HoopGameNight.Api.Controllers.V1
                     AwayGames = recentGames.Count(g => g.VisitorTeam.Id == teamId)
                 };
 
-                Response.Headers.Add("X-Games-Summary", System.Text.Json.JsonSerializer.Serialize(summary));
+                Response.Headers.Append("X-Games-Summary", System.Text.Json.JsonSerializer.Serialize(summary));
 
                 return Ok(recentGames, $"Encontrados {recentGames.Count} jogos recentes");
             }
@@ -429,7 +429,7 @@ namespace HoopGameNight.Api.Controllers.V1
 
                 var result = await _gameService.GetGamesForMultipleTeamsAsync(request);
 
-                Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
+                Response.Headers.Append("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
 
                 var favoriteSummary = new
                 {
@@ -443,7 +443,7 @@ namespace HoopGameNight.Api.Controllers.V1
                         .ToList()
                 };
 
-                Response.Headers.Add("X-Favorites-Summary", System.Text.Json.JsonSerializer.Serialize(favoriteSummary));
+                Response.Headers.Append("X-Favorites-Summary", System.Text.Json.JsonSerializer.Serialize(favoriteSummary));
 
                 Logger.LogInformation(
                     "Encontrados {GameCount} jogos para {TeamCount} times favoritos",
@@ -505,9 +505,9 @@ namespace HoopGameNight.Api.Controllers.V1
                     .GroupBy(g => g.Date.Date)
                     .ToDictionary(g => g.Key, g => g.ToList());
 
-                Response.Headers.Add("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
-                Response.Headers.Add("X-Total-Days", calendar.Count.ToString());
-                Response.Headers.Add("X-Total-Games", result.AllGames.Count.ToString());
+                Response.Headers.Append("X-Data-Source", result.ApiLimitations?.DataSource ?? "Database");
+                Response.Headers.Append("X-Total-Days", calendar.Count.ToString());
+                Response.Headers.Append("X-Total-Games", result.AllGames.Count.ToString());
 
                 return Ok(calendar, $"Calendário para {month:00}/{year} recuperado com sucesso");
             }

@@ -16,16 +16,21 @@ namespace HoopGameNight.Core.Services.AI
     {
         private readonly IGameService _gameService;
         private readonly ITeamRepository _teamRepository;
+        private readonly IPlayerRepository _playerRepository;
+        private readonly IPlayerStatsService _playerStatsService;
         private readonly NbaPromptBuilder _promptBuilder;
         private readonly GroqClient _groqClient;
         private readonly ICacheService _cacheService;
         private readonly ILogger<NbaAiService> _logger;
 
         private readonly Dictionary<string, string> _teamKeywords = new();
+        private readonly Dictionary<string, string> _playerKeywords = new();
 
         public NbaAiService(
             IGameService gameService,
             ITeamRepository teamRepository,
+            IPlayerRepository playerRepository,
+            IPlayerStatsService playerStatsService,
             NbaPromptBuilder promptBuilder,
             GroqClient groqClient,
             ICacheService cacheService,
@@ -33,12 +38,15 @@ namespace HoopGameNight.Core.Services.AI
         {
             _gameService = gameService;
             _teamRepository = teamRepository;
+            _playerRepository = playerRepository;
+            _playerStatsService = playerStatsService;
             _promptBuilder = promptBuilder;
             _groqClient = groqClient;
             _cacheService = cacheService;
             _logger = logger;
 
             LoadTeamKeywords();
+            LoadPlayerKeywords();
         }
 
         private void LoadTeamKeywords()
@@ -74,19 +82,42 @@ namespace HoopGameNight.Core.Services.AI
             }
         }
 
+        private void LoadPlayerKeywords()
+        {
+            try
+            {
+                var filePath = Path.Combine(AppContext.BaseDirectory, "Resources", "players_keywords.json");
+                if (!File.Exists(filePath))
+                {
+                    filePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "HoopGameNight.Core", "Resources", "players_keywords.json");
+                }
+
+                if (File.Exists(filePath))
+                {
+                    var json = File.ReadAllText(filePath);
+                    var keywords = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                    if (keywords != null)
+                    {
+                        foreach (var kvp in keywords)
+                            _playerKeywords[kvp.Key] = kvp.Value;
+                        
+                        _logger.LogInformation("Carregados {Count} palavras-chave de jogadores do JSON", _playerKeywords.Count);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Arquivo de keywords de jogadores não encontrado em: {Path}", filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao carregar keywords de jogadores do JSON");
+            }
+        }
+
         public async Task<AskResponse> AskAsync(AskRequest request)
         {
             var normalizedQuestion = NormalizeQuestion(request.Question);
-            var cacheKey = $"ai:ask:{normalizedQuestion}";
-
-            // Tentar cache (5 minutos)
-            var cached = await _cacheService.GetAsync<AskResponse>(cacheKey);
-            if (cached != null)
-            {
-                _logger.LogInformation("Cache hit para a pergunta: '{Question}'", request.Question);
-                cached.FromCache = true;
-                return cached;
-            }
 
             _logger.LogInformation("Processando consulta: {Question}", request.Question);
 
@@ -96,14 +127,16 @@ namespace HoopGameNight.Core.Services.AI
             _logger.LogInformation("Métricas da busca: {Count} jogos localizados | Período: {Period} | Times: {Teams}",
                 games.Count, period, string.Join(", ", detectedTeams));
 
-            // Validação: se não encontrou jogos
-            if (!games.Any())
+            // Validação: se não encontrou jogos E não encontrou jogadores
+            var (playerStatsText, detectedPlayers) = await GetRelevantPlayerStatsAsync(normalizedQuestion);
+
+            if (!games.Any() && string.IsNullOrEmpty(playerStatsText))
             {
-                _logger.LogWarning("Nenhum registro de jogo localizado para o contexto fornecido.");
+                _logger.LogWarning("Nenhum registro de jogo ou jogador localizado para o contexto fornecido.");
                 return new AskResponse
                 {
                     Question = request.Question,
-                    Answer = "Não encontrei jogos no banco de dados para este período/time.",
+                    Answer = "Não encontrei informações no banco de dados para este período/time/jogador.",
                     GamesAnalyzed = 0,
                     FromCache = false,
                     DataSource = "Database",
@@ -113,7 +146,7 @@ namespace HoopGameNight.Core.Services.AI
             }
 
             // Montar prompt
-            var prompt = _promptBuilder.BuildPrompt(request.Question, games);
+            var prompt = _promptBuilder.BuildPrompt(request.Question, games, playerStatsText);
 
             // Enviar ao Groq
             var answer = await _groqClient.GenerateAsync(prompt);
@@ -129,9 +162,6 @@ namespace HoopGameNight.Core.Services.AI
                 DetectedTeams = detectedTeams
             };
 
-            // Salvar em cache (5 minutos)
-            await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromMinutes(5));
-
             return response;
         }
 
@@ -140,6 +170,9 @@ namespace HoopGameNight.Core.Services.AI
             return question.Trim().ToLower()
                 .Replace("?", "")
                 .Replace("!", "")
+                .Replace(" do ", " ")
+                .Replace(" da ", " ")
+                .Replace(" de ", " ")
                 .Replace("  ", " ");
         }
 
@@ -224,18 +257,18 @@ namespace HoopGameNight.Core.Services.AI
             // Próximos
             if (question.Contains("próxim") || question.Contains("proxim") || question.Contains("next") || question.Contains("futur"))
             {
-                return (DateTime.Today, DateTime.Today.AddDays(7), "Próximos 7 dias");
+                return (DateTime.Today, DateTime.Today.AddDays(30), "Próximos Jogos (Amplo)");
             }
 
             // Últimos
             if (question.Contains("últim") || question.Contains("ultim") || question.Contains("recente") ||
-                question.Contains("recent") || question.Contains("passad"))
+                question.Contains("recent") || question.Contains("passad") || question.Contains("históric") || question.Contains("esquenta"))
             {
-                return (DateTime.Today.AddDays(-7), DateTime.Today, "Últimos 7 dias");
+                return (DateTime.Today.AddDays(-45), DateTime.Today, "Últimos Jogos (Histórico Amplo)");
             }
 
-            // Padrão
-            return (DateTime.Today.AddDays(-3), DateTime.Today.AddDays(3), "±3 dias");
+            // Padrão Ampliado
+            return (DateTime.Today.AddDays(-10), DateTime.Today.AddDays(7), "Recentes e Próximos");
         }
 
         /// <summary>
@@ -260,8 +293,71 @@ namespace HoopGameNight.Core.Services.AI
                     }
                 }
             }
-
             return (teamIds, teamNames);
+        }
+
+        /// <summary>
+        /// Analisa a pergunta para identificar jogadores e recuperar estatísticas recentes.
+        /// </summary>
+        private async Task<(string statsText, List<string> detectedPlayers)> GetRelevantPlayerStatsAsync(string question)
+        {
+            var detectedPlayers = new List<string>();
+            var statsLines = new List<string>();
+
+            var activePlayers = await _playerRepository.GetActivePlayersAsync();
+            var matchedPlayers = new List<HoopGameNight.Core.Models.Entities.Player>();
+
+            foreach (var p in activePlayers)
+            {
+                var fName = p.FirstName?.ToLowerInvariant() ?? "";
+                var lName = p.LastName?.ToLowerInvariant() ?? "";
+                var fullName = p.FullName?.ToLowerInvariant() ?? "";
+
+                bool isMatch = false;
+
+                var keywordMatch = _playerKeywords.FirstOrDefault(k => question.Contains(k.Key) && fullName.Contains(k.Value));
+                if (keywordMatch.Key != null)
+                {
+                    isMatch = true;
+                }
+                else if (question.Contains(fullName))
+                {
+                    isMatch = true;
+                }
+                else if (!string.IsNullOrEmpty(fName) && fName.Length >= 4 && question.Contains(fName) && !question.Contains("hoje") && !question.Contains("ontem") && !question.Contains("amanha"))
+                {
+                    isMatch = true;
+                }
+                else if (!string.IsNullOrEmpty(lName) && lName.Length >= 4 && question.Contains(lName))
+                {
+                    isMatch = true;
+                }
+
+                if (isMatch && !matchedPlayers.Any(m => m.Id == p.Id))
+                {
+                    matchedPlayers.Add(p);
+                    detectedPlayers.Add(p.FullName);
+                }
+            }
+
+            if (!matchedPlayers.Any())
+                return (string.Empty, detectedPlayers);
+
+            foreach (var player in matchedPlayers.Take(3))
+            {
+                var gamelog = await _playerStatsService.GetPlayerRecentGamesAsync(player.Id, 5); 
+                if (gamelog != null && gamelog.Games.Any())
+                {
+                    statsLines.Add($"--- Estatísticas Recentes: {player.FullName} ---");
+                    foreach (var game in gamelog.Games.Take(5))
+                    {
+                        statsLines.Add($"{game.GameDate} vs {game.Opponent}: {game.Points} PTS, {game.Rebounds} REB, {game.Assists} AST, Minutos {game.Minutes}");
+                    }
+                }
+            }
+
+            var statsText = statsLines.Any() ? string.Join("\n", statsLines) : string.Empty;
+            return (statsText, detectedPlayers);
         }
     }
 }

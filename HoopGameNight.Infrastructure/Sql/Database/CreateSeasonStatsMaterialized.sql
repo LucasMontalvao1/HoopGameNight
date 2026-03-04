@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS season_stats_materialized (
     apg DECIMAL(5,1) DEFAULT 0.0,
     spg DECIMAL(5,1) DEFAULT 0.0,
     bpg DECIMAL(5,1) DEFAULT 0.0,
+    tpg DECIMAL(5,1) DEFAULT 0.0,
+    fpg DECIMAL(5,1) DEFAULT 0.0,
     
     fg_percentage DECIMAL(5,3) DEFAULT 0.000,
     three_percentage DECIMAL(5,3) DEFAULT 0.000,
@@ -49,7 +51,7 @@ BEGIN
         games_played, games_started,
         total_points, total_rebounds, total_assists,
         total_steals, total_blocks, total_turnovers,
-        ppg, rpg, apg, spg, bpg,
+        ppg, rpg, apg, spg, bpg, tpg, fpg,
         fg_percentage, three_percentage, ft_percentage,
         double_doubles, triple_doubles
     )
@@ -58,7 +60,7 @@ BEGIN
         GamesPlayed, GamesStarted,
         TotalPoints, TotalRebounds, TotalAssists,
         TotalSteals, TotalBlocks, TotalTurnovers,
-        PPG, RPG, APG, SPG, BPG,
+        PPG, RPG, APG, SPG, BPG, TPG, FPG,
         FGPercentage, ThreePointPercentage, FTPercentage,
         DoubleDoubles, TripleDoubles
     FROM vw_player_season_stats_calculated;
@@ -68,4 +70,3 @@ END //
 
 DELIMITER ;
 
--- CALL refresh_season_stats_materialized();

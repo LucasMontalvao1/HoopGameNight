@@ -12,6 +12,7 @@ namespace HoopGameNight.Core.Interfaces.Repositories
         Task<IEnumerable<Game>> GetGamesByDateAsync(DateTime date);
         Task<IEnumerable<Game>> GetByDateAsync(DateTime date); 
         Task<IEnumerable<Game>> GetByDateRangeAsync(DateTime startDate, DateTime endDate);
+        Task<IEnumerable<Game>> GetByDateRangeAndTeamsAsync(DateTime startDate, DateTime endDate, List<int> teamIds);
         Task<IEnumerable<Game>> GetLiveGamesAsync();
 
         Task<IEnumerable<Game>> GetByTeamAsync(int teamId, DateTime? startDate = null, DateTime? endDate = null);
@@ -22,5 +23,6 @@ namespace HoopGameNight.Core.Interfaces.Repositories
         Task<Game?> GetByExternalIdAsync(string externalId);
         Task<bool> ExistsByExternalIdAsync(string externalId);
         Task<bool> UpdateScoreAsync(int gameId, int homeScore, int visitorScore);
+        Task<IEnumerable<Game>> GetGamesMissingStatsAsync();
     }
 }

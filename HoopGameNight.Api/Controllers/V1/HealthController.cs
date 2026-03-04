@@ -23,7 +23,7 @@ namespace HoopGameNight.Api.Controllers
     [ApiController]
     [Route("api/health")]
     [AllowAnonymous]
-    [ApiExplorerSettings(GroupName = "Health")]
+    [ApiExplorerSettings(GroupName = "monitoring")]
     public class HealthController : ControllerBase
     {
         private static readonly DateTime _startTime = DateTime.UtcNow;
@@ -75,16 +75,13 @@ namespace HoopGameNight.Api.Controllers
             var checks = new List<DependencyCheck>();
             var overallHealthy = true;
 
-            // Check Database
             var dbCheck = await CheckDatabaseAsync();
             checks.Add(dbCheck);
             if (!dbCheck.IsHealthy) overallHealthy = false;
 
-            // Check External API
             var apiCheck = await CheckExternalApiAsync();
             checks.Add(apiCheck);
 
-            // Check Configuration
             var configCheck = CheckConfiguration();
             checks.Add(configCheck);
             if (!configCheck.IsHealthy) overallHealthy = false;

@@ -17,19 +17,20 @@ namespace HoopGameNight.Core.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<GroqClient> _logger;
-        private const string DefaultModel = "llama-3.3-70b-versatile"; // Modelo performático para RAG
+        private readonly string _apiKey;
+        private const string DefaultModel = "llama-3.3-70b-versatile"; 
         private const int MaxPromptLength = 32000; 
 
-        public GroqClient(HttpClient httpClient, ILogger<GroqClient> logger)
+        public GroqClient(HttpClient httpClient, ILogger<GroqClient> logger, string apiKey = "")
         {
             _httpClient = httpClient;
             _logger = logger;
+            _apiKey = apiKey;
         }
 
         public Task<bool> IsAvailableAsync()
         {
-            var apiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
-            return Task.FromResult(!string.IsNullOrEmpty(apiKey));
+            return Task.FromResult(!string.IsNullOrEmpty(_apiKey));
         }
 
         public async Task<string> GenerateAsync(string prompt)

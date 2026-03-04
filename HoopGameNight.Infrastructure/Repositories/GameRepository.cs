@@ -47,7 +47,6 @@ namespace HoopGameNight.Infrastructure.Repositories
 
         public async Task<IEnumerable<Game>> GetByDateAsync(DateTime date)
         {
-            // Redireciona para o método principal
             return await GetGamesByDateAsync(date);
         }
 
@@ -61,6 +60,23 @@ namespace HoopGameNight.Infrastructure.Repositories
 
             Logger.LogDebug("Retrieved {GameCount} games between {StartDate} and {EndDate}",
                 games.Count(), startDate.ToShortDateString(), endDate.ToShortDateString());
+            return games;
+        }
+
+        public async Task<IEnumerable<Game>> GetByDateRangeAndTeamsAsync(DateTime startDate, DateTime endDate, List<int> teamIds)
+        {
+            Logger.LogDebug("Getting games between {StartDate} and {EndDate} for {TeamIdsCount} teams",
+                startDate.ToShortDateString(), endDate.ToShortDateString(), teamIds.Count);
+
+            if (teamIds == null || !teamIds.Any())
+            {
+                return await GetByDateRangeAsync(startDate, endDate);
+            }
+
+            var sql = await LoadSqlAsync("GetByDateRangeAndTeams");
+            var games = await ExecuteQueryWithTeamsAsync(sql, new { StartDate = startDate, EndDate = endDate, TeamIds = teamIds });
+
+            Logger.LogDebug("Retrieved {GameCount} games for specific teams", games.Count());
             return games;
         }
 
@@ -227,7 +243,9 @@ namespace HoopGameNight.Infrastructure.Repositories
                 game.Period,
                 game.TimeRemaining,
                 game.PostSeason,
-                game.Season
+                game.Season,
+                game.AiSummary,
+                game.AiHighlights
             });
 
             game.Id = id;
@@ -250,6 +268,8 @@ namespace HoopGameNight.Infrastructure.Repositories
                 Status = game.Status.ToString(),
                 game.Period,
                 game.TimeRemaining,
+                game.AiSummary,
+                game.AiHighlights,
                 game.UpdatedAt
             });
 
@@ -391,11 +411,31 @@ namespace HoopGameNight.Infrastructure.Repositories
             }
         }
 
-        private async Task<Team?> GetTeamByIdAsync(int teamId)
+        public async Task<IEnumerable<Game>> GetGamesMissingStatsAsync()
         {
-            using var connection = _connection.CreateConnection();
-            var sql = "SELECT * FROM teams WHERE id = @Id";
-            return await connection.QueryFirstOrDefaultAsync<Team>(sql, new { Id = teamId });
+            Logger.LogInformation("Identifying games with status 'Final' but missing player statistics");
+
+            var sql = @"
+                SELECT g.*, 
+                       h.id as id, h.external_id as external_id, h.name as name, h.full_name as full_name, h.abbreviation as abbreviation, h.city as city, h.conference as conference, h.division as division, h.created_at as created_at, h.updated_at as updated_at,
+                       v.id as id, v.external_id as external_id, v.name as name, v.full_name as full_name, v.abbreviation as abbreviation, v.city as city, v.conference as conference, v.division as division, v.created_at as created_at, v.updated_at as updated_at
+                FROM Games g
+                LEFT JOIN Teams h ON g.home_team_id = h.id
+                LEFT JOIN Teams v ON g.visitor_team_id = v.id
+                LEFT JOIN player_game_stats pgs ON g.id = pgs.game_id
+                WHERE g.Status = 'Final' AND pgs.game_id IS NULL
+                ORDER BY g.Date DESC";
+
+            var games = await ExecuteQueryWithTeamsAsync(sql);
+            
+            Logger.LogInformation("Found {Count} games missing statistics", games.Count());
+            return games;
+        }
+
+        private async Task<Team?> GetTeamByIdAsync(int id)
+        {
+            var sql = "SELECT * FROM Teams WHERE Id = @Id";
+            return await ExecuteQuerySingleOrDefaultAsync<Team>(sql, new { Id = id });
         }
     }
 }

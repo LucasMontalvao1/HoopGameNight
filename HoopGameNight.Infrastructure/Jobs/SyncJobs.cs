@@ -15,6 +15,8 @@ namespace HoopGameNight.Infrastructure.Jobs
         private readonly IGameSyncService _gameSyncService;
         private readonly ITeamService _teamService;
         private readonly IPlayerStatsSyncService _playerStatsSyncService;
+        private readonly IBackgroundSyncService _backgroundSyncService;
+        private readonly ICacheService _cacheService;
         private readonly IDistributedLockFactory? _lockFactory;
         private readonly ILogger<SyncJobs> _logger;
 
@@ -23,6 +25,8 @@ namespace HoopGameNight.Infrastructure.Jobs
             IGameSyncService gameSyncService,
             ITeamService teamService,
             IPlayerStatsSyncService playerStatsSyncService,
+            IBackgroundSyncService backgroundSyncService,
+            ICacheService cacheService,
             ILogger<SyncJobs> logger,
             IDistributedLockFactory? lockFactory = null)
         {
@@ -30,8 +34,21 @@ namespace HoopGameNight.Infrastructure.Jobs
             _gameSyncService = gameSyncService;
             _teamService = teamService;
             _playerStatsSyncService = playerStatsSyncService;
+            _backgroundSyncService = backgroundSyncService;
+            _cacheService = cacheService;
             _lockFactory = lockFactory;
             _logger = logger;
+        }
+
+        /// <summary>
+        /// Job mestre da madrugada (03:00 AM) que orquestra rosters, gaps de stats e refresh de cache
+        /// </summary>
+        [AutomaticRetry(Attempts = 2)]
+        [Queue("sync")]
+        public async Task DawnMasterSyncJobAsync()
+        {
+            _logger.LogInformation("HANGFIRE: Iniciando DawnMasterSyncJobAsync");
+            await _backgroundSyncService.DawnMasterSyncAsync();
         }
 
         [AutomaticRetry(Attempts = 3)]
@@ -115,6 +132,11 @@ namespace HoopGameNight.Infrastructure.Jobs
                 _logger.LogInformation("Sincronizando estatísticas para o jogo finalizado: {GameId}", game.Id);
                 await _playerStatsSyncService.SyncGameStatsForAllPlayersInGameAsync(game.Id);
             }
+
+            _logger.LogInformation("Limpando cache de líderes");
+            await _cacheService.RemoveByPatternAsync("leaders_scoring_*");
+            await _cacheService.RemoveByPatternAsync("leaders_rebounds_*");
+            await _cacheService.RemoveByPatternAsync("leaders_assists_*");
 
             _logger.LogInformation("Sincronização de Estatísticas concluída");
         }

@@ -17,6 +17,8 @@ namespace HoopGameNight.Core.Models.Entities
         public string? TimeRemaining { get; set; }
         public bool PostSeason { get; set; }
         public int Season { get; set; }
+        public string? AiSummary { get; set; }
+        public string? AiHighlights { get; set; }
 
         public Team? HomeTeam { get; set; }
         public Team? VisitorTeam { get; set; }

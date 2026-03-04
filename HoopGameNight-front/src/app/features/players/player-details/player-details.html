@@ -56,10 +56,13 @@
         <!-- TABS NAVEGAÇÃO -->
         <nav class="player-tabs glass-panel animate-fade-in" style="animation-delay: 0.1s">
           <button [class.active]="activeTab() === 'stats'" (click)="setTab('stats')">
-            <span class="material-icons">analytics</span> Estatísticas
+            <span class="material-icons">analytics</span> Temporada
           </button>
           <button [class.active]="activeTab() === 'gamelog'" (click)="setTab('gamelog')">
-            <span class="material-icons">history</span> Histórico
+            <span class="material-icons">history</span> Histórico Recente
+          </button>
+          <button [class.active]="activeTab() === 'career'" (click)="setTab('career')">
+            <span class="material-icons">workspace_premium</span> Carreira
           </button>
         </nav>
 
@@ -73,7 +76,7 @@
             <div class="season-selector-inline">
               <select class="season-dropdown" [value]="selectedSeason()" (change)="onSeasonChange($event)">
                 @for (season of availableSeasons(); track season) {
-                <option [value]="season">{{ season }}/{{ (season + 1).toString().slice(-2) }}</option>
+                <option [value]="season">Temporada {{ season }}/{{ (season + 1).toString().slice(-2) }}</option>
                 }
               </select>
             </div>
@@ -235,7 +238,7 @@
           }
           }
         </div>
-        } @else {
+        } @else if (activeTab() === 'gamelog') {
         <!-- Gamelog section -->
         <div class="gamelog-section glass-panel animate-fade-in" style="animation-delay: 0.2s">
           <div class="section-header-compact">
@@ -297,6 +300,64 @@
             </table>
           </div>
           }
+          }
+        </div>
+        } @else if (activeTab() === 'career') {
+        <!-- Career section -->
+        <div class="career-section glass-panel animate-fade-in" style="animation-delay: 0.2s">
+          <div class="section-header-compact">
+            <h2><span class="material-icons">workspace_premium</span> Histórico de Carreira</h2>
+          </div>
+
+          @if (loadingStats()) {
+          <div class="stats-loading">
+            <div class="loading-spinner"></div>
+          </div>
+          } @else {
+          <div class="table-responsive-wrapper">
+            <table class="gamelog-table-modern">
+              <thead>
+                <tr>
+                  <th class="sticky-col">TEMPORADA</th>
+                  <th title="Time">TIME</th>
+                  <th title="Jogos Disputados">GP</th>
+                  <th title="Minutos por Jogo">MIN</th>
+                  <th title="Pontos por Jogo">PTS</th>
+                  <th title="Rebotes por Jogo">REB</th>
+                  <th title="Assistências por Jogo">AST</th>
+                  <th title="Roubos">STL</th>
+                  <th title="Tocos">BLK</th>
+                  <th title="Arremessos de Quadra">FG%</th>
+                  <th title="Três Pontos">3P%</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (season of allCareerStats; track season.season) {
+                <tr class="game-row">
+                  <td class="opponent-cell sticky-col">
+                    <span class="game-date-mini">{{ season.season }}/{{ (season.season + 1).toString().slice(-2)
+                      }}</span>
+                    @if (season.isPlayoffs) { <span class="home-away">PLY</span> }
+                  </td>
+                  <td>{{ season.teamName || '-' }}</td>
+                  <td>{{ season.gamesPlayed || 0 }}</td>
+                  <td>{{ formatDecimal(season.avgMinutes) }}</td>
+                  <td class="stat-highlight">{{ formatDecimal(season.avgPoints) }}</td>
+                  <td>{{ formatDecimal(season.avgRebounds) }}</td>
+                  <td>{{ formatDecimal(season.avgAssists) }}</td>
+                  <td>{{ formatDecimal(season.spg) }}</td>
+                  <td>{{ formatDecimal(season.bpg) }}</td>
+                  <td class="fg-cell">{{ formatPercentage(season.fieldGoalPercentage) }}</td>
+                  <td>{{ formatPercentage(season.threePointPercentage) }}</td>
+                </tr>
+                } @empty {
+                <tr>
+                  <td colspan="11" class="empty-msg">Nenhum dado de carreira encontrado.</td>
+                </tr>
+                }
+              </tbody>
+            </table>
+          </div>
           }
         </div>
         }

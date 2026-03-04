@@ -12,14 +12,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.AspNetCore.Authorization; 
 
 namespace HoopGameNight.Api.Controllers.V1
 {
-    /// <summary>
-    /// Controller para métricas e analytics do sistema
-    /// </summary>
     [Route(ApiConstants.API_PREFIX + "/" + ApiConstants.API_VERSION + "/metrics")]
-    [ApiExplorerSettings(GroupName = "Monitoring")]
+    [ApiExplorerSettings(GroupName = "monitoring")] 
     public class MetricsController : BaseApiController
     {
         private readonly IGameService _gameService;

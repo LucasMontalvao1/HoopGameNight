@@ -188,7 +188,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             await GetAsync<EspnPlayerSplitsDto>($"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/splits", $"player splits {playerId}");
 
         public async Task<EspnPlayerGamelogDto?> GetPlayerGamelogAsync(string playerId) =>
-            await GetWithCacheAsync<EspnPlayerGamelogDto>($"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/gamelog", $"player_gamelog_{playerId}", TimeSpan.FromHours(6));
+            await GetWithCacheAsync<EspnPlayerGamelogDto>($"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/gamelog", $"player_gamelog_v37_{playerId}", TimeSpan.FromHours(4));
 
         public async Task<EspnPlayerStatsDto?> GetPlayerSeasonStatsAsync(string playerId, int season, int seasonType = 2)
         {
@@ -214,18 +214,91 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
         public async Task<List<EspnPlayerStatsDto>> GetPlayerCareerStatsAsync(string playerId)
         {
-            var cacheKey = $"player_career_{playerId}";
+            var cacheKey = $"player_career_v38_{playerId}";
             var cached = await _cacheService.GetAsync<List<EspnPlayerStatsDto>>(cacheKey);
             if (cached != null) return cached;
 
             try
             {
+                var url = $"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/stats?region=us&lang=en&contentorigin=espn";
+                var statsResponse = await GetAsync<EspnPlayerCareerStatsDto>(url, $"consolidated stats {playerId}");
+                
+                if (statsResponse != null)
+                {
+                    var allStats = new List<EspnPlayerStatsDto>();
+                    var teamsDict = statsResponse.Teams != null 
+                        ? statsResponse.Teams.Values
+                            .Where(t => !string.IsNullOrEmpty(t.Id))
+                            .GroupBy(t => t.Id!)
+                            .ToDictionary(g => g.Key, g => g.First().DisplayName) 
+                        : new Dictionary<string, string?>();
+
+                    if (statsResponse.SeasonTypes != null)
+                    {
+                        foreach (var st in statsResponse.SeasonTypes)
+                        {
+                            if (st.Categories == null) continue;
+                            foreach (var cat in st.Categories) {
+                                if (cat.Stats == null) continue;
+                                var tId = st.TeamId?.ToString() ?? "";
+                                allStats.Add(new EspnPlayerStatsDto {
+                                    Season = new EspnSeasonRefDto { Year = st.Year },
+                                    SeasonTypeId = st.Type,
+                                    Team = new EspnTeamRefDto { Id = tId, DisplayName = st.TeamName ?? (teamsDict.TryGetValue(tId, out var dn) ? dn : null) },
+                                    Splits = new EspnPlayerStatsSplitDto { Categories = new List<EspnStatsCategoryDto> { 
+                                        new EspnStatsCategoryDto { 
+                                            Name = cat.Name ?? "stats", 
+                                            Stats = cat.Stats.Select((s, i) => new EspnStatDto { 
+                                                Value = (s.Value == 0 && !string.IsNullOrEmpty(s.DisplayValue) && s.DisplayValue != "0") ? SafeParseDouble(s.DisplayValue) : s.Value, 
+                                                DisplayValue = s.DisplayValue ?? s.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                                                Name = (cat.Names != null && i < cat.Names.Count) ? cat.Names[i] : (s.Name ?? i.ToString()),
+                                                Label = (cat.Labels != null && i < cat.Labels.Count) ? cat.Labels[i] : (s.Label ?? s.Name ?? (cat.Names != null && i < cat.Names.Count ? cat.Names[i] : i.ToString()))
+                                            }).ToList() 
+                                        } 
+                                    } }
+                                });
+                            }
+                        }
+                    }
+                    else if (statsResponse.Categories != null)
+                    {
+                        foreach (var cat in statsResponse.Categories)
+                        {
+                            if (cat.Statistics == null) continue;
+                            foreach (var stat in cat.Statistics) {
+                                if (stat.Stats == null || stat.Season == null) continue;
+                                var tId = stat.TeamId?.ToString() ?? "";
+                                allStats.Add(new EspnPlayerStatsDto {
+                                    Season = stat.Season,
+                                    SeasonTypeId = stat.Type?.Type ?? 2,
+                                    Team = new EspnTeamRefDto { Id = tId, DisplayName = stat.TeamName ?? (teamsDict.TryGetValue(tId, out var dn) ? dn : null) },
+                                    Splits = new EspnPlayerStatsSplitDto { Categories = new List<EspnStatsCategoryDto> { 
+                                        new EspnStatsCategoryDto { 
+                                            Name = cat.Name ?? "stats", 
+                                            Stats = stat.Stats.Select((s, i) => new EspnStatDto { 
+                                                Value = SafeParseDouble(s), 
+                                                DisplayValue = s,
+                                                Name = (cat.Names != null && i < cat.Names.Count) ? cat.Names[i] : i.ToString(),
+                                                Label = (cat.Labels != null && i < cat.Labels.Count) ? cat.Labels[i] : ((cat.Names != null && i < cat.Names.Count) ? cat.Names[i] : i.ToString())
+                                            }).ToList() 
+                                        } 
+                                    } }
+                                });
+                            }
+                        }
+                    }
+
+                    if (allStats.Any())
+                    {
+                        await _cacheService.SetAsync(cacheKey, allStats, TimeSpan.FromDays(1));
+                        return allStats;
+                    }
+                }
+
                 var years = await GetAthleteSeasonsAsync(playerId);
                 if (!years.Any()) return new List<EspnPlayerStatsDto>();
-
                 var tasks = years.SelectMany(y => new[] { GetPlayerSeasonStatsAsync(playerId, y, 2), GetPlayerSeasonStatsAsync(playerId, y, 3) });
                 var results = (await Task.WhenAll(tasks)).Where(r => r?.Season != null).Cast<EspnPlayerStatsDto>().ToList();
-
                 if (results.Any()) await _cacheService.SetAsync(cacheKey, results, TimeSpan.FromDays(1));
                 return results;
             }
@@ -261,18 +334,48 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
         private async Task<T?> GetAsync<T>(string url, string context) where T : class
         {
-            try
+            int maxRetries = 3;
+            int delayMs = 2000;
+
+            for (int i = 0; i < maxRetries; i++)
             {
-                var response = await _httpClient.GetAsync(url);
-                if (!response.IsSuccessStatusCode) return null;
-                var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<T>(json, JsonOptions);
+                try
+                {
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    
+                    var response = await _httpClient.GetAsync(url, cts.Token);
+                    if (!response.IsSuccessStatusCode) return null;
+                    
+                    var json = await response.Content.ReadAsStringAsync(cts.Token);
+                    return JsonSerializer.Deserialize<T>(json, JsonOptions);
+                }
+                catch (System.Net.Http.HttpRequestException ex)
+                {
+                    _logger.LogWarning("Network error fetching {Context}. Retry {Retry}/{MaxRetries}. Exception: {Message}", context, i + 1, maxRetries, ex.Message);
+                    if (i == maxRetries - 1)
+                    {
+                        _logger.LogError(ex, "Max retries reached. Error fetching {Context}", context);
+                        return null;
+                    }
+                    await Task.Delay(delayMs * (i + 1)); 
+                }
+                catch (TaskCanceledException ex)
+                {
+                    _logger.LogWarning("Timeout fetching {Context}. Retry {Retry}/{MaxRetries}. Exception: {Message}", context, i + 1, maxRetries, ex.Message);
+                    if (i == maxRetries - 1)
+                    {
+                        _logger.LogError(ex, "Max timeouts reached. Error fetching {Context}", context);
+                        return null;
+                    }
+                    await Task.Delay(delayMs * (i + 1)); 
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching {Context}", context);
+                    return null;
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fetching {Context}", context);
-                return null;
-            }
+            return null;
         }
 
         private async Task<T?> GetWithCacheAsync<T>(string url, string cacheKey, TimeSpan ttl) where T : class
@@ -304,7 +407,11 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             try
             {
-                var json = await _httpClient.GetStringAsync($"{CORE_API_BASE_URL}/athletes/{playerId}/seasons?lang=en&region=us");
+                var response = await _httpClient.GetAsync($"{CORE_API_BASE_URL}/athletes/{playerId}/seasons?lang=en&region=us");
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return new List<int>();
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
                 using var doc = JsonDocument.Parse(json);
                 if (!doc.RootElement.TryGetProperty("items", out var items)) return new List<int>();
 
@@ -316,7 +423,11 @@ namespace HoopGameNight.Infrastructure.ExternalServices
                     .OrderByDescending(y => y)
                     .ToList();
             }
-            catch { return new List<int>(); }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not fetch seasons for player {PlayerId}: {Message}", playerId, ex.Message);
+                return new List<int>();
+            }
         }
 
         private string ExtractIdFromRef(string? refUrl, string pattern)
@@ -331,12 +442,32 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         #region Legacy Support 
         public async Task<List<EspnGameDto>> GetTeamScheduleAsync(int teamId, DateTime startDate, DateTime endDate)
         {
+            _logger.LogInformation("FETCHING TEAM SCHEDULE: Parallel ESPN request for Team {TeamId} from {Start} to {End}",
+                teamId, startDate.ToShortDateString(), endDate.ToShortDateString());
+
             var results = new List<EspnGameDto>();
-            for (var d = startDate; d <= endDate; d = d.AddDays(1)) 
-                results.AddRange(await GetGamesByDateAsync(d));
+            var dateRange = Enumerable.Range(0, (int)(endDate - startDate).TotalDays + 1)
+                                      .Select(offset => startDate.AddDays(offset))
+                                      .ToList();
+
+            var tasks = dateRange.Select(d => GetGamesByDateAsync(d));
+            var gameLists = await Task.WhenAll(tasks);
+
+            foreach (var list in gameLists)
+            {
+                if (list != null) results.AddRange(list);
+            }
+
             return results;
         }
         #endregion
+
+        private double SafeParseDouble(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return 0;
+            var cleanValue = value.Split(new[] { '-', '/' })[0].Replace("%", "").Trim();
+            return double.TryParse(cleanValue, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var result) ? result : 0;
+        }
     }
 
     internal static class JsonExtensions

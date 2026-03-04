@@ -42,9 +42,9 @@ namespace HoopGameNight.Api.Controllers
 
                 if (!Response.Headers.ContainsKey("X-Request-ID"))
                 {
-                    Response.Headers.Add("X-Request-ID", requestId);
+                    Response.Headers.Append("X-Request-ID", requestId);
                 }
-                Response.Headers.Add("X-Response-Time", $"{_stopwatch.ElapsedMilliseconds}ms");
+                Response.Headers.Append("X-Response-Time", $"{_stopwatch.ElapsedMilliseconds}ms");
 
                 return result;
             }
@@ -64,9 +64,9 @@ namespace HoopGameNight.Api.Controllers
         /// <summary>
         /// Encapsula os dados em um objeto <see cref="ApiResponse{T}"/> com status HTTP 200 (OK).
         /// </summary>
-        protected new ActionResult<ApiResponse<T>> Ok<T>(T data, string message = "Success")
+        protected new ActionResult<ApiResponse<T>> Ok<T>(T data, string message = "Success", bool isSyncing = false)
         {
-            var response = ApiResponse<T>.SuccessResult(data, message);
+            var response = ApiResponse<T>.SuccessResult(data, message, isSyncing);
             response.RequestId = HttpContext.TraceIdentifier;
             return base.Ok(response);
         }
@@ -104,9 +104,9 @@ namespace HoopGameNight.Api.Controllers
             var response = PaginatedResponse<T>.Create(data.ToList(), page, pageSize, totalRecords, message);
             response.RequestId = HttpContext.TraceIdentifier;
 
-            Response.Headers.Add("X-Total-Count", totalRecords.ToString());
-            Response.Headers.Add("X-Page", page.ToString());
-            Response.Headers.Add("X-Page-Size", pageSize.ToString());
+            Response.Headers.Append("X-Total-Count", totalRecords.ToString());
+            Response.Headers.Append("X-Page", page.ToString());
+            Response.Headers.Append("X-Page-Size", pageSize.ToString());
 
             return base.Ok(response);
         }
@@ -149,8 +149,8 @@ namespace HoopGameNight.Api.Controllers
         /// </summary>
         protected void SetCacheHeaders(int seconds)
         {
-            Response.Headers.Add("Cache-Control", $"public, max-age={seconds}");
-            Response.Headers.Add("Expires", DateTime.UtcNow.AddSeconds(seconds).ToString("R"));
+            Response.Headers.Append("Cache-Control", $"public, max-age={seconds}");
+            Response.Headers.Append("Expires", DateTime.UtcNow.AddSeconds(seconds).ToString("R"));
         }
     }
 }

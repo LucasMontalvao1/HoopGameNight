@@ -204,10 +204,11 @@ namespace HoopGameNight.Api.Extensions
             services.AddSingleton<NbaPromptBuilder>();
             services.AddScoped<INbaAiService, NbaAiService>();
 
-            services.AddHttpClient<GroqClient>(client =>
+            var apiKey = configuration["GROQ_API_KEY"] ?? "";
+
+            services.AddHttpClient("Groq", client =>
             {
                 var groqUrl = Environment.GetEnvironmentVariable("GROQ_API_URL") ?? "https://api.groq.com/";
-                var apiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
 
                 client.BaseAddress = new Uri(groqUrl);
                 client.Timeout = TimeSpan.FromSeconds(60); 
@@ -219,6 +220,14 @@ namespace HoopGameNight.Api.Extensions
             })
             .AddPolicyHandler(GetOllamaRetryPolicy())
             .AddPolicyHandler(GetOllamaCircuitBreakerPolicy());
+
+            services.AddTransient<GroqClient>(sp =>
+            {
+                var factory = sp.GetRequiredService<IHttpClientFactory>();
+                var client = factory.CreateClient("Groq");
+                var logger = sp.GetRequiredService<ILogger<GroqClient>>();
+                return new GroqClient(client, logger, apiKey);
+            });
 
             // Repositories
             services.AddScoped<IGameRepository, GameRepository>();
@@ -280,6 +289,11 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<IPlayerStatsService, PlayerStatsService>();
             services.AddScoped<IGameStatsService, GameStatsService>();
             services.AddScoped<IEspnParser, EspnParser>();
+            services.AddScoped<IBackgroundSyncService, BackgroundSyncService>();
+            services.AddScoped<IBackgroundSyncQueue, BackgroundSyncQueue>();
+            
+            // Health Services Locais (Admin)
+            services.AddScoped<HoopGameNight.Api.Controllers.V1.Admin.ISyncHealthService, HoopGameNight.Api.Controllers.V1.Admin.SyncHealthService>();
 
             return services;
         }
@@ -335,7 +349,7 @@ namespace HoopGameNight.Api.Extensions
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .Or<TaskCanceledException>() // Handle timeouts as retriable
+                .Or<TaskCanceledException>() 
                 .WaitAndRetryAsync(
                     3,
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -372,7 +386,7 @@ namespace HoopGameNight.Api.Extensions
                     cacheOptions.ExpirationScanFrequencyMinutes);
             });
 
-            // Configurar Redis (se habilitado)
+            // Configurar Redis
             var redisSettings = configuration.GetSection("Redis").Get<Core.Configuration.RedisSettings>();
             if (redisSettings?.Enabled == true)
             {
@@ -440,7 +454,6 @@ namespace HoopGameNight.Api.Extensions
                     }
                 });
 
-                // Development policy
                 options.AddPolicy("DevelopmentPolicy", policy =>
                 {
                     policy.AllowAnyOrigin()
@@ -449,7 +462,7 @@ namespace HoopGameNight.Api.Extensions
                 });
             });
 
-            // Rate Limiting (usando o nativo do .NET 7+)
+            // Rate Limiting 
             var rateLimitOptions = configuration.GetSection("RateLimit").Get<RateLimitOptions>()
                 ?? new RateLimitOptions();
 
@@ -483,7 +496,7 @@ namespace HoopGameNight.Api.Extensions
 
                 options.OnRejected = async (context, token) =>
                 {
-                    context.HttpContext.Response.Headers.Add("X-Rate-Limit-Retry-After", "60");
+                    context.HttpContext.Response.Headers.Append("X-Rate-Limit-Retry-After", "60");
                     
                     await context.HttpContext.Response.WriteAsJsonAsync(new
                     {

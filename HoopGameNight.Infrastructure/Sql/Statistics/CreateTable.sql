@@ -44,10 +44,14 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
     turnovers INT DEFAULT 0,
     personal_fouls INT DEFAULT 0,
 
-    -- Médias (calculadas automaticamente via triggers)
+    -- Médias (calculadas automaticamente via triggers ou sincronizadas pela API)
     avg_points DECIMAL(5, 2),
     avg_rebounds DECIMAL(5, 2),
     avg_assists DECIMAL(5, 2),
+    avg_steals DECIMAL(5, 2),
+    avg_blocks DECIMAL(5, 2),
+    avg_turnovers DECIMAL(5, 2),
+    avg_fouls DECIMAL(5, 2),
     avg_minutes DECIMAL(5, 2),
 
     -- Timestamps

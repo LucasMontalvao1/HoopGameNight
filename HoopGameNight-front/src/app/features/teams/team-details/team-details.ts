@@ -95,13 +95,13 @@ export class TeamDetails implements OnInit {
         await this.teamsService.loadAllTeams();
       }
 
-      // Buscar time pela abreviação (case-insensitive)
+      // Buscar time pela abreviação 
       const upperAbbr = abbreviation.toUpperCase();
       let team = this.teamsService.getTeamByAbbreviation(upperAbbr);
 
       console.log(`Time em cache local:`, team);
 
-      // Se não achou no cache, tentar buscar na API (Fallback robusto)
+      // Se não achou no cache, tentar buscar na API 
       if (!team) {
         console.log(`Time "${abbreviation}" não está no cache local. Buscando na API...`);
         try {
@@ -143,7 +143,7 @@ export class TeamDetails implements OnInit {
     try {
       console.log(`Buscando jogos recentes para o time ID: ${teamId}`);
 
-      // Buscar jogos recentes (últimos 30 dias) - otimizado com endpoint específico
+      // Buscar jogos recentes (últimos 30 dias) 
       const recentGames = await this.gamesService.getRecentGamesForTeam(teamId, 30);
 
       console.log(`Jogos recentes carregados:`, recentGames.length);
@@ -257,11 +257,12 @@ export class TeamDetails implements OnInit {
       this._loadingPlayers.set(true);
       console.log(`Buscando jogadores do time ID: ${teamId}`);
 
-      // Carregar todos os jogadores do time (máximo 100)
       await this.playersService.loadPlayersByTeam(teamId, 1, 100);
       this._teamPlayers.set(this.playersService.teamPlayers());
 
-      console.log(`${this._teamPlayers().length} jogadores carregados`);
+      const debugPlayers = this._teamPlayers().slice(0, 5);
+      console.log(`[TeamDetails] ${this._teamPlayers().length} jogadores carregados. Primeiros 5 IDs:`,
+        debugPlayers.map(p => `${p.fullName}(id=${p.id}, extId=${p.externalId})`));
     } catch (error) {
       console.error('Erro ao carregar jogadores:', error);
     } finally {
@@ -274,6 +275,7 @@ export class TeamDetails implements OnInit {
   }
 
   navigateToPlayer(playerId: number): void {
+    console.log(`[TeamDetails] Navegando para jogador ID: ${playerId}`);
     this.router.navigate(['/players', playerId]);
   }
 

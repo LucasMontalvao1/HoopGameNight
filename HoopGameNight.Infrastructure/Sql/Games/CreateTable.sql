@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS games (
     -- Informações da temporada
     postseason BOOLEAN DEFAULT FALSE COMMENT 'Playoffs',
     season INT NOT NULL COMMENT 'Ano da temporada',
+    
+    -- IA Insight
+    ai_summary TEXT DEFAULT NULL COMMENT 'Resumo gerado por IA',
+    ai_highlights JSON DEFAULT NULL COMMENT 'Destaques e insights da IA',
 
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

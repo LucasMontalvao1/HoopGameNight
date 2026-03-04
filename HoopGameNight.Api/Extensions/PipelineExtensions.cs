@@ -344,22 +344,22 @@ namespace HoopGameNight.Api.Extensions
             app.Use(async (context, next) =>
             {
                 // Security headers baseados em OWASP recommendations
-                context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
-                context.Response.Headers.Add("X-Frame-Options", "DENY");
-                context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
-                context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
-                context.Response.Headers.Add("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+                context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+                context.Response.Headers.Append("X-Frame-Options", "DENY");
+                context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+                context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+                context.Response.Headers.Append("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
                 // API Version header
-                context.Response.Headers.Add("X-API-Version", ApiConstants.API_VERSION);
+                context.Response.Headers.Append("X-API-Version", ApiConstants.API_VERSION);
 
                 // Custom headers
-                context.Response.Headers.Add("X-Service-Name", "HoopGameNight-API");
+                context.Response.Headers.Append("X-Service-Name", "HoopGameNight-API");
 
                 // Request ID for tracking
                 if (!context.Response.Headers.ContainsKey("X-Request-ID"))
                 {
-                    context.Response.Headers.Add("X-Request-ID", context.TraceIdentifier);
+                    context.Response.Headers.Append("X-Request-ID", context.TraceIdentifier);
                 }
 
                 await next();
@@ -498,6 +498,14 @@ namespace HoopGameNight.Api.Extensions
                         job => job.SyncPlayerStatsAsync(),
                         "0 */12 * * *",
                         new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "stats" }
+                    );
+
+                    // Dawn Master Sync (03:00 AM)
+                    recurringJobManager.AddOrUpdate<IBackgroundSyncService>(
+                        "dawn-master-sync",
+                        job => job.DawnMasterSyncAsync(),
+                        "0 3 * * *",
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
                     );
 
                     Log.Information("Hangfire Recurring Jobs registrados com sucesso.");

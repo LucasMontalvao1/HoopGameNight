@@ -1,5 +1,36 @@
--- Recupera as métricas agregadas da temporada a partir da VIEW vw_player_season_stats_calculated
-SELECT * 
+SELECT 
+    season AS Season,
+    team_id AS TeamId,
+    GamesPlayed,
+    GamesStarted,
+    TotalPoints,
+    TotalRebounds,
+    TotalAssists,
+    FieldGoalsMade,
+    FieldGoalsAttempted,
+    ThreePointersMade,
+    ThreePointersAttempted,
+    FreeThrowsMade,
+    FreeThrowsAttempted,
+    OffensiveRebounds,
+    DefensiveRebounds,
+    TotalSteals AS Steals,
+    TotalBlocks AS Blocks,
+    TotalTurnovers AS Turnovers,
+    TotalPersonalFouls AS PersonalFouls,
+    MinutesPlayed,
+    TotalPoints AS Points,
+    PPG,
+    RPG,
+    APG,
+    SPG,
+    BPG,
+    TPG,
+    FPG,
+    MPG,
+    FGPercentage,
+    ThreePointPercentage,
+    FTPercentage
 FROM vw_player_season_stats_calculated
 WHERE player_id = @PlayerId 
   AND season = @Season;

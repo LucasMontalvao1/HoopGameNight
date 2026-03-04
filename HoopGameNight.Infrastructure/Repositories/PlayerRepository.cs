@@ -134,6 +134,17 @@ namespace HoopGameNight.Infrastructure.Repositories
             return player;
         }
 
+        public async Task<Player?> GetByEspnIdAsync(string espnId)
+        {
+            Logger.LogDebug("Getting player by ESPN ID: {EspnId}", espnId);
+
+            var sql = "SELECT * FROM players WHERE espn_id = @EspnId";
+            var player = await ExecuteQuerySingleOrDefaultAsync<Player>(sql, new { EspnId = espnId });
+
+            Logger.LogDebug("Player {Found} with ESPN ID: {EspnId}", player != null ? "found" : "not found", espnId);
+            return player;
+        }
+
         public async Task<IEnumerable<Player>> GetAllAsync()
         {
             Logger.LogDebug("Getting all players");

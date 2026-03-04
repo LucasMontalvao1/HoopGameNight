@@ -28,6 +28,18 @@ namespace HoopGameNight.Core.Constants
         public static string GameById(int id) => $"games:id:{id}";
 
         /// <summary>
+        /// Chave para líderes do jogo
+        /// Formato: "game_leaders_123"
+        /// </summary>
+        public static string GameLeaders(int gameId) => $"game_leaders_{gameId}";
+
+        /// <summary>
+        /// Chave para boxscore do jogo
+        /// Formato: "game_boxscore_123"
+        /// </summary>
+        public static string GameBoxscore(int gameId) => $"game_boxscore_{gameId}";
+
+        /// <summary>
         /// Chave para jogos de um time
         /// Formato: "games:team:13:page:1"
         /// </summary>
@@ -83,7 +95,7 @@ namespace HoopGameNight.Core.Constants
         /// Chave para jogadores de um time
         /// Formato: "players:team:13:page:1"
         /// </summary>
-        public static string PlayersByTeam(int teamId, int page) => $"players:team:{teamId}:page:{page}";
+        public static string PlayersByTeam(int teamId, int page) => $"players:team:v3:{teamId}:page:{page}";
 
         /// <summary>
         /// Chave para busca de jogadores
@@ -92,10 +104,22 @@ namespace HoopGameNight.Core.Constants
         public static string PlayersSearch(string term, int page) => $"players:search:{term.ToLowerInvariant()}:page:{page}";
 
         /// <summary>
-        /// Chave para estatísticas de jogador
-        /// Formato: "players:456:stats:2024"
+        /// Chave para estatísticas de jogador na temporada
+        /// Formato: "player_season_stats_456" (modificado para bater com BackgroundSyncService)
         /// </summary>
-        public static string PlayerStats(int playerId, int season) => $"players:{playerId}:stats:{season}";
+        public static string PlayerSeasonStats(int playerId) => $"player_season_stats_{playerId}";
+
+        /// <summary>
+        /// Chave para estatísticas de carreira do jogador
+        /// Formato: "player_career_456"
+        /// </summary>
+        public static string PlayerCareer(int playerId) => $"player_career_{playerId}";
+
+        /// <summary>
+        /// Chave para jogos recentes do jogador
+        /// Formato: "player_recent_456"
+        /// </summary>
+        public static string PlayerRecentGames(int playerId) => $"player_recent_{playerId}";
 
         // ===== STATISTICS =====
 
@@ -148,6 +172,6 @@ namespace HoopGameNight.Core.Constants
         /// </summary>
         public static string AllPlayersPattern => "players:*";
 
-        public static string GamesByDateRange(DateTime start, DateTime end) => $"games_range_{start:yyyyMMdd}_{end:yyyyMMdd}";
+        public static string GamesByDateRange(DateTime start, DateTime end) => $"games:range:{start:yyyyMMdd}:{end:yyyyMMdd}";
     }
 }

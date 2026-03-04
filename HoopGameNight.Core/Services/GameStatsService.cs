@@ -8,6 +8,8 @@ using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Core.Models.Entities;
 using HoopGameNight.Core.Enums;
+using HoopGameNight.Core.Constants;
+using HoopGameNight.Core.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace HoopGameNight.Core.Services
@@ -56,19 +58,47 @@ namespace HoopGameNight.Core.Services
         {
             try
             {
-                var cacheKey = $"game_all_stats_{gameId}";
-
-                var cached = await _cacheService.GetAsync<GamePlayerStatsResponse>(cacheKey);
-                if (cached != null) return cached;
-
                 var game = await _gameRepository.GetByIdAsync(gameId);
                 if (game == null) return null;
 
+                var cacheKey = $"game_all_stats_{gameId}";
+                var cached = await _cacheService.GetAsync<GamePlayerStatsResponse>(cacheKey);
+
+                bool isFinal = game.Status == GameStatus.Final || game.Status == GameStatus.Postponed || game.Status == GameStatus.Cancelled;
+
+                if (cached != null)
+                {
+                    int cachedTotalScore = (cached.HomeScore ?? 0) + (cached.VisitorScore ?? 0);
+                    int actualGameTotalScore = (game.HomeTeamScore ?? 0) + (game.VisitorTeamScore ?? 0);
+
+                    if (cachedTotalScore == actualGameTotalScore)
+                    {
+                        return cached;
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Placar do jogo {GameId} em cache ({Cached}) diverge do banco ({Actual}). Invalidando cache do boxscore...", gameId, cachedTotalScore, actualGameTotalScore);
+                    }
+                }
+
                 var allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
 
-                if (!allStats.Any())
+                bool needsSync = !allStats.Any();
+
+                if (!needsSync)
                 {
-                    _logger.LogInformation("Stats do jogo {GameId} não encontradas. Sincronizando...", gameId);
+                    int totalStatsPoints = allStats.Sum(s => s.Points);
+                    int totalGamePoints = (game.HomeTeamScore ?? 0) + (game.VisitorTeamScore ?? 0);
+                    
+                    if (totalStatsPoints != totalGamePoints)
+                    {
+                         needsSync = true;
+                    }
+                }
+
+                if (needsSync)
+                {
+                    _logger.LogInformation("Stats do jogo {GameId} desatualizadas ou ausentes. Sincronizando...", gameId);
                     await SyncGameStatsAsync(gameId);
                     allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
                 }
@@ -85,7 +115,9 @@ namespace HoopGameNight.Core.Services
                     VisitorTeamStats = allStats.Where(s => s.TeamId == game.VisitorTeamId).ToList()
                 };
 
-                await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromMinutes(10));
+                var cacheTime = isFinal ? CacheDurations.NoExpiration : TimeSpan.FromSeconds(30);
+                await _cacheService.SetAsync(cacheKey, response, cacheTime);
+
                 return response;
             }
             catch (Exception ex)
@@ -106,7 +138,7 @@ namespace HoopGameNight.Core.Services
                     return null;
                 }
 
-                var cacheKey = $"game_leaders_{gameId}";
+                var cacheKey = CacheKeys.GameLeaders(gameId);
                 var cached = await _cacheService.GetAsync<GameLeadersResponse>(cacheKey);
                 if (cached != null) return cached;
 
@@ -120,7 +152,8 @@ namespace HoopGameNight.Core.Services
                 var response = await MapEspnGameLeadersToResponse(espnLeaders, game);
                 if (response != null)
                 {
-                    await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromMinutes(15));
+                    var cacheTime = game.IsCompleted ? CacheDurations.NoExpiration : TimeSpan.FromSeconds(30);
+                    await _cacheService.SetAsync(cacheKey, response, cacheTime);
                 }
                 return response;
             }
@@ -136,14 +169,15 @@ namespace HoopGameNight.Core.Services
             var game = await _gameRepository.GetByIdAsync(gameId);
             if (string.IsNullOrEmpty(game?.ExternalId)) return null;
 
-            var cacheKey = $"game_boxscore_{gameId}";
+            var cacheKey = CacheKeys.GameBoxscore(gameId);
             var cached = await _cacheService.GetAsync<EspnBoxscoreDto>(cacheKey);
             if (cached != null) return cached;
 
             var boxscore = await _espnService.GetGameBoxscoreAsync(game.ExternalId);
             if (boxscore != null)
             {
-                await _cacheService.SetAsync(cacheKey, boxscore, TimeSpan.FromMinutes(5));
+                var cacheTime = game.IsCompleted ? CacheDurations.NoExpiration : TimeSpan.FromSeconds(30);
+                await _cacheService.SetAsync(cacheKey, boxscore, cacheTime);
             }
             return boxscore;
         }

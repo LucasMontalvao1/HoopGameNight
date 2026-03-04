@@ -46,7 +46,7 @@ namespace HoopGameNight.Core.Services
                 var teams = await _teamRepository.GetAllAsync();
                 var response = _mapper.Map<List<TeamResponse>>(teams);
 
-                await _cacheService.SetAsync(CacheKeys.ALL_TEAMS, response, TimeSpan.FromHours(24));
+                await _cacheService.SetAsync(CacheKeys.ALL_TEAMS, response, CacheDurations.NoExpiration);
 
                 return response;
             }
