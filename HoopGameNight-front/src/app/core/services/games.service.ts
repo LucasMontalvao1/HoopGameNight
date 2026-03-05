@@ -42,12 +42,20 @@ export class GamesService {
     this.liveGames().length > 0
   );
 
-  readonly selectedDateString = computed(() =>
-    this._selectedDate().toISOString().split('T')[0]
-  );
+  readonly selectedDateString = computed(() => {
+    const d = this._selectedDate();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
 
   readonly isToday = computed(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
     return this.selectedDateString() === today;
   });
 
@@ -68,6 +76,7 @@ export class GamesService {
   }
 
   async loadTodayGames(forceRefresh = false): Promise<void> {
+    this._selectedDate.set(new Date());
     await this.executeWithLoading(async () => {
       const cacheKey = APP_CONSTANTS.CACHE_KEYS.TODAY_GAMES;
 
@@ -92,7 +101,7 @@ export class GamesService {
     this._selectedDate.set(date);
 
     await this.executeWithLoading(async () => {
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = this.selectedDateString();
       const cacheKey = APP_CONSTANTS.CACHE_KEYS.GAMES_BY_DATE.replace('{date}', dateStr);
 
       if (!forceRefresh && this.isCacheValid(cacheKey)) {
@@ -117,7 +126,10 @@ export class GamesService {
    * Usado para buscar jogos sem afetar selectedDate
    */
   async loadGamesByDateAndReturn(date: Date): Promise<GameResponse[]> {
-    const dateStr = date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const cacheKey = APP_CONSTANTS.CACHE_KEYS.GAMES_BY_DATE.replace('{date}', dateStr);
 
     // Verificar cache primeiro
@@ -169,7 +181,11 @@ export class GamesService {
       }
 
       await this.checkSyncStatus();
-      console.log(`Sincronização concluída para ${targetDate.toISOString().split('T')[0]}`);
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const day = String(targetDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      console.log(`Sincronização concluída para ${dateStr}`);
     });
   }
 

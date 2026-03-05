@@ -13,14 +13,12 @@ import { SEOService } from '../../core/services/seo.service';
 import { PreferencesStore } from '../../core/services/preferences.store';
 import { AssistantService } from '../../core/services/assistant.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
-import { SkeletonLoader } from '../../shared/components/skeleton-loader/skeleton-loader';
-import { ErrorView } from '../../shared/components/error-view/error-view';
 import { ApiStatus, PlayerResponse } from '../../core/interfaces/api.interface';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, StatusIndicator, SkeletonLoader, ErrorView, FormsModule],
+  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -40,6 +38,9 @@ export class Dashboard implements OnInit {
     return this.teamsService.allTeams().filter(t => favoriteIds.includes(t.id));
   });
 
+  private destroy$ = new Subject<void>();
+  private searchSubject = new Subject<string>();
+
   constructor(
     protected readonly healthCheck: HealthCheck,
     protected readonly gamesService: GamesService,
@@ -49,24 +50,41 @@ export class Dashboard implements OnInit {
     protected readonly preferencesStore: PreferencesStore,
     protected readonly assistantService: AssistantService,
     private readonly router: Router
-  ) { }
+  ) {
+    this.searchSubject.pipe(
+      debounceTime(400),
+      distinctUntilChanged(),
+      takeUntil(this.destroy$)
+    ).subscribe(query => {
+      if (query.trim().length >= 3) {
+        this.searchPlayers();
+      } else {
+        this.playerSearchResults.set([]);
+        this.showPlayerResults.set(false);
+      }
+    });
+  }
 
   async askAssistant(question: string) {
-    if (!question.trim()) return;
+    if (!question.trim() || this.assistantService.isTyping()) return;
     await this.assistantService.sendMessage(question);
   }
 
   async ngOnInit(): Promise<void> {
-    this.seoService.updateTitle('Dashboard Central');
-    this.seoService.updateMeta('Seu ponto central para insights da NBA.');
+    this.seoService.updateTitle('NBA Dashboard | HoopGameNight');
+    this.seoService.updateMeta('Placares ao vivo, estatísticas de atletas e análise por IA da NBA.');
     this.healthCheck.checkHealth();
 
     try {
       await this.gamesService.loadTodayGames();
-      console.log('Dashboard: Jogos de hoje preparados');
     } catch (error) {
-      console.error('Dashboard: Erro ao preparar jogos', error);
+      console.error('Dashboard: Erro ao carregar dados iniciais', error);
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   getTodayGamesCount(): number {
@@ -81,15 +99,6 @@ export class Dashboard implements OnInit {
     return this.gamesService.hasLiveGames();
   }
 
-  getNextGame(): string {
-    const games = this.gamesService.scheduledGames();
-    if (games.length === 0) return 'Nenhum jogo agendado';
-
-    const nextGame = games[0];
-    const time = this.formatGameTime(nextGame.dateTime);
-    return `${nextGame.gameTitle} às ${time}`;
-  }
-
   formatGameTime(dateTime: string): string {
     return new Date(dateTime).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
@@ -97,21 +106,8 @@ export class Dashboard implements OnInit {
     });
   }
 
-  formatGameDate(dateTime: string): string {
-    return new Date(dateTime).toLocaleDateString('pt-BR');
-  }
-
-  formatFullDateTime(dateTime: string): string {
-    return new Date(dateTime).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
   trackByGameId(index: number, game: any): number {
-    return game.id;
+    return game?.id || index;
   }
 
   getTeamLogoUrl(abbreviation: string): string {
@@ -120,9 +116,13 @@ export class Dashboard implements OnInit {
 
   handleLogoError(event: Event, abbreviation: string): void {
     const img = event.target as HTMLImageElement;
-    if (img.src.includes('fallback')) return;
-    console.warn(`Logo não encontrado para: ${abbreviation}`);
+    if (img.src.includes('data:image')) return;
     img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOWNhM2FmIj5OQkE8L3RleHQ+PC9zdmc+';
+  }
+
+  async selectDate(option: string): Promise<void> {
+    this.selectedDateOption = option;
+    await this.refreshDashboardGames();
   }
 
   async onDateChange(event: Event): Promise<void> {
@@ -145,13 +145,10 @@ export class Dashboard implements OnInit {
         targetDate = new Date(today);
         targetDate.setDate(today.getDate() + 1);
         break;
-      case 'today':
       default:
         targetDate = today;
         break;
     }
-
-    console.log(`Dashboard: Carregando jogos para ${targetDate.toLocaleDateString('pt-BR')}`);
 
     if (value === 'today') {
       await this.gamesService.loadTodayGames(true);
@@ -162,7 +159,6 @@ export class Dashboard implements OnInit {
 
   navigateToTeam(abbreviation: string): void {
     if (abbreviation) {
-      console.log(`Navegando para detalhes do time: ${abbreviation}`);
       this.router.navigate(['/teams', abbreviation]);
     }
   }
@@ -172,25 +168,20 @@ export class Dashboard implements OnInit {
   }
 
   getCurrentGames() {
-    return this.selectedDateOption === 'today'
-      ? this.gamesService.todayGames()
-      : this.gamesService.currentGames();
+    return this.gamesService.currentGames();
   }
 
-  // Player search methods
   updatePlayerSearch(value: string): void {
     this.playerSearchQuery.set(value);
-    if (value.length === 0) {
-      this.playerSearchResults.set([]);
+    this.searchSubject.next(value);
+    if (!value) {
       this.showPlayerResults.set(false);
     }
   }
 
   async searchPlayers(): Promise<void> {
     const query = this.playerSearchQuery();
-    if (query.trim().length < 2) {
-      return;
-    }
+    if (query.trim().length < 3) return;
 
     this.isSearchingPlayers.set(true);
     this.showPlayerResults.set(true);
@@ -199,7 +190,6 @@ export class Dashboard implements OnInit {
       await this.playersService.searchPlayers(query, 1, 5);
       this.playerSearchResults.set(this.playersService.searchResults());
     } catch (error) {
-      console.error('Erro ao buscar jogadores:', error);
       this.playerSearchResults.set([]);
     } finally {
       this.isSearchingPlayers.set(false);
@@ -213,18 +203,12 @@ export class Dashboard implements OnInit {
   }
 
   getPlayerPhotoUrl(player: PlayerResponse): string {
-    return this.playersService.getPlayerPhotoUrl(player.espnId || player.externalId);
+    const id = player.espnId || player.externalId;
+    return this.playersService.getPlayerPhotoUrl(id);
   }
 
   onPlayerImageError(event: Event): void {
     const img = event.target as HTMLImageElement;
-    if (!img.dataset['fallback']) {
-      img.dataset['fallback'] = 'true';
-      img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjOTk5OTk5Ij48cGF0aCBkPSJNMTIgMTJjMi43NiAwIDUtMi4yNCA1LTVzLTIuMjQtNS01LTUtNSAyLjI0LTUgNSAyLjI0IDUgNSA1em0wIDJjLTIuNjcgMC04IDEuMzQtOCA0djJINHYyaDE2di0yaDR2LTJjMC0yLjY2LTUuMzMtNC04LTR6Ii8+PC9zdmc+';
-    }
-  }
-
-  closePlayerResults(): void {
-    this.showPlayerResults.set(false);
+    img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjOTk5OTk5Ij48cGF0aCBkPSJNMTIgMTJjMi43NiAwIDUtMi4yNCA1LTVzLTIuMjQtNS01LTUtNSAyLjI0LTUgNSAyLjI0IDUgNSA1em0wIDJjLTIuNjcgMC04IDEuMzQtOCA0djJINHYyaDE2di0yaDR2LTJjMC0yLjY2LTUuMzMtNC04LTR6Ii8+PC9zdmc+';
   }
 }

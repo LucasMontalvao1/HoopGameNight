@@ -1,360 +1,252 @@
 <div class="nba-dashboard">
   <div class="nba-dashboard__container">
-    <!-- Hero Section -->
-    <section class="hero glass-panel animate-fade-in">
-      <div class="hero__content">
-        <div class="hero__badge">TEMPORADA 2025/26</div>
-        <h1 class="hero__title">
-          <span class="hero__title-main">Hoop</span>
-          <span class="hero__title-accent">Game Night</span>
-        </h1>
-        <p class="hero__subtitle">
-          Sua central definitiva de estatísticas, resultados ao vivo e análises inteligentes da NBA.
-        </p>
-        <div class="hero__actions">
-          <button class="btn btn--primary" routerLink="/games">
-            <span class="material-icons">explore</span>
-            Explorar Jogos
-          </button>
-          <button class="btn btn--secondary" routerLink="/players">
-            <span class="material-icons">people</span>
-            Ver Jogadores
-          </button>
-        </div>
-      </div>
 
-      <!-- API Status Integration -->
-      <div class="hero__status">
-        <div class="api-status-pill">
-          <div class="api-status-pill__icon">
+    <!-- Top Bar / Compact Header -->
+    <header class="dashboard-header animate-fade-in">
+      <div class="dashboard-header__content">
+        <h1 class="dashboard-header__title">
+          <span class="title-main">Hoop</span><span class="title-accent">GameNight</span>
+        </h1>
+        <div class="dashboard-header__meta">
+          <span class="season-badge">TEMPORADA 2025/26</span>
+          <div class="api-status-pill">
             <app-status-indicator [status]="healthCheck.status()" [showText]="false"
               size="small"></app-status-indicator>
-          </div>
-          <div class="api-status-pill__info">
-            <span class="api-status-pill__label">API Status</span>
-            <span class="api-status-pill__value">{{ healthCheck.status() === 'online' ? 'Conectado' : 'Instável'
-              }}</span>
+            <span class="api-status-text">{{ healthCheck.status() === 'online' ? 'Conectado' : 'Sincronizando' }}</span>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- Today's Games Section -->
-    <section class="games-section">
-      <div class="section-header">
-        <h2 class="section-title">
-          @if (selectedDateOption === 'today') {
-          Jogos de Hoje
-          } @else if (selectedDateOption === 'yesterday') {
-          Jogos de Ontem
-          } @else {
-          Jogos de Amanhã
-          }
-        </h2>
-        <div class="section-actions">
-          @if (hasLiveGames()) {
-          <span class="live-games-badge">
-            <span class="live-indicator"></span>
-            {{ getLiveGamesCount() }} ao vivo
-          </span>
-          }
-          <select class="date-selector" (change)="onDateChange($event)" [value]="selectedDateOption">
-            <option value="today">Hoje</option>
-            <option value="yesterday">Ontem</option>
-            <option value="tomorrow">Amanhã</option>
-          </select>
-        </div>
+      <div class="dashboard-header__actions">
+        <button class="btn btn--ghost" routerLink="/players">
+          <span class="material-icons">people</span>
+          Atletas
+        </button>
+        <button class="btn btn--ghost" routerLink="/teams">
+          <span class="material-icons">groups</span>
+          Times
+        </button>
       </div>
+    </header>
 
-      <div class="games-preview">
-        @if (gamesService.isLoading()) {
-        <div class="games-skeleton-list">
-          @for (i of [1, 2, 3]; track i) {
-          <div class="game-mini-card skeleton-card">
-            <div class="game-mini-card__team">
-              <app-skeleton-loader variant="circle" width="32px" height="32px"></app-skeleton-loader>
-              <div class="team-info">
-                <app-skeleton-loader width="40px" height="12px" borderRadius="4px"></app-skeleton-loader>
-              </div>
-            </div>
-            <div class="game-mini-card__vs">
-              <app-skeleton-loader width="16px" height="16px" borderRadius="4px"></app-skeleton-loader>
-            </div>
-            <div class="game-mini-card__team">
-              <div class="team-info" style="align-items: flex-end;">
-                <app-skeleton-loader width="40px" height="12px" borderRadius="4px"></app-skeleton-loader>
-              </div>
-              <app-skeleton-loader variant="circle" width="32px" height="32px"></app-skeleton-loader>
-            </div>
-          </div>
-          }
-        </div>
-        } @else if (gamesService.error()) {
-        <app-error-view title="Erro ao carregar jogos" [message]="gamesService.error() || ''"
-          (retry)="refreshDashboardGames()">
-        </app-error-view>
-        } @else if (getTodayGamesCount() === 0) {
-        <div class="games-placeholder">
-          <div class="games-placeholder__icon">🏀</div>
-          <h3>
-            @if (selectedDateOption === 'today') {
-            Nenhum jogo hoje
-            } @else if (selectedDateOption === 'yesterday') {
-            Nenhum jogo ontem
-            } @else {
-            Nenhum jogo amanhã
-            }
-          </h3>
-          <p>Não há jogos da NBA agendados para esta data</p>
-          <button class="btn btn--primary" routerLink="/games">
-            <span class="material-icons">calendar_today</span>
-            Ver Outros Dias
-          </button>
-        </div>
-        } @else {
-        <div class="games-mini-list">
-          @for (game of getCurrentGames(); track trackByGameId($index, game)) {
-          <div class="game-mini-card" [class.game-mini-card--live]="game.isLive"
-            [class.game-mini-card--completed]="game.isCompleted" (click)="viewGameDetails(game.id)"
-            style="cursor: pointer;">
+    <div class="dashboard-layout">
+      <!-- MAIN COLUMN: Games & More -->
+      <main class="dashboard-main">
 
-            <!-- Time Visitante-->
-            <div class="game-mini-card__team team--clickable"
-              (click)="navigateToTeam(game.visitorTeam.abbreviation); $event.stopPropagation()">
-              <img [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)" [alt]="game.visitorTeam.name" class="team-logo"
-                (error)="handleLogoError($event, game.visitorTeam.abbreviation)" loading="lazy">
-              <div class="team-info">
-                <span class="team-abbr">{{ game.visitorTeam.abbreviation }}</span>
-                <span class="team-name">{{ game.visitorTeam.displayName }}</span>
-              </div>
-            </div>
+        <!-- Games Section -->
+        <section class="games-section">
+          <div class="section-header">
+            <h2 class="section-title">
+              @if (selectedDateOption === 'today') { Jogos de Hoje }
+              @else if (selectedDateOption === 'yesterday') { Jogos de Ontem }
+              @else { Jogos de Amanhã }
+            </h2>
 
-            <!-- Placar Visitante (Abre Boxscore) -->
-            @if (game.isCompleted || game.isLive) {
-            <span class="team-score" [class.winner]="game.winningTeam?.id === game.visitorTeam.id">
-              {{ game.visitorTeamScore ?? 0 }}
-            </span>
-            }
-
-            <!-- Separador VS -->
-            <div class="game-mini-card__vs">vs</div>
-
-            <!-- Placar Casa (Abre Boxscore) -->
-            @if (game.isCompleted || game.isLive) {
-            <span class="team-score" [class.winner]="game.winningTeam?.id === game.homeTeam.id">
-              {{ game.homeTeamScore ?? 0 }}
-            </span>
-            }
-
-            <!-- Time da Casa -->
-            <div class="game-mini-card__team team--clickable"
-              (click)="navigateToTeam(game.homeTeam.abbreviation); $event.stopPropagation()">
-              <img [src]="getTeamLogoUrl(game.homeTeam.abbreviation)" [alt]="game.homeTeam.name" class="team-logo"
-                (error)="handleLogoError($event, game.homeTeam.abbreviation)" loading="lazy">
-              <div class="team-info">
-                <span class="team-abbr">{{ game.homeTeam.abbreviation }}</span>
-                <span class="team-name">{{ game.homeTeam.displayName }}</span>
-              </div>
-            </div>
-
-            <!-- Info do Jogo -->
-            <div class="game-mini-card__info">
-              @if (game.isLive) {
-              <span class="status status--live">
-                <span class="live-dot"></span>
-                LIVE
+            <div class="section-actions">
+              @if (hasLiveGames()) {
+              <span class="live-pulse-badge">
+                <span class="pulse-dot"></span> {{ getLiveGamesCount() }} AO VIVO
               </span>
-              } @else if (game.isCompleted) {
-              <span class="status status--completed">Final</span>
-              } @else {
-              <span class="time">{{ formatGameTime(game.dateTime) }}</span>
+              }
+              <div class="date-selector-group">
+                <button [class.active]="selectedDateOption === 'yesterday'"
+                  (click)="selectDate('yesterday')">Ontem</button>
+                <button [class.active]="selectedDateOption === 'today'" (click)="selectDate('today')">Hoje</button>
+                <button [class.active]="selectedDateOption === 'tomorrow'"
+                  (click)="selectDate('tomorrow')">Amanhã</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- GAMES GRID -->
+          <div class="games-grid-premium">
+            @if (gamesService.isLoading()) {
+            @for (i of [1,2,3,4]; track i) {
+            <div class="game-card-skeleton glass-panel">
+              <div class="skeleton-shimmer"></div>
+            </div>
+            }
+            } @else if (gamesService.error()) {
+            <div class="error-view-premium glass-panel">
+              <span class="material-icons">error_outline</span>
+              <p>{{ gamesService.error() }}</p>
+              <button (click)="refreshDashboardGames()" class="btn btn--sm">Tentar Novamente</button>
+            </div>
+            } @else if (getTodayGamesCount() === 0) {
+            <div class="empty-games-premium glass-panel">
+              <span class="material-icons">event_busy</span>
+              <p>Nenhum jogo agendado para esta data.</p>
+            </div>
+            } @else {
+            @for (game of getCurrentGames(); track trackByGameId($index, game)) {
+            <div class="game-card-premium" [class.is-live]="game.isLive" [class.is-final]="game.isCompleted"
+              (click)="viewGameDetails(game.id)">
+              <div class="game-card-premium__header">
+                @if (game.isLive) {
+                <span class="badge badge--live">LIVE</span>
+                } @else if (game.isCompleted) {
+                <span class="badge badge--final">FINAL</span>
+                } @else {
+                <span class="badge badge--time">{{ formatGameTime(game.dateTime) }}</span>
+                }
+              </div>
+
+              <div class="game-card-premium__teams">
+                <!-- Away Team -->
+                <div class="team-v-stack">
+                  <img [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)" class="team-logo-lg"
+                    (error)="handleLogoError($event, game.visitorTeam.abbreviation)">
+                  <span class="team-abbr-lg">{{ game.visitorTeam.abbreviation }}</span>
+                  @if (game.isCompleted || game.isLive) {
+                  <span class="team-score-lg" [class.is-winner]="game.winningTeam?.id === game.visitorTeam.id">
+                    {{ game.visitorTeamScore }}
+                  </span>
+                  }
+                </div>
+
+                <div class="vs-divider">VS</div>
+
+                <!-- Home Team -->
+                <div class="team-v-stack">
+                  <img [src]="getTeamLogoUrl(game.homeTeam.abbreviation)" class="team-logo-lg"
+                    (error)="handleLogoError($event, game.homeTeam.abbreviation)">
+                  <span class="team-abbr-lg">{{ game.homeTeam.abbreviation }}</span>
+                  @if (game.isCompleted || game.isLive) {
+                  <span class="team-score-lg" [class.is-winner]="game.winningTeam?.id === game.homeTeam.id">
+                    {{ game.homeTeamScore }}
+                  </span>
+                  }
+                </div>
+              </div>
+            </div>
+            }
+            }
+          </div>
+
+          <div class="section-footer-actions">
+            <button class="btn btn--secondary btn--full" routerLink="/games">
+              <span class="material-icons">calendar_month</span> Ver Calendário Completo
+            </button>
+          </div>
+        </section>
+
+        <!-- Secondary Content Area -->
+        <div class="secondary-content-grid">
+          <!-- Favoritos -->
+          <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.1s">
+            <div class="premium-card__header">
+              <span class="material-icons icon-gold">grade</span>
+              <h3>Seguindo</h3>
+            </div>
+            <div class="favorite-teams-scroll">
+              @for (team of favoriteTeams(); track team.id) {
+              <div class="mini-fav-item" (click)="navigateToTeam(team.abbreviation)">
+                <img [src]="getTeamLogoUrl(team.abbreviation)" [title]="team.displayName" class="mini-logo-fav">
+                <span class="mini-fav-item__abbr">{{ team.abbreviation }}</span>
+              </div>
+              } @empty {
+              <div class="empty-state-mini">
+                <p>Siga times para acesso rápido</p>
+                <button class="btn btn--ghost btn--sm" routerLink="/teams">Explorar</button>
+              </div>
               }
             </div>
-          </div>
-          }
-        </div>
+          </section>
 
-        <div class="games-summary">
-          <div class="summary-stats">
-            <div class="stat">
-              <span class="stat__value">{{ getTodayGamesCount() }}</span>
-              <span class="stat__label">Total</span>
+          <!-- Busca Rápida -->
+          <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.2s">
+            <div class="premium-card__header">
+              <span class="material-icons">person_search</span>
+              <h3>Quick Search</h3>
             </div>
-            @if (hasLiveGames()) {
-            <div class="stat stat--live">
-              <span class="stat__value">{{ getLiveGamesCount() }}</span>
-              <span class="stat__label">Ao Vivo</span>
+            <div class="premium-search-box">
+              <div class="search-input-group">
+                <span class="material-icons">search</span>
+                <input type="text" placeholder="Buscar jogador..." [ngModel]="playerSearchQuery()"
+                  (ngModelChange)="updatePlayerSearch($event)">
+              </div>
+
+              @if (showPlayerResults()) {
+              <div class="quick-results glass-panel">
+                @for (player of playerSearchResults().slice(0,5); track player.id) {
+                <div class="quick-result-row" (click)="selectPlayer(player)">
+                  <img [src]="getPlayerPhotoUrl(player)" class="avatar-xs">
+                  <div class="quick-result-info">
+                    <span class="name">{{ player.fullName }}</span>
+                    <span class="meta">{{ player.team.abbreviation }} • {{ player.position }}</span>
+                  </div>
+                </div>
+                }
+              </div>
+              }
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <!-- SIDEBAR: Coach Assistant -->
+      <aside class="dashboard-sidebar">
+        <!-- Coach Assistant -->
+        <section class="assistant-pane glass-panel animate-slide-in-right">
+          <div class="assistant-header">
+            <div class="assistant-title">
+              <span class="material-icons ai-sparkle">auto_awesome</span>
+              <h3>Coach Assistant</h3>
+            </div>
+            <div class="ai-status-badge">OLLAMA</div>
+          </div>
+
+          <div class="assistant-chat" #chatContainer>
+            @for (msg of assistantService.messages(); track msg.timestamp) {
+            <div class="chat-msg" [class]="'chat-msg--' + msg.role">
+              <div class="chat-msg__bubble">
+                {{ msg.content }}
+              </div>
+            </div>
+            } @empty {
+            <div class="assistant-welcome">
+              <span class="material-icons">forum</span>
+              <p>Olá! Como posso ajudar com os jogos de hoje?</p>
             </div>
             }
-            <div class="stat">
-              <span class="stat__value">{{ gamesService.completedGames().length }}</span>
-              <span class="stat__label">Finalizados</span>
-            </div>
-          </div>
 
-          <button class="btn btn--primary" routerLink="/games">
-            <span class="material-icons">sports_basketball</span>
-            Ver Todos os Jogos
-          </button>
-        </div>
-        }
-      </div>
-    </section>
-
-    <!-- Bottom Grid -->
-    <div class="dashboard-grid">
-      <!-- My Teams -->
-      <section class="my-teams glass-panel animate-fade-in" style="animation-delay: 0.1s">
-        <div class="section-header-compact">
-          <h3 class="section-title-small">Meus Times</h3>
-          <span class="material-icons info-icon">star</span>
-        </div>
-
-        <div class="teams-list">
-          @for (team of favoriteTeams(); track team.id) {
-          <div class="team-card team--clickable" (click)="navigateToTeam(team.abbreviation)">
-            <div class="team-card__info">
-              <div class="team-logo-wrapper">
-                <img [src]="getTeamLogoUrl(team.abbreviation)" class="team-logo--mini"
-                  (error)="handleLogoError($event, team.abbreviation)">
-              </div>
-              <div class="team-card__details">
-                <span class="team-card__name">{{ team.displayName || team.name }}</span>
-                <span class="team-card__city">{{ team.city }}</span>
-              </div>
-            </div>
-            <span class="material-icons arrow-icon">chevron_right</span>
-          </div>
-          } @empty {
-          <div class="empty-favorites">
-            <span class="material-icons">favorite_border</span>
-            <p>Siga seus times favoritos para acesso rápido.</p>
-            <button class="btn btn--ghost btn--sm" routerLink="/teams">Explorar Equipes</button>
-          </div>
-          }
-        </div>
-      </section>
-
-      <!-- Search Player -->
-      <section class="player-search glass-panel animate-fade-in" style="animation-delay: 0.2s">
-        <h3 class="section-title-small">Atletas</h3>
-
-        <div class="search-box">
-          <div class="search-input-wrapper">
-            <span class="material-icons search-icon">search</span>
-            <input type="text" class="search-input" placeholder="Buscar LeBron, Curry..."
-              [ngModel]="playerSearchQuery()" (ngModelChange)="updatePlayerSearch($event)"
-              (keyup.enter)="searchPlayers()">
-          </div>
-        </div>
-
-        @if (showPlayerResults()) {
-        <div class="search-results-dropdown glass-panel">
-          @if (isSearchingPlayers()) {
-          <div class="search-loading">
-            <app-skeleton-loader width="100%" height="40px" className="mb-2"></app-skeleton-loader>
-            <app-skeleton-loader width="100%" height="40px" className="mb-2"></app-skeleton-loader>
-          </div>
-          } @else if (playerSearchResults().length === 0) {
-          <div class="search-no-results">
-            <span class="material-icons">person_search</span>
-            <p>Nenhum atleta encontrado</p>
-          </div>
-          } @else {
-          <div class="search-results-list">
-            @for (player of playerSearchResults(); track player.id) {
-            <div class="search-result-item" (click)="selectPlayer(player)">
-              <img [src]="getPlayerPhotoUrl(player)" [alt]="player.fullName" class="player-thumb"
-                (error)="onPlayerImageError($event)">
-              <div class="player-info">
-                <span class="player-name">{{ player.fullName }}</span>
-                <span class="player-details">{{ player.position }} - {{ player.team.displayName }}</span>
+            @if (assistantService.isTyping()) {
+            <div class="chat-msg chat-msg--assistant">
+              <div class="typing-dots">
+                <span></span><span></span><span></span>
               </div>
             </div>
             }
-          </div>
-          <button class="btn btn--primary btn--sm view-all-btn" routerLink="/players"
-            style="width: calc(100% - 20px); margin: 10px auto; display: flex;">
-            Ver todos
-          </button>
-          }
-        </div>
-        } @else {
-        <div class="stats-preview-placeholder">
-          <p class="search-hint">Busque por qualquer jogador da liga.</p>
-        </div>
-        }
-      </section>
 
-      <!-- Coach Assistant -->
-      <section class="coach-assistant">
-        <div class="section-header-row">
-          <h3 class="section-title-small">Coach Assistant</h3>
-          <span class="ai-badge">OLLAMA AI</span>
-        </div>
-
-        <div class="chat-container" #chatContainer>
-          @for (msg of assistantService.messages(); track msg.timestamp) {
-          <div class="chat-bubble" [class]="'chat-bubble--' + msg.role">
-            <div class="bubble-content">{{ msg.content }}</div>
-            @if (msg.gamesAnalyzed) {
-            <div class="bubble-meta">Analisados {{ msg.gamesAnalyzed }} jogos</div>
+            @if (assistantService.error()) {
+            <div class="chat-error-msg">
+              <span class="material-icons">error_outline</span>
+              <p>{{ assistantService.error() }}</p>
+            </div>
             }
           </div>
-          } @empty {
-          <div class="chat-empty">
-            <span class="material-icons">auto_awesome</span>
-            <p>Tire suas dúvidas sobre jogos e resultados da NBA agora mesmo!</p>
+
+          <div class="assistant-input-area">
+            <input type="text" #questionInput placeholder="Diga algo..." [disabled]="assistantService.isTyping()"
+              (input)="0" (keyup.enter)="askAssistant(questionInput.value); questionInput.value = ''">
+            <button class="assistant-send-btn" [disabled]="assistantService.isTyping() || !questionInput.value"
+              (click)="askAssistant(questionInput.value); questionInput.value = ''">
+              <span class="material-icons">send</span>
+            </button>
           </div>
-          }
+        </section>
 
-          @if (assistantService.isTyping()) {
-          <div class="chat-bubble chat-bubble--assistant typing">
-            <div class="typing-indicator"><span></span><span></span><span></span></div>
+        <!-- System Health Mini -->
+        <section class="health-mini glass-panel animate-fade-in" style="animation-delay: 0.4s">
+          <div class="health-item">
+            <span class="label">API Status</span>
+            <div class="status-indicator">
+              <span class="dot online"></span>
+              <span class="text">Online</span>
+            </div>
           </div>
-          }
-        </div>
-
-        <div class="chat-input-box">
-          <input type="text" #questionInput placeholder="Lakers ganhou ontem?"
-            (keyup.enter)="askAssistant(questionInput.value); questionInput.value = ''"
-            [disabled]="assistantService.isTyping()">
-          <button class="send-btn" (click)="askAssistant(questionInput.value); questionInput.value = ''"
-            [disabled]="assistantService.isTyping()">
-            <span class="material-icons">send</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- System Status -->
-      <section class="system-status">
-        <h3 class="section-title-small">Saúde da Plataforma</h3>
-
-        <div class="status-list">
-          <div class="status-item">
-            <span class="status-item__label">NBA API</span>
-            <app-status-indicator [status]="healthCheck.status()" [showText]="true" size="small">
-            </app-status-indicator>
-          </div>
-
-          <div class="status-item">
-            <span class="status-item__label">Base de Dados</span>
-            <app-status-indicator [status]="ApiStatusEnum.ONLINE" [showText]="true" size="small">
-            </app-status-indicator>
-          </div>
-
-          <div class="status-item">
-            <span class="status-item__label">Cache</span>
-            <app-status-indicator [status]="ApiStatusEnum.ONLINE" [showText]="true" size="small">
-            </app-status-indicator>
-          </div>
-
-          <button class="btn btn--ghost btn--sm" routerLink="/api-status">
-            <span class="material-icons">monitor_heart</span>
-            Detalhes
-          </button>
-        </div>
-      </section>
+        </section>
+      </aside>
     </div>
   </div>
 </div>

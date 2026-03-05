@@ -7,24 +7,23 @@ using Microsoft.Extensions.Logging;
 using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
+using HoopGameNight.Core.DTOs.Response;
 
-namespace HoopGameNight.Api.Controllers
+namespace HoopGameNight.Api.Controllers.V1
 {
     /// <summary>
     /// Interface de consulta em linguagem natural utilizando IA local para processamento de dados históricos e futuros da NBA.
     /// </summary>
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/v1/[controller]")]
     [Produces("application/json")]
-    public class AskController : ControllerBase
+    public class AskController : BaseApiController
     {
         private readonly INbaAiService _aiService;
-        private readonly ILogger<AskController> _logger;
 
-        public AskController(INbaAiService aiService, ILogger<AskController> logger)
+        public AskController(INbaAiService aiService, ILogger<AskController> logger) : base(logger)
         {
             _aiService = aiService;
-            _logger = logger;
         }
 
         /// <summary>
@@ -56,50 +55,35 @@ namespace HoopGameNight.Api.Controllers
         /// </remarks>
         [HttpPost]
         [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("AskPolicy")]
-        [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(typeof(object), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> Ask([FromBody] AskRequest request)
+        [ProducesResponseType(typeof(ApiResponse<AskResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<AskResponse>>> Ask([FromBody] AskRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Question))
             {
-                return BadRequest(new
-                {
-                    error = "Question is required",
-                    message = "A pergunta não pode estar vazia",
-                    example = "Quais jogos aconteceram ontem?"
-                });
+                return BadRequest<AskResponse>("A pergunta não pode estar vazia");
             }
 
             if (request.Question.Length < 5)
             {
-                return BadRequest(new
-                {
-                    error = "Question too short",
-                    message = "A pergunta deve ter pelo menos 5 caracteres",
-                    example = "Jogos de hoje?"
-                });
+                return BadRequest<AskResponse>("A pergunta deve ter pelo menos 5 caracteres");
             }
 
             if (request.Question.Length > 500)
             {
-                return BadRequest(new
-                {
-                    error = "Question too long",
-                    message = "A pergunta não pode ter mais de 500 caracteres",
-                    hint = "Seja mais específico, por exemplo: 'Qual foi o resultado do jogo do Lakers ontem?'"
-                });
+                return BadRequest<AskResponse>("A pergunta não pode ter mais de 500 caracteres");
             }
 
             try
             {
-                _logger.LogInformation("Pergunta de {IP}: {Question}",
+                Logger.LogInformation("Pergunta de {IP}: {Question}",
                     HttpContext.Connection.RemoteIpAddress,
                     request.Question);
 
                 var response = await _aiService.AskAsync(request);
 
-                _logger.LogInformation("Resposta gerada: {Games} jogos analisados, cache: {Cache}",
+                Logger.LogInformation("Resposta gerada: {Games} jogos analisados, cache: {Cache}",
                     response.GamesAnalyzed,
                     response.FromCache);
 
@@ -107,14 +91,10 @@ namespace HoopGameNight.Api.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao processar: {Question}", request.Question);
+                Logger.LogError(ex, "Erro ao processar: {Question}", request.Question);
 
-                return StatusCode(500, new
-                {
-                    error = "Internal server error",
-                    message = "Erro ao processar pergunta. Verifique se o Ollama está rodando.",
-                    details = ex.Message
-                });
+                return StatusCode(500, ApiResponse<AskResponse>.ErrorResult(
+                    "Erro ao processar pergunta. Verifique se o Ollama está rodando."));
             }
         }
     }

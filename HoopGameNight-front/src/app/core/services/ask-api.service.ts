@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
-import { AskRequest, AskResponse } from '../interfaces/api.interface';
+import { AskRequest, AskResponse, ApiResponse } from '../interfaces/api.interface';
 import { APP_CONSTANTS } from '../constants/app.constants';
 
 @Injectable({
@@ -11,14 +11,16 @@ import { APP_CONSTANTS } from '../constants/app.constants';
 })
 export class AskApiService {
     private readonly http = inject(HttpClient);
-    private readonly baseUrl = `${environment.apiUrl}/api/Ask`;
+    private readonly baseUrl = `${environment.apiUrl}/api/v1/Ask`;
 
     async ask(question: string): Promise<AskResponse> {
         const request: AskRequest = { question };
 
-        return await firstValueFrom(
-            this.http.post<AskResponse>(this.baseUrl, request)
-                .pipe(timeout(60000)) 
+        const response = await firstValueFrom(
+            this.http.post<ApiResponse<AskResponse>>(this.baseUrl, request)
+                .pipe(timeout(60000))
         );
+
+        return response.data;
     }
 }

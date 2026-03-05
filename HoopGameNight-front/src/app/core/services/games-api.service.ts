@@ -4,12 +4,12 @@ import { firstValueFrom } from 'rxjs';
 import { timeout } from 'rxjs/operators';
 
 import { environment } from '../../../environments/environment';
-import { 
-  ApiResponse, 
-  PaginatedResponse, 
-  GameResponse, 
+import {
+  ApiResponse,
+  PaginatedResponse,
+  GameResponse,
   GetGamesRequest,
-  SyncStatusResponse 
+  SyncStatusResponse
 } from '../interfaces/api.interface';
 import { APP_CONSTANTS } from '../constants/app.constants';
 
@@ -19,37 +19,40 @@ import { APP_CONSTANTS } from '../constants/app.constants';
 export class GamesApiService {
   private readonly baseUrl = `${environment.apiUrl}/api/v1/games`;
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(private readonly http: HttpClient) { }
 
   // GET /api/v1/games/today
   async getTodayGames(): Promise<GameResponse[]> {
     const url = `${this.baseUrl}/today`;
-    
+
     const response = await firstValueFrom(
       this.http.get<ApiResponse<GameResponse[]>>(url)
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response.data;
   }
 
   // GET /api/v1/games/date/{date}
   async getGamesByDate(date: Date): Promise<GameResponse[]> {
-    const dateStr = date.toISOString().split('T')[0]; // yyyy-MM-dd
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const url = `${this.baseUrl}/date/${dateStr}`;
-    
+
     const response = await firstValueFrom(
       this.http.get<ApiResponse<GameResponse[]>>(url)
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response.data;
   }
 
   // GET /api/v1/games (com filtros)
   async getGames(request: GetGamesRequest): Promise<PaginatedResponse<GameResponse>> {
     let params = new HttpParams();
-    
+
     if (request.page) params = params.set('page', request.page.toString());
     if (request.pageSize) params = params.set('pageSize', request.pageSize.toString());
     if (request.date) params = params.set('date', request.date);
@@ -64,20 +67,20 @@ export class GamesApiService {
       this.http.get<PaginatedResponse<GameResponse>>(this.baseUrl, { params })
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response;
   }
 
   // GET /api/v1/games/{id}
   async getGameById(id: number): Promise<GameResponse | null> {
     const url = `${this.baseUrl}/${id}`;
-    
+
     try {
       const response = await firstValueFrom(
         this.http.get<ApiResponse<GameResponse>>(url)
           .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
       );
-      
+
       return response.data;
     } catch (error: any) {
       if (error.status === 404) {
@@ -98,44 +101,47 @@ export class GamesApiService {
       this.http.get<PaginatedResponse<GameResponse>>(url, { params })
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response;
   }
 
   // POST /api/v1/games/sync/today
   async syncTodayGames(): Promise<any> {
     const url = `${this.baseUrl}/sync/today`;
-    
+
     const response = await firstValueFrom(
       this.http.post<ApiResponse<any>>(url, {})
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response.data;
   }
 
   // POST /api/v1/games/sync/date/{date}
   async syncGamesByDate(date: Date): Promise<any> {
-    const dateStr = date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const url = `${this.baseUrl}/sync/date/${dateStr}`;
-    
+
     const response = await firstValueFrom(
       this.http.post<ApiResponse<any>>(url, {})
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response.data;
   }
 
   // GET /api/v1/games/sync/status
   async getSyncStatus(): Promise<SyncStatusResponse> {
     const url = `${this.baseUrl}/sync/status`;
-    
+
     const response = await firstValueFrom(
       this.http.get<ApiResponse<SyncStatusResponse>>(url)
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
-    
+
     return response.data;
   }
 
