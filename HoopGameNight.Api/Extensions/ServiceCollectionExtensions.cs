@@ -327,12 +327,13 @@ namespace HoopGameNight.Api.Extensions
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .OrResult(msg => !msg.IsSuccessStatusCode)
+                .Or<TaskCanceledException>() // Capturar timeouts
                 .WaitAndRetryAsync(
                     retryCount,
                     retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
                     onRetry: (outcome, timespan, retryCount, context) =>
                     {
-                        Console.WriteLine($"Retry {retryCount} after {timespan.TotalMilliseconds}ms");
+                        Console.WriteLine($"Polly Retry {retryCount} after {timespan.TotalMilliseconds}ms due to {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}");
                     });
         }
 
@@ -340,9 +341,10 @@ namespace HoopGameNight.Api.Extensions
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
+                .Or<TaskCanceledException>()
                 .CircuitBreakerAsync(
-                    handledEventsAllowedBeforeBreaking: 5,
-                    durationOfBreak: TimeSpan.FromSeconds(30));
+                    handledEventsAllowedBeforeBreaking: 10,
+                    durationOfBreak: TimeSpan.FromSeconds(20));
         }
 
         private static IAsyncPolicy<HttpResponseMessage> GetOllamaRetryPolicy()

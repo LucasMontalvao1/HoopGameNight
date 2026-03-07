@@ -97,5 +97,22 @@ namespace HoopGameNight.Api.Controllers.V1
                     "Erro ao processar pergunta. Verifique se o Ollama está rodando."));
             }
         }
+
+        [HttpGet("game/{gameId}")]
+        [ProducesResponseType(typeof(ApiResponse<AskResponse>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<ApiResponse<AskResponse>>> GetGameSummary(int gameId)
+        {
+            try
+            {
+                var response = await _aiService.GetGameSummaryAsync(gameId);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao gerar resumo para jogo {GameId}", gameId);
+                return StatusCode(500, ApiResponse<AskResponse>.ErrorResult("Erro ao gerar resumo do jogo."));
+            }
+        }
     }
 }

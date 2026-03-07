@@ -22,10 +22,12 @@ namespace HoopGameNight.Api.Mappings
             CreateMap<Team, TeamResponse>()
                 .ForMember(dest => dest.Conference, opt => opt.MapFrom(src => src.Conference.ToString()))
                 .ForMember(dest => dest.ConferenceDisplay, opt => opt.MapFrom(src => src.Conference.GetDescription()))
-                .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName));
+                .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName))
+                .ForMember(dest => dest.LogoUrl, opt => opt.MapFrom(src => TeamExtensions.GetTeamLogoUrl(src.Abbreviation)));
 
             CreateMap<Team, TeamSummaryResponse>()
-                .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName));
+                .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName))
+                .ForMember(dest => dest.LogoUrl, opt => opt.MapFrom(src => TeamExtensions.GetTeamLogoUrl(src.Abbreviation)));
 
             // Player Mappings
             CreateMap<Player, PlayerResponse>()
@@ -163,7 +165,8 @@ namespace HoopGameNight.Api.Mappings
                 Name = winningTeam.Name,
                 Abbreviation = winningTeam.Abbreviation,
                 City = winningTeam.City,
-                DisplayName = winningTeam.DisplayName
+                DisplayName = winningTeam.DisplayName,
+                LogoUrl = TeamExtensions.GetTeamLogoUrl(winningTeam.Abbreviation)
             } : null;
         }
 
