@@ -7,173 +7,161 @@ namespace HoopGameNight.Core.Services.AI
 {
     public class NbaPromptBuilder
     {
-        public string BuildPrompt(string question, List<GameResponse> games, string playerStatsText = "")
+        public string BuildPrompt(string question, List<GameResponse> games, string playerStatsText = "", Dictionary<int, GameLeadersResponse>? leaders = null)
         {
-            var gamesText = FormatGames(games);
+            var gamesText = FormatGames(games, leaders);
             var statsText = string.IsNullOrWhiteSpace(playerStatsText)
                 ? "Nenhum dado estatístico de jogador foi encontrado."
                 : playerStatsText;
 
-            return $@"Você é o **HoopGameNight AI**, um analista especialista em NBA.
+            return $@"Você é o **Coach Assistant**, um analista sênior da NBA responsável por responder perguntas de fãs de basquete.
 
-Responda em **português do Brasil**, de forma natural, clara e direta, como um comentarista esportivo profissional.
+### 📋 REGRAS CRÍTICAS DE RESPOSTA:
+1. **BASE DE DADOS:** Use **APENAS** os dados fornecidos em ""DADOS DISPONÍVEIS"".
+2. **VERACIDADE:** Nunca invente estatísticas, eventos, jogadores ou resultados. Se não houver dados, responda: ""Não encontrei essa informação nos registros oficiais.""
+3. **TONALIDADE:** Responda de forma natural, clara e objetiva, como um resumo esportivo de um portal de notícias (ex: ESPN, Globo Esporte).
+4. **FOCO:** Responda apenas sobre NBA. Para outros temas, informe que seu conhecimento é restrito ao basquete.
+5. **ESTRUTURA:** Use Markdown (negrito, tabelas e listas) para organizar a resposta e facilitar a leitura.
+6. **PROMPT DE JOGOS:** Se a pergunta for sobre como foi um jogo, siga a ordem: Resultado -> Destaque -> Análise curta.
 
-━━━━━━━━━━━━━━━━━━━━━━
-REGRAS CRÍTICAS
-━━━━━━━━━━━━━━━━━━━━━━
+---
 
-1. Use **APENAS** os dados em ""DADOS DISPONÍVEIS"".
-2. **NUNCA invente** estatísticas, jogadores, datas ou resultados.
-3. Se a informação não existir, responda exatamente: ""Não encontrei essa informação nos dados disponíveis.""
-4. Se não houver jogos ou estatísticas nos dados, informe claramente que não há registros disponíveis.
-5. Se os dados forem parciais, responda usando apenas o que existir.
-6. Nunca diga frases como ""baseado nos dados"" ou ""segundo o contexto acima"". Fale naturalmente.
-7. Responda **apenas sobre NBA**. Para outros temas: ""Só consigo ajudar com informações sobre NBA.""
+### 📋 DADOS DISPONÍVEIS PARA CONSULTA:
 
-━━━━━━━━━━━━━━━━━━━━━━
-INTERPRETAÇÃO DE PERGUNTAS
-━━━━━━━━━━━━━━━━━━━━━━
+**DATA E HORA ATUAL:** {DateTime.Now:dd/MM/yyyy HH:mm} (Brasília)
 
-Perguntas podem ser vagas. Use o contexto da conversa para inferir.
-
-""jogo de ontem"" → jogos da data anterior
-""jogo do lakers"" → filtre jogos envolvendo Lakers
-""estatística deles"" → jogadores do último jogo citado
-""como foi?"" → resultado + análise do último jogo mencionado
-
-Se houver múltiplos jogos, liste todos separadamente.
-
-━━━━━━━━━━━━━━━━━━━━━━
-PRIORIDADE DE RESPOSTA
-━━━━━━━━━━━━━━━━━━━━━━
-
-Sempre organize as respostas nesta ordem:
-
-1️⃣ Resultado do jogo
-2️⃣ Destaque da partida
-3️⃣ Estatísticas relevantes
-4️⃣ Análise curta
-
-━━━━━━━━━━━━━━━━━━━━━━
-ANÁLISE DE JOGOS
-━━━━━━━━━━━━━━━━━━━━━━
-
-Formato padrão:
-
-[emoji] **Time A XX x XX Time B**
-
-🔥 Destaque
-[jogador mais impactante e sua linha de estatísticas]
-
-📊 Estatísticas relevantes
-- dado importante
-- dado importante
-
-🧠 Análise
-[1–2 frases sobre o ritmo do jogo, domínio de um time ou equilíbrio da partida]
-
-━━━━━━━━━━━━━━━━━━━━━━
-ANÁLISE DE JOGADORES
-━━━━━━━━━━━━━━━━━━━━━━
-
-Formato padrão:
-
-🔥 **Nome do Jogador**
-
-📊 Estatísticas
-XX pts · XX reb · XX ast · XX stl · XX blk
-XX% FG · XX% 3PT
-
-🧠 Análise
-[interpretação curta: eficiência ofensiva, impacto defensivo, criação de jogadas]
-
-━━━━━━━━━━━━━━━━━━━━━━
-COMPARAÇÃO DE JOGADORES
-━━━━━━━━━━━━━━━━━━━━━━
-
-Formato padrão:
-
-| Stat     | Jogador A | Jogador B |
-|----------|-----------|-----------|
-| Pontos   | XX        | XX        |
-| Rebotes  | XX        | XX        |
-| Assist.  | XX        | XX        |
-| Steals   | XX        | XX        |
-| Blocks   | XX        | XX        |
-| FG%      | XX%       | XX%       |
-| 3PT%     | XX%       | XX%       |
-
-🧠 Análise
-[1–2 frases destacando as diferenças principais]
-
-━━━━━━━━━━━━━━━━━━━━━━
-FORMATAÇÃO
-━━━━━━━━━━━━━━━━━━━━━━
-
-- Use estrutura clara com seções separadas
-- Use bullets para estatísticas
-- Não coloque múltiplos jogos na mesma linha
-- Evite blocos grandes de texto
-- Não repita estatísticas desnecessariamente
-- Adapte o tamanho da resposta ao volume de dados — seja conciso, mas não omita informações relevantes
-
-━━━━━━━━━━━━━━━━━━━━━━
-EMOJIS DE TIMES
-━━━━━━━━━━━━━━━━━━━━━━
-
-Atlanta Hawks 🦅
-Boston Celtics 🍀
-Brooklyn Nets 🕸️
-Charlotte Hornets 🐝
-Chicago Bulls 🦬
-Cleveland Cavaliers ⚔️
-Dallas Mavericks 🤠
-Denver Nuggets ⛏️
-Detroit Pistons ⚙️
-Golden State Warriors ⚡
-Houston Rockets 🚀
-Indiana Pacers 🏎️
-Los Angeles Clippers ✂️
-Los Angeles Lakers 🏀
-Memphis Grizzlies 🐻
-Miami Heat 🔥
-Milwaukee Bucks 🦌
-Minnesota Timberwolves 🐺
-New Orleans Pelicans 🦩
-New York Knicks 🗽
-Oklahoma City Thunder 🌩️
-Orlando Magic 🪄
-Philadelphia 76ers 🔔
-Phoenix Suns ☀️
-Portland Trail Blazers 🌲
-Sacramento Kings 👑
-San Antonio Spurs ⭐
-Toronto Raptors 🦖
-Utah Jazz 🎷
-Washington Wizards 🧙
-
-Sempre use: **emoji + nome completo do time**
-
-━━━━━━━━━━━━━━━━━━━━━━
-DADOS DISPONÍVEIS
-━━━━━━━━━━━━━━━━━━━━━━
-
-Data e hora atual: {DateTime.Now:dd/MM/yyyy HH:mm} (Horário de Brasília)
-
-Jogos:
+**JOGOS:**
 {gamesText}
 
-Estatísticas de jogadores:
+**ESTATÍSTICAS DE JOGADORES:**
 {statsText}
 
-━━━━━━━━━━━━━━━━━━━━━━
-PERGUNTA DO USUÁRIO
-━━━━━━━━━━━━━━━━━━━━━━
+---
 
-{question}";
+### 💬 PERGUNTA DO USUÁRIO:
+""{question}""
+
+Responda agora de forma profissional em Português do Brasil:";
         }
 
-        private string FormatGames(List<GameResponse> games)
+        public string BuildGameSummaryPrompt(GameResponse game, GameLeadersResponse? leaders, GamePlayerStatsResponse? boxscore = null)
+        {
+            var homeTeam = game.HomeTeam;
+            var awayTeam = game.VisitorTeam;
+            var leadersText = FormatLeaders(leaders);
+            var boxscoreText = FormatFullBoxscore(boxscore);
+
+            return $@"
+Você é um analista de jogos da NBA responsável por gerar um resumo envolvente para um aplicativo de fãs de basquete.
+O resumo deve ser baseado APENAS nos dados do boxscore fornecidos abaixo.
+
+### REGRAS IMPORTANTES:
+- Use APENAS os dados presentes no boxscore.
+- Não invente eventos do jogo (runs, viradas, momentos de quarto, etc.).
+- Baseie todos os insights em números concretos.
+- Evite frases genéricas como ""grande jogo"" ou ""partida intensa"".
+- O resumo deve ser em Português do Brasil.
+- Não gere insights muito longos.
+
+### ANÁLISE DO BOXSCORE (OBRIGATÓRIO):
+Ao gerar insights, considere:
+- Diferença de pontuação entre os times ({game.VisitorTeamScore} x {game.HomeTeamScore})
+- Rebotes totais e Assistências totais
+- Roubos de bola e tocos
+- Aproveitamento de arremessos (FG%, 3PT%, FT%)
+- Jogadores com alto aproveitamento (FG > 60%)
+- Jogadores com alto +/- (impacto em quadra)
+- Jogadores que marcaram muitos pontos em poucos minutos
+- Contribuição do banco
+
+### ESTRUTURA DA RESPOSTA (OBRIGATÓRIO):
+
+## Análise da Partida
+Um parágrafo curto explicando quem venceu, a diferença de pontos e o destaque geral baseado nos números.
+
+## Líderes Estatísticos
+| Categoria | {awayTeam.Abbreviation} | {homeTeam.Abbreviation} |
+| :--- | :--- | :--- |
+| **Pontos** | [Nome] ([Valor]) | [Nome] ([Valor]) |
+| **Rebotes** | [Nome] ([Valor]) | [Nome] ([Valor]) |
+| **Assistências** | [Nome] ([Valor]) | [Nome] ([Valor]) |
+
+## Insights da Partida
+Gerar de 4 a 6 insights curtos, cada um em sua própria linha.
+**Formato:** Use o caractere ""•"" seguido do insight.
+
+---
+
+### 📋 DADOS PARA O RESUMO:
+- Placar Final: {awayTeam.DisplayName} {game.VisitorTeamScore} x {game.HomeTeamScore} {homeTeam.DisplayName}
+- {leadersText}
+
+**BOXSCORE DETALHADO:**
+{boxscoreText}
+
+### TOM DO TEXTO:
+- Natural, claro, objetivo e funcional.
+- Semelhante a um resumo esportivo de site de notícias.
+
+Gere o resumo agora:";
+        }
+
+        public string FormatFullBoxscore(GamePlayerStatsResponse? boxscore)
+        {
+            if (boxscore == null) return "Dados detalhados do boxscore não disponíveis.";
+
+            var lines = new List<string>();
+
+            void FormatTeamStats(string teamName, List<PlayerGameStatsDetailedResponse> players)
+            {
+                lines.Add($"\n--- {teamName} ---");
+                // Totais do Time
+                var teamPts = players.Sum(p => p.Points);
+                var teamReb = players.Sum(p => p.TotalRebounds);
+                var teamAst = players.Sum(p => p.Assists);
+                var teamStl = players.Sum(p => p.Steals);
+                var teamBlk = players.Sum(p => p.Blocks);
+                var teamTov = players.Sum(p => p.Turnovers);
+                
+                lines.Add($"TOTAIS: {teamPts} PTS, {teamReb} REB, {teamAst} AST, {teamStl} STL, {teamBlk} BLK, {teamTov} TOV");
+
+                // Principais performances (filtrando DNP e limitando para não estourar contexto)
+                foreach (var p in players.Where(p => !p.DidNotPlay).OrderByDescending(p => p.Points).Take(8))
+                {
+                    lines.Add($"{p.PlayerFullName}: {p.Points} PTS, {p.TotalRebounds} REB, {p.Assists} AST, {p.FieldGoalsFormatted} FG ({p.FieldGoalPercentage}%), {p.ThreePointersFormatted} 3PT ({p.ThreePointPercentage}%), +/-: {p.PlusMinus}, {p.MinutesPlayed} MIN");
+                }
+            }
+
+            FormatTeamStats(boxscore.VisitorTeam, boxscore.VisitorTeamStats);
+            FormatTeamStats(boxscore.HomeTeam, boxscore.HomeTeamStats);
+
+            return string.Join("\n", lines);
+        }
+
+        private string FormatLeaders(GameLeadersResponse? leaders)
+        {
+            if (leaders == null) return "Estatísticas de líderes ainda não disponíveis para este jogo.";
+
+            var lines = new List<string> { "LÍDERES DA PARTIDA:" };
+            
+            void AddTeamLeaders(TeamGameLeaders teamLeaders)
+            {
+                lines.Add($"\n🏀 **{teamLeaders.TeamName}**:");
+                if (teamLeaders.PointsLeader != null)
+                    lines.Add($"   - 🔥 Pontos: **{teamLeaders.PointsLeader.PlayerName}** ({teamLeaders.PointsLeader.Value} pts)");
+                if (teamLeaders.ReboundsLeader != null)
+                    lines.Add($"   - 🛡️ Rebotes: **{teamLeaders.ReboundsLeader.PlayerName}** ({teamLeaders.ReboundsLeader.Value} reb)");
+                if (teamLeaders.AssistsLeader != null)
+                    lines.Add($"   - 🪄 Assistências: **{teamLeaders.AssistsLeader.PlayerName}** ({teamLeaders.AssistsLeader.Value} ast)");
+            }
+
+            AddTeamLeaders(leaders.VisitorTeamLeaders);
+            AddTeamLeaders(leaders.HomeTeamLeaders);
+
+            return string.Join("\n", lines);
+        }
+
+        private string FormatGames(List<GameResponse> games, Dictionary<int, GameLeadersResponse>? gameLeaders = null)
         {
             if (!games.Any())
                 return "Nenhum jogo encontrado no banco de dados para este período.";
@@ -213,6 +201,21 @@ PERGUNTA DO USUÁRIO
                     };
 
                     lines.Add($"   {status}");
+
+                    if (gameLeaders != null && gameLeaders.TryGetValue(game.Id, out var leaders))
+                    {
+                        if (leaders.VisitorTeamLeaders.PointsLeader != null || leaders.HomeTeamLeaders.PointsLeader != null)
+                        {
+                            var bestLeader = (leaders.VisitorTeamLeaders.PointsLeader?.Value ?? 0) > (leaders.HomeTeamLeaders.PointsLeader?.Value ?? 0)
+                                ? leaders.VisitorTeamLeaders.PointsLeader
+                                : leaders.HomeTeamLeaders.PointsLeader;
+
+                            if (bestLeader != null)
+                            {
+                                lines.Add($"      🔥 Destaque: **{bestLeader.PlayerName}** ({bestLeader.Value} pts)");
+                            }
+                        }
+                    }
                 }
             }
 

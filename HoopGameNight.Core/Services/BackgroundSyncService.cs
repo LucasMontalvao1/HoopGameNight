@@ -104,21 +104,6 @@ namespace HoopGameNight.Core.Services
                     _logger.LogInformation("POST-GAME SYNC: Caches de stats individuais invalidados para {Count} jogadores do jogo {GameId}", playersInGame.Count(), gameId);
                 }
 
-                _logger.LogInformation("POST-GAME SYNC: Gerando resumos de IA para o jogo {GameId}", gameId);
-                var aiRequest = new AskRequest 
-                { 
-                    Question = $"Resuma o jogo {game.GameTitle} do dia {game.Date:dd/MM/yyyy}. Placar final: {game.Score}. Cite os 3 principais destaques individuais baseando-se nas estatísticas." 
-                };
-
-                var aiResponse = await _nbaAiService.AskAsync(aiRequest);
-                if (aiResponse != null && !string.IsNullOrEmpty(aiResponse.Answer))
-                {
-                    game.AiSummary = aiResponse.Answer;
-                    game.AiHighlights = "Automatically generated summary"; 
-                    await _gameRepository.UpdateAsync(game);
-                    _logger.LogInformation("POST-GAME SYNC: Resumo da IA salvo para o jogo {GameId}", gameId);
-                }
-
                 _logger.LogInformation("POST-GAME SYNC: Concluído com sucesso para o jogo {GameId}", gameId);
             }
             catch (Exception ex)
@@ -129,9 +114,27 @@ namespace HoopGameNight.Core.Services
 
         public async Task PriorityPlayerSyncAsync(int playerId)
         {
-            _logger.LogInformation("PRIORITY SYNC: Buscando todos os dados históricos para o player {PlayerId}", playerId);
-            await _playerStatsSyncService.SyncPlayerCareerHistoryAsync(playerId, 1900, DateTime.Today.Year + 1);
-            await _playerStatsSyncService.SyncPlayerRecentGamesAsync(playerId);
+            var syncLockKey = $"priority_sync_running_{playerId}";
+            var isRunning = _cacheService.Get<bool>(syncLockKey);
+            if (isRunning)
+            {
+                _logger.LogInformation("PRIORITY SYNC: Sincronização já em andamento para o player {PlayerId}. Ignorando duplicata.", playerId);
+                return;
+            }
+
+            try
+            {
+                await _cacheService.SetAsync(syncLockKey, true, TimeSpan.FromMinutes(10));
+                _logger.LogInformation("PRIORITY SYNC: Buscando todos os dados históricos para o player {PlayerId}", playerId);
+                await _playerStatsSyncService.SyncPlayerCareerHistoryAsync(playerId, 1900, DateTime.Today.Year + 1);
+                await _playerStatsSyncService.SyncPlayerRecentGamesAsync(playerId);
+            }
+            finally
+            {
+                await _cacheService.RemoveAsync(syncLockKey);
+                // Também remove a trava de enfileiramento para permitir novos pedidos se necessário 
+                await _cacheService.RemoveAsync($"sync_lock_player_{playerId}");
+            }
         }
 
         public async Task SyncInjuryReportsAsync()

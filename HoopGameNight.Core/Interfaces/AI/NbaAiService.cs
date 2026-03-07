@@ -15,12 +15,14 @@ namespace HoopGameNight.Core.Services.AI
     public class NbaAiService : INbaAiService
     {
         private readonly IGameService _gameService;
+        private readonly IGameRepository _gameRepository;
         private readonly ITeamRepository _teamRepository;
         private readonly IPlayerRepository _playerRepository;
         private readonly IPlayerStatsService _playerStatsService;
         private readonly NbaPromptBuilder _promptBuilder;
         private readonly GroqClient _groqClient;
         private readonly ICacheService _cacheService;
+        private readonly IGameStatsService _gameStatsService;
         private readonly ILogger<NbaAiService> _logger;
 
         private readonly Dictionary<string, string> _teamKeywords = new();
@@ -28,21 +30,25 @@ namespace HoopGameNight.Core.Services.AI
 
         public NbaAiService(
             IGameService gameService,
+            IGameRepository gameRepository,
             ITeamRepository teamRepository,
             IPlayerRepository playerRepository,
             IPlayerStatsService playerStatsService,
             NbaPromptBuilder promptBuilder,
             GroqClient groqClient,
             ICacheService cacheService,
+            IGameStatsService gameStatsService,
             ILogger<NbaAiService> logger)
         {
             _gameService = gameService;
+            _gameRepository = gameRepository;
             _teamRepository = teamRepository;
             _playerRepository = playerRepository;
             _playerStatsService = playerStatsService;
             _promptBuilder = promptBuilder;
             _groqClient = groqClient;
             _cacheService = cacheService;
+            _gameStatsService = gameStatsService;
             _logger = logger;
 
             LoadTeamKeywords();
@@ -145,8 +151,40 @@ namespace HoopGameNight.Core.Services.AI
                 };
             }
 
+            // 2. Buscar líderes para até 3 jogos finalizados/em andamento (local ou cache)
+            var gamesWithPerformance = games
+                .Where(g => g.IsCompleted || g.IsLive)
+                .OrderByDescending(g => g.Date)
+                .Take(3) // Reduzido para performance no chat
+                .ToList();
+
+            var gameLeaders = new Dictionary<int, GameLeadersResponse>();
+            foreach (var g in gamesWithPerformance)
+            {
+                // Tenta buscar líderes calculados localmente primeiro (muito mais rápido)
+                var leaders = await CalculateLeadersFromBoxscoreAsync(g.Id);
+                
+                if (leaders != null)
+                {
+                    gameLeaders[g.Id] = leaders;
+                }
+            }
+
+            // 3. Enriquecer com Boxscore se houver apenas um jogo foco (especificidade)
+            var statsText = playerStatsText;
+            if (gamesWithPerformance.Count == 1)
+            {
+                var focusedGame = gamesWithPerformance[0];
+                var boxscore = await _gameStatsService.GetGamePlayerStatsAsync(focusedGame.Id);
+                if (boxscore != null)
+                {
+                    var boxscoreText = _promptBuilder.FormatFullBoxscore(boxscore);
+                    statsText += $"\n--- Boxscore Detalhado ({focusedGame.GameTitle}) ---\n{boxscoreText}";
+                }
+            }
+
             // Montar prompt
-            var prompt = _promptBuilder.BuildPrompt(request.Question, games, playerStatsText);
+            var prompt = _promptBuilder.BuildPrompt(request.Question, games, statsText, gameLeaders);
 
             // Enviar ao Groq
             var answer = await _groqClient.GenerateAsync(prompt);
@@ -157,12 +195,123 @@ namespace HoopGameNight.Core.Services.AI
                 Answer = answer,
                 GamesAnalyzed = games.Count,
                 FromCache = false,
-                DataSource = "Database",
+                DataSource = "Database (Enriched)",
                 Period = period,
                 DetectedTeams = detectedTeams
             };
 
             return response;
+        }
+    
+        public async Task<AskResponse> GetGameSummaryAsync(int gameId)
+        {
+            _logger.LogInformation("Gerando resumo IA para o jogo ID: {GameId}", gameId);
+    
+            // Chave de cache única por jogo
+            var cacheKey = $"ai:summary:game:{gameId}";
+
+            // 1. Verificar cache primeiro (mais rápido que banco)
+            var cached = await _cacheService.GetAsync<string>(cacheKey);
+            if (!string.IsNullOrEmpty(cached))
+            {
+                _logger.LogInformation("Retornando resumo do CACHE para o jogo {GameId}", gameId);
+                return new AskResponse
+                {
+                    Question = $"Resumo do jogo {gameId}",
+                    Answer = cached,
+                    GamesAnalyzed = 1,
+                    FromCache = true,
+                    DataSource = "Cache (Permanent)"
+                };
+            }
+
+            // 2. Buscar jogo no banco (como entidade para acesso a AiSummary)
+            var gameEntity = await _gameRepository.GetByIdAsync(gameId);
+            if (gameEntity == null) return new AskResponse { Answer = "Jogo não encontrado." };
+
+            // 3. Se já tiver resumo no banco e o jogo terminou, use-o e resalva no cache
+            if (gameEntity.IsCompleted && !string.IsNullOrEmpty(gameEntity.AiSummary))
+            {
+                _logger.LogInformation("Retornando resumo do BANCO e populando cache para o jogo {GameId}", gameId);
+                // Salva no cache permanente (sem expiração – jogo finalizado não muda)
+                await _cacheService.SetAsync(cacheKey, gameEntity.AiSummary, expiration: null);
+                return new AskResponse
+                {
+                    Question = $"Resumo do jogo {gameEntity.GameTitle}",
+                    Answer = gameEntity.AiSummary,
+                    GamesAnalyzed = 1,
+                    DataSource = "Database (Persisted)"
+                };
+            }
+
+            // 4. Buscar jogo como Response (para consistência com o PromptBuilder)
+            var game = await _gameService.GetGameByIdAsync(gameId);
+            if (game == null) return new AskResponse { Answer = "Detalhes do jogo não localizados." };
+    
+            // 5. Calcular líderes direto do banco (sem chamar ESPN - muito mais rápido e confiável)
+            var leaders = await CalculateLeadersFromBoxscoreAsync(gameId);
+            
+            // 5.1 Buscar Boxscore completo para análise profunda
+            var boxscore = await _gameStatsService.GetGamePlayerStatsAsync(gameId);
+
+            // 6. Montar Prompt Especializado
+            var prompt = _promptBuilder.BuildGameSummaryPrompt(game, leaders, boxscore);
+    
+            // 7. Chamar Groq
+            var answer = await _groqClient.GenerateAsync(prompt);
+
+            // 8. Persistência: Banco + Cache Permanente (apenas jogos encerrados)
+            if (gameEntity.IsCompleted && !string.IsNullOrEmpty(answer))
+            {
+                // 8.1 Salva no banco
+                gameEntity.AiSummary = answer;
+                await _gameRepository.UpdateAsync(gameEntity);
+                _logger.LogInformation("Resumo salvo no banco de dados para o jogo {GameId}", gameId);
+
+                // 8.2 Salva no cache permanente (sem expiração – jogo finalizado não muda)
+                await _cacheService.SetAsync(cacheKey, answer, expiration: null);
+                _logger.LogInformation("Resumo salvo no cache permanente para o jogo {GameId}", gameId);
+            }
+    
+            return new AskResponse
+            {
+                Question = $"Resumo do jogo {game.VisitorTeam.Abbreviation} vs {game.HomeTeam.Abbreviation}",
+                Answer = answer,
+                GamesAnalyzed = 1,
+                DataSource = "Database (Processed)",
+                DetectedTeams = new List<string> { game.HomeTeam.Abbreviation, game.VisitorTeam.Abbreviation }
+            };
+        }
+
+        private async Task<GameLeadersResponse?> CalculateLeadersFromBoxscoreAsync(int gameId)
+        {
+            var stats = await _gameStatsService.GetGamePlayerStatsAsync(gameId);
+            if (stats == null) return null;
+
+            var result = new GameLeadersResponse
+            {
+                GameId = gameId,
+                HomeTeam = stats.HomeTeam,
+                VisitorTeam = stats.VisitorTeam,
+                HomeTeamLeaders = new TeamGameLeaders { TeamName = stats.HomeTeam },
+                VisitorTeamLeaders = new TeamGameLeaders { TeamName = stats.VisitorTeam }
+            };
+
+            void FillLeaders(List<PlayerGameStatsDetailedResponse> teamStats, TeamGameLeaders teamLeaders)
+            {
+                var ptsLeader = teamStats.OrderByDescending(s => s.Points).FirstOrDefault();
+                var rebLeader = teamStats.OrderByDescending(s => s.TotalRebounds).FirstOrDefault();
+                var astLeader = teamStats.OrderByDescending(s => s.Assists).FirstOrDefault();
+
+                if (ptsLeader != null) teamLeaders.PointsLeader = new StatLeader { PlayerName = ptsLeader.PlayerFullName, Value = ptsLeader.Points };
+                if (rebLeader != null) teamLeaders.ReboundsLeader = new StatLeader { PlayerName = rebLeader.PlayerFullName, Value = rebLeader.TotalRebounds };
+                if (astLeader != null) teamLeaders.AssistsLeader = new StatLeader { PlayerName = astLeader.PlayerFullName, Value = astLeader.Assists };
+            }
+
+            FillLeaders(stats.HomeTeamStats, result.HomeTeamLeaders);
+            FillLeaders(stats.VisitorTeamStats, result.VisitorTeamLeaders);
+
+            return result;
         }
 
         private string NormalizeQuestion(string question)
@@ -191,17 +340,38 @@ namespace HoopGameNight.Core.Services.AI
 
             var allGames = new List<GameResponse>();
 
-            // 3. Buscar jogos 
+            // 3. Buscar jogos do período detectado
             var rangeGames = await _gameService.GetGamesByDateRangeAsync(startDate, endDate);
 
             if (teamIds.Any())
             {
-                // Filtrar apenas jogos dos times detectados
+                // Filtrar apenas jogos dos times detectados no período original
                 foreach (var teamId in teamIds)
                 {
                     var teamGames = rangeGames.Where(g =>
                         g.HomeTeam.Id == teamId || g.VisitorTeam.Id == teamId);
                     allGames.AddRange(teamGames);
+                }
+
+                // 4. Fallback Inteligente: Se detectou um time mas não achou jogo no período estrito
+                if (!allGames.Any())
+                {
+                    _logger.LogInformation("Nenhum jogo encontrado para {Teams} no período {Period}. Tentando fallback de 10 dias...", 
+                        string.Join(", ", teamNames), periodLabel);
+                    
+                    var fallbackStart = DateTime.Today.AddDays(-10);
+                    var fallbackEnd = DateTime.Today.AddDays(1);
+                    var fallbackGames = await _gameService.GetGamesByDateRangeAsync(fallbackStart, fallbackEnd);
+
+                    foreach (var teamId in teamIds)
+                    {
+                        var teamGames = fallbackGames.Where(g =>
+                            g.HomeTeam.Id == teamId || g.VisitorTeam.Id == teamId);
+                        allGames.AddRange(teamGames);
+                    }
+                    
+                    if (allGames.Any())
+                        periodLabel += " (Fallback: Jogos Recentes)";
                 }
             }
             else
@@ -210,7 +380,7 @@ namespace HoopGameNight.Core.Services.AI
                 allGames.AddRange(rangeGames);
             }
 
-            // 4. Remover duplicatas e limitar
+            // 5. Remover duplicatas e limitar
             var uniqueGames = allGames
                 .GroupBy(g => new { GameDate = g.Date, HomeTeamId = g.HomeTeam.Id, VisitorTeamId = g.VisitorTeam.Id })
                 .Select(g => g.First())
