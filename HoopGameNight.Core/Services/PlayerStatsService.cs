@@ -128,7 +128,7 @@ namespace HoopGameNight.Core.Services
                 var espnData = await _espnApiService.GetPlayerGamelogAsync(player.EspnId!);
                 if (espnData == null) return null;
 
-                var response = MapEspnGamelogToResponse(espnData, playerId, player.FullName, 20);
+                var response = MapEspnGamelogToResponse(espnData, playerId, player.FullName, 100);
 
                 if (response != null && response.Games.Any())
                 {
@@ -145,6 +145,34 @@ namespace HoopGameNight.Core.Services
                                 _logger.LogInformation("Gamelog Sync: Jogo {EventId} não encontrado. Sincronizando...", g.EventId);
                                 await _gameSyncService.SyncGameByIdAsync(g.EventId);
                                 gameInDb = await _gameRepository.GetByExternalIdAsync(g.EventId);
+                                
+                                // Fallback: se ainda não encontrou por ID numérico, tenta buscar por times e data
+                                if (gameInDb == null && g.GameDate > DateTime.MinValue)
+                                {
+                                    _logger.LogInformation("Gamelog Sync: Fallback - Buscando jogo por times e data ({Date})", g.GameDate.ToShortDateString());
+                                    var homeTeamId = g.IsHome ? (g.TeamId > 0 ? g.TeamId : (player.TeamId ?? 0)) : 0;
+                                    var visitorTeamId = !g.IsHome ? (g.TeamId > 0 ? g.TeamId : (player.TeamId ?? 0)) : 0;
+                                    
+                                    // Precisamos do ID do oponente do sistema aqui, mas g.OpponentId é da ESPN.
+                                    // No entanto, o GetGamesByDateAsync no repositório pode nos ajudar se filtrarmos.
+                                    var gamesOnDate = await _gameRepository.GetGamesByDateAsync(g.GameDate.Date);
+                                    gameInDb = gamesOnDate.FirstOrDefault(x => 
+                                        (x.HomeTeamId == player.TeamId || x.VisitorTeamId == player.TeamId) &&
+                                        x.Date.Date == g.GameDate.Date);
+
+                                    if (gameInDb != null)
+                                    {
+                                        _logger.LogInformation("Gamelog Sync: Falback bem sucedido! Encontrado jogo {GameId} por data/times.", gameInDb.Id);
+                                        
+                                        // Unificar o ID se ele for placeholder
+                                        if (gameInDb.ExternalId != g.EventId)
+                                        {
+                                            _logger.LogInformation("Gamelog Sync: Unificando ExternalId {Old} -> {New}", gameInDb.ExternalId, g.EventId);
+                                            gameInDb.ExternalId = g.EventId;
+                                            await _gameRepository.UpdateAsync(gameInDb);
+                                        }
+                                    }
+                                }
                             }
 
                             if (gameInDb == null)
@@ -961,33 +989,30 @@ namespace HoopGameNight.Core.Services
                         } 
                         catch { }
 
-                        if (metaObj == null)
+                         if (metaObj == null)
                         {
                              try
                              {
-                                gameDateStr = meta.TryGetProperty("gameDate", out var gd) ? gd.GetString() : (meta.TryGetProperty("date", out var d) ? d.GetString() : null);
-                                gameResult = meta.TryGetProperty("gameResult", out var gr) ? gr.GetString() : null;
-                                score = meta.TryGetProperty("score", out var sc) ? sc.GetString() : "";
+                                gameDateStr = GetStringSafe(meta, "gameDate") ?? GetStringSafe(meta, "date") ?? GetStringSafe(meta, "dateTime") ?? GetStringSafe(meta, "game_date");
+                                gameResult = GetStringSafe(meta, "gameResult");
+                                score = GetStringSafe(meta, "score") ?? "";
                                 
-                                if (meta.TryGetProperty("opponent", out var opt))
-                                {
-                                    opponentName = opt.TryGetProperty("displayName", out var dn) ? dn.GetString() ?? "Unknown" : "Unknown";
-                                    opponentId = opt.TryGetProperty("id", out var oid) ? oid.GetString() ?? "" : "";
-                                }
+                                var opponent = GetPropertySafe(meta, "opponent");
+                                opponentName = GetStringSafe(opponent, "displayName") ?? "Unknown";
+                                opponentId = GetStringSafe(opponent, "id") ?? "";
 
-                                if (meta.TryGetProperty("team", out var tpt))
-                                {
-                                    var pTeamIdStr = tpt.TryGetProperty("id", out var tid) ? tid.GetString() : null;
-                                    int.TryParse(pTeamIdStr, out evtTeamId);
+                                var teamProp = GetPropertySafe(meta, "team");
+                                var pTeamIdStr = GetStringSafe(teamProp, "id");
+                                if (pTeamIdStr != null) int.TryParse(pTeamIdStr, out evtTeamId);
                                     
-                                    if (meta.TryGetProperty("homeTeamId", out var htid))
-                                    {
-                                        var htIdStr = htid.GetString();
-                                        isHome = pTeamIdStr != null && htIdStr != null && pTeamIdStr == htIdStr;
-                                    }
+                                var homeTeamIdProp = GetPropertySafe(meta, "homeTeamId");
+                                if (homeTeamIdProp.ValueKind != JsonValueKind.Undefined)
+                                {
+                                    var htIdStr = homeTeamIdProp.GetString();
+                                    isHome = pTeamIdStr != null && htIdStr != null && pTeamIdStr == htIdStr;
                                 }
                              }
-                             catch { }
+                             catch (Exception ex) { _logger.LogDebug("Error extracting meta properties: {Msg}", ex.Message); }
                         }
                     }
 
@@ -1083,8 +1108,7 @@ namespace HoopGameNight.Core.Services
                 }
 
                 response.Games = recentGamesList
-                    .OrderByDescending(g => g.GameDate)
-                    .Take(limit)
+                    .OrderBy(g => g.GameDate) // Ordenar ascendente para o gráfico (lado esquerdo = mais antigo)
                     .ToList();
                 return response;
             }
@@ -1093,6 +1117,27 @@ namespace HoopGameNight.Core.Services
                 _logger.LogError(ex, "Error mapping gamelog for player {PlayerId}", playerId);
                 return null;
             }
+        }
+
+        private JsonElement GetPropertySafe(JsonElement element, string propertyName)
+        {
+            if (element.ValueKind != JsonValueKind.Object) return default;
+            if (element.TryGetProperty(propertyName, out var prop)) return prop;
+            
+            // Busca case-insensitive manual se falhar
+            foreach (var p in element.EnumerateObject())
+            {
+                if (p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+                    return p.Value;
+            }
+            
+            return default;
+        }
+
+        private string? GetStringSafe(JsonElement element, string propertyName)
+        {
+            var prop = GetPropertySafe(element, propertyName);
+            return prop.ValueKind == JsonValueKind.String ? prop.GetString() : null;
         }
 
         private PlayerSplitsResponse? MapEspnSplitsToResponse(EspnPlayerSplitsDto espnData, int playerId, string playerName)

@@ -1,0 +1,36 @@
+<div class="performance-chart-card glass-panel animate-fade-in">
+    <div class="chart-header">
+        <div class="header-main">
+            <span class="material-icons header-icon">trending_up</span>
+            <h2 class="header-title">Evolução Recente</h2>
+        </div>
+        <div class="metric-selector">
+            <button class="metric-btn" [class.active]="activeMetric() === 'points'" (click)="setMetric('points')"
+                [style.--active-color]="teamColor">
+                PTS
+            </button>
+            <button class="metric-btn" [class.active]="activeMetric() === 'rebounds'" (click)="setMetric('rebounds')"
+                [style.--active-color]="teamColor">
+                REB
+            </button>
+            <button class="metric-btn" [class.active]="activeMetric() === 'assists'" (click)="setMetric('assists')"
+                [style.--active-color]="teamColor">
+                AST
+            </button>
+        </div>
+    </div>
+
+    <div class="chart-body">
+        @if (games && games.length > 0) {
+        <div class="canvas-wrapper">
+            <canvas baseChart [data]="lineChartData" [options]="lineChartOptions" [type]="lineChartType">
+            </canvas>
+        </div>
+        } @else {
+        <div class="no-data-chart">
+            <span class="material-icons">query_stats</span>
+            <p>Dados de evolução ainda não disponíveis.</p>
+        </div>
+        }
+    </div>
+</div>

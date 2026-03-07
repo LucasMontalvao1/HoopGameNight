@@ -6,216 +6,193 @@
       <p>Carregando informações do time...</p>
     </div>
 
-  <!-- Error State -->
-  <div *ngIf="error() && !loading()" class="error-container">
-    <div class="error-icon">⚠️</div>
-    <h2>{{ error() }}</h2>
-    <button class="btn-back" (click)="goBack()">
-      Voltar para Times
-    </button>
-  </div>
-
-  <!-- Team Details -->
-  <div *ngIf="team() && !loading() && !error()" class="team-details-content">
-    <!-- Header -->
-    <div class="team-header">
-      <button class="btn-back-header" (click)="goBack()">
-        <span class="material-icons">arrow_back</span>
-        Voltar
+    <!-- Error State -->
+    <div *ngIf="error() && !loading()" class="error-container">
+      <div class="error-icon">⚠️</div>
+      <h2>{{ error() }}</h2>
+      <button class="btn-back" (click)="goBack()">
+        Voltar para Times
       </button>
+    </div>
 
-      <div class="team-hero" [style.background]="'linear-gradient(135deg, ' + getTeamColorPrimary(team()!.abbreviation) + ' 0%, ' + getTeamColorSecondary(team()!.abbreviation) + ' 100%)'">
-        <div class="team-hero-content">
-          <img
-            [src]="getTeamLogoUrl(team()!.abbreviation)"
-            [alt]="teamDisplayName() + ' logo'"
-            class="team-logo-large"
-            (error)="handleLogoError($event, team()!.abbreviation)"
-          />
-          <div class="team-hero-info">
-            <h1 class="team-name">{{ teamDisplayName() }}</h1>
-            <div class="team-meta">
-              <span class="team-conference">
-                <span class="material-icons">stars</span>
-                {{ team()!.conference === 'East' ? 'Conferência Leste' : 'Conferência Oeste' }}
+    <!-- Team Details -->
+    <div *ngIf="team() && !loading() && !error()" class="team-details-content">
+      <!-- Header -->
+      <div class="team-header">
+        <div class="team-hero"
+          [style.background]="'linear-gradient(135deg, ' + getTeamColorPrimary(team()!.abbreviation) + ' 0%, ' + getTeamColorSecondary(team()!.abbreviation) + ' 100%)'">
+          <!-- Integrated Back Button -->
+          <button class="hero-back-btn" (click)="goBack()" title="Voltar para Times">
+            <span class="material-icons">arrow_back</span>
+          </button>
+
+          <div class="team-hero-content">
+            <div class="hero-logo-wrapper">
+              <div class="hero-logo-glow" [style.background]="getTeamColorPrimary(team()!.abbreviation)"></div>
+              <img [src]="getTeamLogoUrl(team()!.abbreviation)" [alt]="teamDisplayName() + ' logo'"
+                class="team-logo-large" (error)="handleLogoError($event, team()!.abbreviation)" />
+            </div>
+            <div class="team-hero-info">
+              <h1 class="team-name">{{ teamDisplayName() }}</h1>
+              <div class="team-meta">
+                <span class="meta-badge glow-badge">
+                  <span class="material-icons">stars</span>
+                  {{ team()!.conference === 'East' ? 'Leste' : 'Oeste' }}
+                </span>
+                <span class="meta-badge">
+                  <span class="material-icons">group_work</span>
+                  {{ team()!.division }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team Information Strip -->
+      <div class="team-info-section">
+        <div class="stats-strip-glass animate-fade-in" style="animation-delay: 0.1s">
+
+          <div class="stat-cell">
+            <span class="material-icons stat-icon">location_city</span>
+            <div class="stat-data">
+              <label>CIDADE</label>
+              <span>{{ team()!.city }}</span>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+
+          <div class="stat-cell">
+            <span class="material-icons stat-icon">badge</span>
+            <div class="stat-data">
+              <label>SIGLA</label>
+              <span>{{ team()!.abbreviation }}</span>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+
+          <div class="stat-cell">
+            <span class="material-icons stat-icon">sports_basketball</span>
+            <div class="stat-data">
+              <label>NOME COMPLETO</label>
+              <span>{{ team()!.name }}</span>
+            </div>
+          </div>
+          <div class="stat-divider"></div>
+
+          <div class="stat-cell highlight-cell">
+            <span class="material-icons stat-icon">analytics</span>
+            <div class="stat-data">
+              <label>ÚLTIMOS 5 JOGOS</label>
+              <span class="record">{{ wins() }}V - {{ losses() }}D</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Team Players Section -->
+      <div class="team-players-section animate-fade-in" style="animation-delay: 0.2s">
+        <div class="section-header">
+          <div class="header-title">
+            <span class="material-icons header-icon">groups</span>
+            <h2>Elenco Principal</h2>
+          </div>
+          <button class="btn-glass-pill" (click)="navigateToAllPlayers()">
+            Ver Elenco Completo
+            <span class="material-icons">east</span>
+          </button>
+        </div>
+
+        <div *ngIf="loadingPlayers()" class="loading-players">
+          <div class="loading-spinner-small"></div>
+          <span>Carregando jogadores...</span>
+        </div>
+
+        <div *ngIf="!loadingPlayers() && teamPlayers().length === 0" class="no-players glass-panel">
+          <span class="material-icons">person_off</span>
+          <p>Nenhum jogador encontrado para este time.</p>
+        </div>
+
+        <div *ngIf="teamPlayers().length > 0" class="players-list">
+          <div *ngFor="let player of teamPlayers(); trackBy: trackByPlayerId" class="player-card-glass"
+            (click)="navigateToPlayer(player.id)">
+            <div class="player-photo-wrapper">
+              <img [src]="getPlayerPhotoUrl(player)" [alt]="player.fullName"
+                (error)="handleLogoError($event, 'player')" />
+              <div class="player-position-glow">{{ player.position }}</div>
+            </div>
+            <div class="player-info">
+              <span class="player-name">{{ player.fullName }}</span>
+              <span class="player-specs">{{ player.height }} | {{ player.weight }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Games Section -->
+      <div class="recent-games-section animate-fade-in" style="animation-delay: 0.3s">
+        <div class="section-header">
+          <div class="header-title">
+            <span class="material-icons header-icon">history</span>
+            <h2>Últimos Confrontos</h2>
+          </div>
+          <button class="btn-glass-pill" (click)="navigateToGames()">
+            Ver Agenda Completa
+            <span class="material-icons">east</span>
+          </button>
+        </div>
+
+        <div *ngIf="recentGames().length === 0" class="no-games glass-panel">
+          <span class="material-icons">event_busy</span>
+          <p>Nenhum jogo encontrado na janela dos últimos 30 dias.</p>
+        </div>
+
+        <div *ngIf="recentGames().length > 0" class="games-list-glass">
+          <div *ngFor="let game of recentGames(); trackBy: trackByGameId" class="game-card-glass"
+            [class.is-win]="getGameResult(game) === 'win'" [class.is-loss]="getGameResult(game) === 'loss'">
+            <!-- Left side: Date / Status -->
+            <div class="game-meta">
+              <div class="game-date">{{ formatDate(game.date) }}</div>
+              <span class="game-status-dot" [class.win]="getGameResult(game) === 'win'"
+                [class.loss]="getGameResult(game) === 'loss'">
               </span>
-              <span class="team-division">
-                <span class="material-icons">group_work</span>
-                {{ team()!.division }}
-              </span>
+            </div>
+
+            <!-- Center: The Matchup -->
+            <div class="game-matchup-core">
+              <!-- Visitor -->
+              <div class="matchup-team" [class.is-current]="game.visitorTeam.id === team()!.id">
+                <img [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)" class="matchup-logo"
+                  (error)="handleLogoError($event, game.visitorTeam.abbreviation)">
+                <span class="matchup-abbr">{{ game.visitorTeam.abbreviation }}</span>
+                <span class="matchup-score" *ngIf="game.isCompleted || game.isLive">{{ game.visitorTeamScore }}</span>
+              </div>
+
+              <div class="matchup-divider">
+                <span class="material-icons local-icon">{{ getGameLocation(game) === 'home' ? 'home' : 'flight_takeoff'
+                  }}</span>
+              </div>
+
+              <!-- Home -->
+              <div class="matchup-team" [class.is-current]="game.homeTeam.id === team()!.id">
+                <span class="matchup-score" *ngIf="game.isCompleted || game.isLive">{{ game.homeTeamScore }}</span>
+                <span class="matchup-abbr">{{ game.homeTeam.abbreviation }}</span>
+                <img [src]="getTeamLogoUrl(game.homeTeam.abbreviation)" class="matchup-logo"
+                  (error)="handleLogoError($event, game.homeTeam.abbreviation)">
+              </div>
+            </div>
+
+            <!-- Right side: Result Badge -->
+            <div class="game-result-action">
+              <div class="premium-result-badge" [class.win]="getGameResult(game) === 'win'"
+                [class.loss]="getGameResult(game) === 'loss'">
+                {{ getGameResult(game) === 'win' ? 'W' : getGameResult(game) === 'loss' ? 'L' : '-' }}
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Team Information Cards -->
-    <div class="team-info-section">
-      <div class="info-cards">
-        <div class="info-card">
-          <span class="material-icons info-icon">location_city</span>
-          <div class="info-content">
-            <label>Cidade</label>
-            <span>{{ team()!.city }}</span>
-          </div>
-        </div>
-
-        <div class="info-card">
-          <span class="material-icons info-icon">badge</span>
-          <div class="info-content">
-            <label>Abreviação</label>
-            <span>{{ team()!.abbreviation }}</span>
-          </div>
-        </div>
-
-        <div class="info-card">
-          <span class="material-icons info-icon">sports_basketball</span>
-          <div class="info-content">
-            <label>Nome Completo</label>
-            <span>{{ team()!.name }}</span>
-          </div>
-        </div>
-
-        <div class="info-card">
-          <span class="material-icons info-icon">analytics</span>
-          <div class="info-content">
-            <label>Últimos 5 Jogos</label>
-            <span class="record">{{ wins() }}V - {{ losses() }}D</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Team Players Section -->
-    <div class="team-players-section">
-      <div class="section-header">
-        <h2>
-          <span class="material-icons">person</span>
-          Jogadores do Time
-        </h2>
-        <button class="btn-view-all" (click)="navigateToAllPlayers()">
-          Ver todos os jogadores
-          <span class="material-icons">arrow_forward</span>
-        </button>
-      </div>
-
-      <div *ngIf="loadingPlayers()" class="loading-players">
-        <div class="loading-spinner-small"></div>
-        <span>Carregando jogadores...</span>
-      </div>
-
-      <div *ngIf="!loadingPlayers() && teamPlayers().length === 0" class="no-players">
-        <span class="material-icons">person_off</span>
-        <p>Nenhum jogador encontrado para este time</p>
-      </div>
-
-      <div *ngIf="teamPlayers().length > 0" class="players-list">
-        <div
-          *ngFor="let player of teamPlayers(); trackBy: trackByPlayerId"
-          class="player-card-mini"
-          (click)="navigateToPlayer(player.id)"
-        >
-          <div class="player-photo">
-            <img
-              [src]="getPlayerPhotoUrl(player)"
-              [alt]="player.fullName"
-              (error)="handleLogoError($event, 'player')"
-            />
-            <span class="player-position-badge">{{ player.position }}</span>
-          </div>
-          <div class="player-info">
-            <span class="player-name">{{ player.fullName }}</span>
-            <span class="player-details-mini">{{ player.height }} | {{ player.weight }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recent Games Section -->
-    <div class="recent-games-section">
-      <div class="section-header">
-        <h2>
-          <span class="material-icons">history</span>
-          Últimos Jogos
-        </h2>
-        <button class="btn-view-all" (click)="navigateToGames()">
-          Ver todos os jogos
-          <span class="material-icons">arrow_forward</span>
-        </button>
-      </div>
-
-      <div *ngIf="recentGames().length === 0" class="no-games">
-        <span class="material-icons">event_busy</span>
-        <p>Nenhum jogo encontrado nos últimos 30 dias</p>
-      </div>
-
-      <div *ngIf="recentGames().length > 0" class="games-list">
-        <div
-          *ngFor="let game of recentGames(); trackBy: trackByGameId"
-          class="game-card"
-          [class.game-win]="getGameResult(game) === 'win'"
-          [class.game-loss]="getGameResult(game) === 'loss'"
-          [class.game-scheduled]="getGameResult(game) === 'scheduled'"
-        >
-          <div class="game-date">
-            {{ formatDate(game.date) }}
-          </div>
-
-          <div class="game-matchup">
-            <div class="game-teams">
-              <!-- Visitor Team -->
-              <div class="team-info" [class.current-team]="game.visitorTeam.id === team()!.id">
-                <img
-                  *ngIf="game.visitorTeam"
-                  [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)"
-                  [alt]="game.visitorTeam.name"
-                  class="team-logo-small"
-                  (error)="handleLogoError($event, game.visitorTeam.abbreviation)"
-                />
-                <span class="team-abbr">{{ game.visitorTeam.abbreviation || 'TBD' }}</span>
-                <span class="team-score" *ngIf="game.isCompleted || game.isLive">
-                  {{ game.visitorTeamScore ?? 0 }}
-                </span>
-              </div>
-
-              <div class="game-vs">
-                <span class="material-icons">{{ getGameLocation(game) === 'home' ? 'home' : 'flight_takeoff' }}</span>
-              </div>
-
-              <!-- Home Team -->
-              <div class="team-info" [class.current-team]="game.homeTeam.id === team()!.id">
-                <span class="team-score" *ngIf="game.isCompleted || game.isLive">
-                  {{ game.homeTeamScore ?? 0 }}
-                </span>
-                <span class="team-abbr">{{ game.homeTeam.abbreviation || 'TBD' }}</span>
-                <img
-                  *ngIf="game.homeTeam"
-                  [src]="getTeamLogoUrl(game.homeTeam.abbreviation)"
-                  [alt]="game.homeTeam.name"
-                  class="team-logo-small"
-                  (error)="handleLogoError($event, game.homeTeam.abbreviation)"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="game-result">
-            <span
-              class="result-badge"
-              [class.win]="getGameResult(game) === 'win'"
-              [class.loss]="getGameResult(game) === 'loss'"
-              [class.scheduled]="getGameResult(game) === 'scheduled'"
-            >
-              {{
-                getGameResult(game) === 'win' ? 'V' :
-                getGameResult(game) === 'loss' ? 'D' :
-                'Agendado'
-              }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
   </div>
 </div>

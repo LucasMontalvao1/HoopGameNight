@@ -293,13 +293,28 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
 
     public class EspnGamelogEventMetadataDto
     {
+        [JsonPropertyName("id")]
         public string? Id { get; set; }
+        
+        [JsonPropertyName("gameDate")]
         public string? GameDate { get; set; }
+        
+        [JsonPropertyName("gameResult")]
         public string? GameResult { get; set; }
+        
+        [JsonPropertyName("opponent")]
         public EspnOpponentDto? Opponent { get; set; }
+        
+        [JsonPropertyName("team")]
         public EspnOpponentDto? Team { get; set; }
+        
+        [JsonPropertyName("homeTeamId")]
         public string? HomeTeamId { get; set; }
+        
+        [JsonPropertyName("awayTeamId")]
         public string? AwayTeamId { get; set; }
+        
+        [JsonPropertyName("score")]
         public string? Score { get; set; }
     }
 

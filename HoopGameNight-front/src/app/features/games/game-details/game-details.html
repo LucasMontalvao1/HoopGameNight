@@ -1,12 +1,4 @@
 <div class="game-details">
-    <!-- Header / Navigation -->
-    <header class="page-header">
-        <button class="back-btn" (click)="goBack()">
-            <span class="material-icons">arrow_back</span>
-            Voltar para Agenda
-        </button>
-    </header>
-
     @if (gamesService.isLoading() || statsService.isLoading()) {
     <div class="loading-state">
         <app-skeleton-loader width="100%" height="250px" borderRadius="16px" className="mb-4"></app-skeleton-loader>
@@ -17,9 +9,14 @@
     <app-error-view [message]="statsService.error() || ''" (retry)="ngOnInit()"></app-error-view>
     } @else {
     @if (gamesService.selectedGame(); as game) {
-    <!-- Scoreboard Section -->
+    <!-- Scoreboard Section (Hero) -->
     <section class="scoreboard glass-panel animate-fade-in">
         <div class="scoreboard__bg-gradient"></div>
+
+        <!-- Integrated Back Button -->
+        <button class="hero-back-btn" (click)="goBack()" title="Voltar para Agenda">
+            <span class="material-icons">arrow_back</span>
+        </button>
 
         <div class="team visitor">
             <div class="team-logo-container">
@@ -68,15 +65,17 @@
         </div>
     </section>
 
-    <!-- Tabs -->
-    <nav class="tabs-nav glass-panel animate-fade-in" style="animation-delay: 0.1s">
-        <button [class.active]="activeTab() === 'boxscore'" (click)="setTab('boxscore')">
-            <span class="material-icons">leaderboard</span> Boxscore
-        </button>
-        <button [class.active]="activeTab() === 'summary'" (click)="setTab('summary')">
-            <span class="material-icons">auto_awesome</span> Resumo IA
-        </button>
-    </nav>
+    <!-- Segmented Tabs -->
+    <div class="tabs-container">
+        <nav class="segmented-tabs glass-panel animate-fade-in" style="animation-delay: 0.1s">
+            <button class="tab-btn" [class.active]="activeTab() === 'boxscore'" (click)="setTab('boxscore')">
+                <span class="material-icons">leaderboard</span> Boxscore
+            </button>
+            <button class="tab-btn" [class.active]="activeTab() === 'summary'" (click)="setTab('summary')">
+                <span class="material-icons">auto_awesome</span> Resumo IA
+            </button>
+        </nav>
+    </div>
 
     @if (activeTab() === 'boxscore') {
     @if (statsService.currentGameBoxscore(); as boxscore) {
@@ -136,29 +135,25 @@
                         </tr>
                         }
                     </tbody>
+                    @if (statsService.visitorTeamTotals(); as totals) {
+                    <tfoot>
+                        <tr class="team-totals-row">
+                            <td class="sticky-col totals-label">TOTAL</td>
+                            <td>—</td>
+                            <td class="stat-highlight">{{ totals.points }}</td>
+                            <td>{{ totals.totalRebounds }}</td>
+                            <td>{{ totals.assists }}</td>
+                            <td>{{ totals.steals }}</td>
+                            <td>{{ totals.blocks }}</td>
+                            <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
+                            <td class="shooting-stat">—</td>
+                            <td class="shooting-stat">—</td>
+                            <td>—</td>
+                        </tr>
+                    </tfoot>
+                    }
                 </table>
             </div>
-            <!-- TOTALS ROW FOR VISITOR -->
-            @if (statsService.visitorTeamTotals(); as totals) {
-            <div class="team-totals-footer glass-panel">
-                <div class="total-label-box" title="Totais Combinados da Equipe">TOTAL</div>
-                <div class="totals-grid">
-                    <div class="total-item"><span title="Total de Pontos">PTS</span><strong>{{ totals.points }}</strong>
-                    </div>
-                    <div class="total-item"><span title="Total de Rebotes">REB</span><strong>{{ totals.totalRebounds
-                            }}</strong></div>
-                    <div class="total-item"><span title="Total de Assistências">AST</span><strong>{{ totals.assists
-                            }}</strong></div>
-                    <div class="total-item"><span title="Total de Roubos de Bola">STL</span><strong>{{ totals.steals
-                            }}</strong></div>
-                    <div class="total-item"><span title="Total de Tocos">BLK</span><strong>{{ totals.blocks }}</strong>
-                    </div>
-                    <div class="total-item"><span title="Total de Arremessos (Convertidos/Tentados)">FG</span><strong>{{
-                            totals.fieldGoalsMade }}/{{
-                            totals.fieldGoalsAttempted }}</strong></div>
-                </div>
-            </div>
-            }
         </div>
 
         <!-- Home Team Boxscore -->
@@ -216,29 +211,25 @@
                         </tr>
                         }
                     </tbody>
+                    @if (statsService.homeTeamTotals(); as totals) {
+                    <tfoot>
+                        <tr class="team-totals-row">
+                            <td class="sticky-col totals-label">TOTAL</td>
+                            <td>—</td>
+                            <td class="stat-highlight">{{ totals.points }}</td>
+                            <td>{{ totals.totalRebounds }}</td>
+                            <td>{{ totals.assists }}</td>
+                            <td>{{ totals.steals }}</td>
+                            <td>{{ totals.blocks }}</td>
+                            <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
+                            <td class="shooting-stat">—</td>
+                            <td class="shooting-stat">—</td>
+                            <td>—</td>
+                        </tr>
+                    </tfoot>
+                    }
                 </table>
             </div>
-            <!-- TOTALS ROW FOR HOME -->
-            @if (statsService.homeTeamTotals(); as totals) {
-            <div class="team-totals-footer glass-panel">
-                <div class="total-label-box" title="Totais Combinados da Equipe">TOTAL</div>
-                <div class="totals-grid">
-                    <div class="total-item"><span title="Total de Pontos">PTS</span><strong>{{ totals.points }}</strong>
-                    </div>
-                    <div class="total-item"><span title="Total de Rebotes">REB</span><strong>{{ totals.totalRebounds
-                            }}</strong></div>
-                    <div class="total-item"><span title="Total de Assistências">AST</span><strong>{{ totals.assists
-                            }}</strong></div>
-                    <div class="total-item"><span title="Total de Roubos de Bola">STL</span><strong>{{ totals.steals
-                            }}</strong></div>
-                    <div class="total-item"><span title="Total de Tocos">BLK</span><strong>{{ totals.blocks }}</strong>
-                    </div>
-                    <div class="total-item"><span title="Total de Arremessos (Convertidos/Tentados)">FG</span><strong>{{
-                            totals.fieldGoalsMade }}/{{
-                            totals.fieldGoalsAttempted }}</strong></div>
-                </div>
-            </div>
-            }
         </div>
     </div>
     }

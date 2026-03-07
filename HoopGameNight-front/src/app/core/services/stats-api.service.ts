@@ -102,6 +102,12 @@ export class StatsApiService {
                 .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
         );
 
+        if (response.success && response.data && response.data.games) {
+            return {
+                ...response.data,
+                games: response.data.games.map(game => this.normalizeRecentGame(game))
+            };
+        }
         return response.data;
     }
 
@@ -127,29 +133,36 @@ export class StatsApiService {
     }
 
     private normalizeRecentGame(game: any): any {
-        const getValue = (obj: any, key: string, defaultValue: any = 0) => {
-            const pascalKey = key.charAt(0).toUpperCase() + key.slice(1);
-            const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
-            return obj[camelKey] ?? obj[pascalKey] ?? obj[key] ?? defaultValue;
+        const safeGet = (obj: any, keys: string[], def: any = null) => {
+            if (!obj) return def;
+            for (const key of keys) {
+                if (obj[key] !== undefined && obj[key] !== null) return obj[key];
+            }
+            // also try snake_case version of first key if provided
+            const primaryKey = keys[0];
+            const snakeKey = primaryKey.split(/(?=[A-Z])/).join('_').toLowerCase();
+            if (obj[snakeKey] !== undefined && obj[snakeKey] !== null) return obj[snakeKey];
+
+            return def;
         };
 
         return {
             ...game,
-            gameId: getValue(game, 'gameId'),
-            gameDate: getValue(game, 'gameDate'),
-            opponent: getValue(game, 'opponent', 'Unknown'),
-            isHome: getValue(game, 'isHome', false),
-            result: getValue(game, 'result', '-'),
-            points: getValue(game, 'points'),
-            rebounds: getValue(game, 'rebounds') || getValue(game, 'totalRebounds'),
-            assists: getValue(game, 'assists'),
-            steals: getValue(game, 'steals'),
-            blocks: getValue(game, 'blocks'),
-            minutes: getValue(game, 'minutes', '-'),
-            fieldGoals: getValue(game, 'fieldGoals', '-'),
-            threePointers: getValue(game, 'threePointers', '-'),
-            freeThrows: getValue(game, 'freeThrows', '-'),
-            plusMinus: getValue(game, 'plusMinus')
+            gameId: safeGet(game, ['gameId', 'GameId', 'id', 'Id'], 0),
+            gameDate: safeGet(game, ['gameDate', 'GameDate', 'date', 'Date', 'dateTime', 'DateTime', 'game_date'], null),
+            opponent: safeGet(game, ['opponent', 'Opponent', 'opponentAbbreviation', 'OpponentAbbreviation'], 'Unknown'),
+            isHome: safeGet(game, ['isHome', 'IsHome'], false),
+            result: safeGet(game, ['result', 'Result'], '-'),
+            points: Number(safeGet(game, ['points', 'Points'], 0)),
+            rebounds: Number(safeGet(game, ['rebounds', 'Rebounds', 'totalRebounds', 'TotalRebounds', 'reb'], 0)),
+            assists: Number(safeGet(game, ['assists', 'Assists', 'ast'], 0)),
+            steals: Number(safeGet(game, ['steals', 'Steals', 'stl'], 0)),
+            blocks: Number(safeGet(game, ['blocks', 'Blocks', 'blk'], 0)),
+            minutes: safeGet(game, ['minutes', 'Minutes', 'minutesFormatted', 'min'], '-'),
+            fieldGoals: safeGet(game, ['fieldGoals', 'FieldGoals', 'fieldGoalsFormatted', 'fg'], '-'),
+            threePointers: safeGet(game, ['threePointers', 'ThreePointers', 'threePointersFormatted', 'tp'], '-'),
+            freeThrows: safeGet(game, ['freeThrows', 'FreeThrows', 'freeThrowsFormatted', 'ft'], '-'),
+            plusMinus: Number(safeGet(game, ['plusMinus', 'PlusMinus', 'plus_minus'], 0))
         };
     }
 }

@@ -1,102 +1,85 @@
 <div class="games-page">
   <div class="games-page__container">
-    <!-- Header -->
-    <div class="games-page__header">
-      <h1 class="games-page__title">Agenda da Liga</h1>
-      <p class="games-page__subtitle">
-        @if (gamesService.isToday()) {
-        Jogos de hoje
-        } @else {
-        Jogos de {{ getCurrentDate() }}
-        }
-      </p>
-    </div>
 
-    <!-- Date Navigation -->
-    <div class="date-navigation">
-      <button class="date-nav-btn" (click)="goToPreviousDay()" [disabled]="gamesService.isLoading()">
-        <span class="material-icons">chevron_left</span>
-        Ontem
-      </button>
+    <!-- Ultra-compact Navigation Bar -->
+    <div class="games-navbar">
 
-      <div class="current-date">
-        <span class="current-date__text">
-          @if (gamesService.isToday()) {
-          Hoje
-          } @else {
-          {{ getShortDate() }}
+      <!-- Left: Title & Navigation -->
+      <div class="games-navbar__left">
+        <h1 class="games-navbar__title">Jogos da Liga</h1>
+
+        <div class="games-navbar__date-controls">
+          <button class="nav-arrow-btn" (click)="goToPreviousDay()" [disabled]="gamesService.isLoading()"
+            title="Dia Anterior">
+            <span class="material-icons">chevron_left</span>
+          </button>
+
+          <div class="current-date-group">
+            <span class="date-text">
+              @if (gamesService.isToday()) {
+              Hoje, {{ getShortDate() }}
+              } @else {
+              {{ getShortDate() }}
+              }
+            </span>
+            <app-date-picker [selectedDate]="gamesService.selectedDate()"
+              (dateChange)="onDateChange($event)"></app-date-picker>
+          </div>
+
+          <button class="nav-arrow-btn" (click)="goToNextDay()" [disabled]="gamesService.isLoading()"
+            title="Próximo Dia">
+            <span class="material-icons">chevron_right</span>
+          </button>
+
+          @if (!gamesService.isToday()) {
+          <button class="btn-return-today" (click)="goToToday()" title="Voltar para Hoje">
+            Hoje
+          </button>
           }
-        </span>
-        <span class="current-date__full">{{ getCurrentDate() }}</span>
-
-        @if (!gamesService.isToday()) {
-        <button class="btn btn--ghost btn--sm" (click)="goToToday()">
-          Voltar para Hoje
-        </button>
-        } @else {
-        <button class="btn btn--ghost btn--sm" (click)="loadCompletedGames()">
-          Carregar Jogos Antigos (3 dias)
-        </button>
-        }
-
-        <!-- Date Picker Integration -->
-        <app-date-picker [selectedDate]="gamesService.selectedDate()" (dateChange)="onDateChange($event)">
-        </app-date-picker>
+        </div>
       </div>
 
-      <button class="date-nav-btn" (click)="goToNextDay()" [disabled]="gamesService.isLoading()">
-        Amanhã
-        <span class="material-icons">chevron_right</span>
-      </button>
-    </div>
-
-    <!-- Actions Bar -->
-    <div class="actions-bar">
-      <div class="actions-bar__info">
+      <!-- Right: Sync & Actions -->
+      <div class="games-navbar__right">
         @if (gamesService.syncStatus(); as status) {
-        <div class="sync-info" [class.sync-info--needs-sync]="status.needsSync">
+        <div class="sync-indicator" [class.needs-sync]="status.needsSync" [title]="status.recommendation">
           <span class="material-icons">
-            {{ status.needsSync ? 'sync_problem' : 'sync' }}
+            {{ status.needsSync ? 'sync_problem' : 'cloud_done' }}
           </span>
-          <span>{{ status.recommendation }}</span>
         </div>
         }
 
-        @if (gamesService.lastUpdate(); as lastUpdate) {
-        <span class="last-update">
-          Atualizado: {{ lastUpdate.toLocaleTimeString('pt-BR') }}
-        </span>
-        }
+        <div class="action-buttons">
+          <button class="btn btn--secondary btn--icon-only" (click)="refreshGames()"
+            [disabled]="gamesService.isLoading()" title="Atualizar Tela">
+            <span class="material-icons" [class.rotating]="gamesService.isLoading()">refresh</span>
+          </button>
+
+          <button class="btn btn--primary btn--compact" (click)="syncCurrentDate()"
+            [disabled]="gamesService.isLoading() || isFutureDate()" [title]="getSyncButtonTooltip()">
+            <span class="material-icons">sync</span>
+            <span class="btn-text">Sincronizar</span>
+          </button>
+        </div>
       </div>
+    </div> <!-- /games-navbar -->
 
-      <div class="actions-bar__buttons">
-        <button class="btn btn--secondary" (click)="refreshGames()" [disabled]="gamesService.isLoading()">
-          <span class="material-icons">refresh</span>
-          Atualizar
-        </button>
-
-        <button class="btn btn--primary" (click)="syncCurrentDate()"
-          [disabled]="gamesService.isLoading() || isFutureDate()" [title]="getSyncButtonTooltip()">
-          <span class="material-icons">sync</span>
-          Sincronizar
-        </button>
-
-        @if (isFutureDate()) {
-        <span class="sync-warning">
-          <span class="material-icons">info</span>
-          Sincronização disponível apenas para jogos já realizados
-        </span>
-        }
-      </div>
+    @if (gamesService.lastUpdate(); as lastUpdate) {
+    <div class="last-update-text">
+      Atualizado: {{ lastUpdate.toLocaleTimeString('pt-BR') }}
+      @if (isFutureDate()) {
+      <span class="future-warning">• Sincronização indisponível para o futuro</span>
+      }
     </div>
+    }
 
     <!-- Loading State -->
     @if (gamesService.isLoading()) {
     <div class="games-grid">
       <div class="games-section">
-        <app-skeleton-loader width="200px" height="24px" className="mb-4"></app-skeleton-loader>
+        <app-skeleton-loader width="200px" height="24px" className="mb-3"></app-skeleton-loader>
         <div class="games-list">
-          @for (i of [1,2,3,4]; track i) {
+          @for (i of [1,2,3,4,5,6]; track i) {
           <div class="game-card skeleton-card">
             <div class="game-card__header">
               <app-skeleton-loader width="80px" height="16px"></app-skeleton-loader>
@@ -124,27 +107,25 @@
 
     <!-- Error State -->
     @if (gamesService.error(); as error) {
-    <app-error-view title="Erro ao carregar jogos" [message]="error" (retry)="refreshGames()">
-    </app-error-view>
+    <app-error-view title="Erro ao carregar jogos" [message]="error" (retry)="refreshGames()"></app-error-view>
     }
 
     <!-- Games Grid -->
     @if (!gamesService.isLoading() && !gamesService.error()) {
     <div class="games-grid">
-      <!-- All Games Section -->
       <div class="games-section">
         <h2 class="games-section__title">
-          Todos os Jogos ({{ gamesService.currentGames().length }})
+          Partidas ({{ gamesService.currentGames().length }})
         </h2>
 
         @if (gamesService.currentGames().length === 0) {
         <div class="empty-state">
-          <span class="material-icons">event_busy</span>
-          <h3>Nenhum jogo encontrado</h3>
-          <p>Não há jogos agendados para esta data.</p>
+          <span class="material-icons">sports_basketball</span>
+          <h3>Nenhum jogo nesta data</h3>
+          <p>A liga está de folga hoje. Tente navegar para outro dia.</p>
           <button class="btn btn--primary" (click)="syncCurrentDate()">
             <span class="material-icons">sync</span>
-            Sincronizar Dados
+            Forçar Sincronização
           </button>
         </div>
         } @else {
@@ -153,7 +134,7 @@
           <div class="game-card" [class.game-card--live]="game.isLive" [class.game-card--completed]="game.isCompleted"
             [class.game-card--scheduled]="!game.isLive && !game.isCompleted" (click)="viewGameDetails(game.id)">
 
-            <!-- Card Header com Status e Horário -->
+            <!-- Card Header -->
             <div class="game-card__header">
               <div class="game-header__left">
                 @if (game.postSeason) {
@@ -180,7 +161,7 @@
               <!-- Visitor Team -->
               <div class="team team--clickable"
                 [class.team--winner]="game.isCompleted && game.winningTeam && game.winningTeam.id === game.visitorTeam.id"
-                (click)="navigateToTeam(game.visitorTeam.abbreviation)">
+                (click)="navigateToTeam(game.visitorTeam.abbreviation); $event.stopPropagation()">
                 <div class="team__logo">
                   <img [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)" [alt]="game.visitorTeam.name + ' logo'"
                     (error)="handleLogoError($event, game.visitorTeam.abbreviation)" class="team-logo" loading="lazy">
@@ -200,7 +181,7 @@
               <!-- Home Team -->
               <div class="team team--clickable"
                 [class.team--winner]="game.isCompleted && game.winningTeam && game.winningTeam.id === game.homeTeam.id"
-                (click)="navigateToTeam(game.homeTeam.abbreviation)">
+                (click)="navigateToTeam(game.homeTeam.abbreviation); $event.stopPropagation()">
                 <div class="team__logo">
                   <img [src]="getTeamLogoUrl(game.homeTeam.abbreviation)" [alt]="game.homeTeam.name + ' logo'"
                     (error)="handleLogoError($event, game.homeTeam.abbreviation)" class="team-logo" loading="lazy">
@@ -215,7 +196,7 @@
             } @else {
             <div class="game-card__teams">
               <div class="team team--error">
-                <span>Dados dos times não disponíveis</span>
+                <span>Dados dos times indisponíveis</span>
               </div>
             </div>
             }

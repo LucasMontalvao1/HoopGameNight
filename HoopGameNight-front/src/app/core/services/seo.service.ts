@@ -9,14 +9,14 @@ export class SEOService {
     private readonly metaService = inject(Meta);
 
     private readonly defaultTitle = 'HoopGameNight - NBA Insights & Stats';
-    private readonly defaultDesc = 'Acompanhe jogos da NBA em tempo real, estatísticas de jogadores e insights gerados por IA.';
+    private readonly defaultDesc = 'Acompanhe jogos da NBA em tempo real, estatísticas de jogadores e insights inteligentes com análises de desempenho.';
 
     updateTitle(newTitle?: string): void {
         const fullTitle = newTitle ? `${newTitle} | HoopGameNight` : this.defaultTitle;
         this.titleService.setTitle(fullTitle);
     }
 
-    updateMeta(description: string = this.defaultDesc, keywords: string = 'NBA, basquete, estatísticas, jogos ao vivo, insights IA'): void {
+    updateMeta(description: string = this.defaultDesc, keywords: string = 'NBA, basquete, estatísticas, jogos ao vivo, análise de desempenho'): void {
         this.metaService.updateTag({ name: 'description', content: description });
         this.metaService.updateTag({ name: 'keywords', content: keywords });
 

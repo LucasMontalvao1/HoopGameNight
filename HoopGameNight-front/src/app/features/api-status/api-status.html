@@ -4,151 +4,157 @@
     <div class="api-status__header">
       <div>
         <h1 class="api-status__title">API Status Monitor</h1>
-        <p class="api-status__subtitle">Confira em tempo real o status de cada api</p>
+        <p class="api-status__subtitle">Operações e conectividade em tempo real</p>
       </div>
-      
-      <button 
-        class="btn btn--primary"
-        (click)="onManualCheck()"
-        [disabled]="healthCheck.status() === 'loading'">
-        <span class="material-icons">refresh</span>
+
+      <button class="btn btn--primary" (click)="onManualCheck()"
+        [class.btn--loading]="healthCheck.status() === 'loading'" [disabled]="healthCheck.status() === 'loading'">
+        <span class="material-icons" [class.rotating]="healthCheck.status() === 'loading'">refresh</span>
         Refresh Status
       </button>
     </div>
 
-    <!-- Main Status Card -->
-    <div class="api-status__main-card">
-      <div class="status-overview">
-        <div class="status-overview__icon">
-          <app-status-indicator 
-            [status]="healthCheck.status()"
-            [showText]="false"
-            size="large">
-          </app-status-indicator>
+    <!-- Main Content Grid -->
+    <div class="api-status__dashboard-grid">
+
+      <!-- Left Column / Main -->
+      <div class="dashboard-main">
+
+        <!-- Main Status Card -->
+        <div class="api-status__main-card">
+          <div class="status-overview">
+            <div class="status-overview__icon">
+              <app-status-indicator [status]="healthCheck.status()" [showText]="false"
+                size="large"></app-status-indicator>
+            </div>
+            <div class="status-overview__content">
+              <h2 class="status-overview__title">{{ healthCheck.getStatusText() }}</h2>
+              <p class="status-overview__description">
+                @if (healthCheck.isOnline()) { All systems operational }
+                @else if (healthCheck.isOffline()) { Service temporarily unavailable }
+                @else { Checking system status... }
+              </p>
+            </div>
+            <div class="status-overview__timestamp">
+              <span class="timestamp-label">Last checked</span>
+              <span class="timestamp-value">{{ healthCheck.getTimeSinceLastCheck() }}</span>
+            </div>
+          </div>
         </div>
-        
-        <div class="status-overview__content">
-          <h2 class="status-overview__title">{{ healthCheck.getStatusText() }}</h2>
-          <p class="status-overview__description">
-            @if (healthCheck.isOnline()) {
-              All systems operational
-            } @else if (healthCheck.isOffline()) {
-              Service temporarily unavailable
-            } @else {
-              Checking system status...
-            }
-          </p>
+
+        @if (healthCheck.healthData(); as data) {
+        <!-- Mini Metrics Row -->
+        <div class="metrics-row">
+          <div class="metric-card">
+            <span class="material-icons metric-icon">speed</span>
+            <div class="metric-data">
+              <span class="metric-label">Avg Latency</span>
+              <span class="metric-value">{{ getHealthDuration() }}</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <span class="material-icons metric-icon">published_with_changes</span>
+            <div class="metric-data">
+              <span class="metric-label">Total Checks</span>
+              <span class="metric-value">{{ getHealthCheckCount() }}</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <span class="material-icons metric-icon metric-icon--success">check_circle</span>
+            <div class="metric-data">
+              <span class="metric-label">Healthy</span>
+              <span class="metric-value">{{ data.summary.healthy || 0 }}</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <span class="material-icons metric-icon metric-icon--warning">warning</span>
+            <div class="metric-data">
+              <span class="metric-label">Issues</span>
+              <span class="metric-value">{{ (data.summary.degraded || 0) + (data.summary.unhealthy || 0) }}</span>
+            </div>
+          </div>
         </div>
 
-        <div class="status-overview__timestamp">
-          <span class="timestamp-label">Last checked</span>
-          <span class="timestamp-value">{{ healthCheck.getTimeSinceLastCheck() }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Detailed Information -->
-    @if (healthCheck.healthData(); as data) {
-      <div class="api-status__details">
-        <div class="detail-card">
-          <h3 class="detail-card__title">System Information</h3>
-
-          <div class="detail-grid">
-            <div class="detail-item">
-              <span class="detail-item__label">Status</span>
-              <span class="detail-item__value detail-item__value--success">{{ data.status }}</span>
+        <!-- Endpoints Grid -->
+        @if (data.checks && data.checks.length > 0) {
+        <div class="detail-card endpoints-card">
+          <div class="endpoints-header">
+            <h3 class="detail-card__title">Endpoint Monitors</h3>
+            <div class="ping-legend">
+              <span class="material-icons">sensors</span> Real-time Ping
             </div>
+          </div>
 
-            <div class="detail-item">
-              <span class="detail-item__label">Health Checks</span>
-              <span class="detail-item__value">{{ getHealthCheckCount() }}</span>
-            </div>
+          <div class="checks-grid">
+            @for (check of data.checks; track check.name) {
+            <div class="check-item" [class.check-item--healthy]="check.status.toLowerCase() === 'healthy'"
+              [class.check-item--degraded]="check.status.toLowerCase() === 'degraded'"
+              [class.check-item--unhealthy]="check.status.toLowerCase() === 'unhealthy'">
 
-            <div class="detail-item">
-              <span class="detail-item__label">Check Duration</span>
-              <span class="detail-item__value">{{ getHealthDuration() }}</span>
-            </div>
-
-            <div class="detail-item">
-              <span class="detail-item__label">Last Response</span>
-              <span class="detail-item__value">{{ data.timestamp | date:'dd/MM/yyyy HH:mm:ss' }}</span>
-            </div>
-
-            @if (data.summary) {
-              <div class="detail-item">
-                <span class="detail-item__label">Healthy</span>
-                <span class="detail-item__value detail-item__value--success">{{ data.summary.healthy }}</span>
+              <div class="check-item__top">
+                <div class="check-item__name">
+                  <span class="check-status-dot"></span>
+                  {{ check.name }}
+                </div>
+                <div class="check-item__status">{{ check.status }}</div>
               </div>
 
-              @if (data.summary.degraded > 0) {
-                <div class="detail-item">
-                  <span class="detail-item__label">Degraded</span>
-                  <span class="detail-item__value detail-item__value--warning">{{ data.summary.degraded }}</span>
-                </div>
+              @if (check.description) {
+              <div class="check-item__description">{{ check.description }}</div>
               }
 
-              @if (data.summary.unhealthy > 0) {
-                <div class="detail-item">
-                  <span class="detail-item__label">Unhealthy</span>
-                  <span class="detail-item__value detail-item__value--error">{{ data.summary.unhealthy }}</span>
+              <!-- Ping Bars Visualization -->
+              <div class="ping-visualization">
+                <div class="ping-bars">
+                  <div class="ping-bar bar-1"></div>
+                  <div class="ping-bar bar-2"></div>
+                  <div class="ping-bar bar-3"></div>
+                  <div class="ping-bar bar-4"></div>
+                  <div class="ping-bar bar-5" [class.offline]="check.status.toLowerCase() === 'unhealthy'"></div>
                 </div>
+                <div class="ping-bottom-info">
+                  <span class="ping-value">{{ check.duration.toFixed(0) }}ms</span>
+                  @if (check.tags.length > 0) {
+                  <span class="check-tags">{{ check.tags.join(', ') }}</span>
+                  }
+                </div>
+              </div>
+
+              @if (check.error) {
+              <div class="check-item__error">
+                <span class="material-icons">error</span>
+                {{ check.error }}
+              </div>
               }
+            </div>
             }
           </div>
         </div>
+        }
+        }
+      </div> <!-- /dashboard-main -->
 
-        <!-- Health Checks Details -->
-        @if (data.checks && data.checks.length > 0) {
-          <div class="detail-card">
-            <h3 class="detail-card__title">Health Checks</h3>
+      <!-- Right Column / Sidebar -->
+      <div class="dashboard-sidebar">
 
-            <div class="checks-list">
-              @for (check of data.checks; track check.name) {
-                <div class="check-item" [class.check-item--healthy]="check.status.toLowerCase() === 'healthy'"
-                     [class.check-item--degraded]="check.status.toLowerCase() === 'degraded'"
-                     [class.check-item--unhealthy]="check.status.toLowerCase() === 'unhealthy'">
-                  <div class="check-item__header">
-                    <div class="check-item__name">
-                      <span class="check-status-dot"></span>
-                      {{ check.name }}
-                    </div>
-                    <div class="check-item__status">{{ check.status }}</div>
-                  </div>
-
-                  @if (check.description) {
-                    <div class="check-item__description">{{ check.description }}</div>
-                  }
-
-                  <div class="check-item__meta">
-                    <span class="check-meta-item">
-                      <span class="material-icons">timer</span>
-                      {{ check.duration.toFixed(2) }}ms
-                    </span>
-                    @if (check.tags.length > 0) {
-                      <span class="check-meta-item">
-                        <span class="material-icons">label</span>
-                        {{ check.tags.join(', ') }}
-                      </span>
-                    }
-                  </div>
-
-                  @if (check.error) {
-                    <div class="check-item__error">
-                      <span class="material-icons">error</span>
-                      {{ check.error }}
-                    </div>
-                  }
-                </div>
-              }
+        @if (healthCheck.healthData(); as data) {
+        <div class="detail-card system-info-card">
+          <h3 class="detail-card__title">System Info</h3>
+          <div class="detail-list-vertical">
+            <div class="detail-item-compact">
+              <span class="label">Status</span>
+              <span class="value value--success">{{ data.status }}</span>
+            </div>
+            <div class="detail-item-compact">
+              <span class="label">Last Response</span>
+              <span class="value">{{ data.timestamp | date:'HH:mm:ss' }}</span>
             </div>
           </div>
+        </div>
         }
-      </div>
-    }
 
-    <!-- Error Information -->
-    @if (healthCheck.errorMessage(); as error) {
-      <div class="api-status__error">
+        <!-- Error Information -->
+        @if (healthCheck.errorMessage(); as error) {
         <div class="error-card">
           <div class="error-card__header">
             <span class="material-icons">error</span>
@@ -159,32 +165,32 @@
             <span>Last attempt: {{ healthCheck.getTimeSinceLastCheck() }}</span>
           </div>
         </div>
-      </div>
-    }
+        }
 
-    <!-- Monitoring Information -->
-    <div class="api-status__info">
-      <div class="info-card">
-        <h3 class="info-card__title">Monitoring Details</h3>
-        <div class="info-list">
-          <div class="info-item">
-            <span class="material-icons">schedule</span>
-            <span>Automatic check every 30 seconds</span>
-          </div>
-          <div class="info-item">
-            <span class="material-icons">timer</span>
-            <span>2-minute timeout per request</span>
-          </div>
-          <div class="info-item">
-            <span class="material-icons">sync</span>
-            <span>Real-time status updates</span>
-          </div>
-          <div class="info-item">
-            <span class="material-icons">security</span>
-            <span>HTTPS encrypted connection</span>
+        <!-- Monitoring Information -->
+        <div class="info-card">
+          <h3 class="info-card__title">Monitoring Rules</h3>
+          <div class="info-list">
+            <div class="info-item">
+              <span class="material-icons">schedule</span>
+              <span>Auto-check 30s</span>
+            </div>
+            <div class="info-item">
+              <span class="material-icons">timer</span>
+              <span>120s timeout</span>
+            </div>
+            <div class="info-item">
+              <span class="material-icons">sync</span>
+              <span>Real-time stream</span>
+            </div>
+            <div class="info-item">
+              <span class="material-icons">security</span>
+              <span>SSL/TLS Encrypted</span>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
+      </div> <!-- /dashboard-sidebar -->
+
+    </div> <!-- /dashboard-grid -->
   </div>
 </div>

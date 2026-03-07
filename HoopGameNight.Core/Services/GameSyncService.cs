@@ -276,6 +276,15 @@ namespace HoopGameNight.Core.Services
                 else
                 {
                     var hasChanges = false;
+                    
+                    // Unificar ID se for diferente (ex: trocando ID gerado manual por ID numérico real)
+                    if (existingGame.ExternalId != gameId)
+                    {
+                        _logger.LogInformation("Unificando ExternalId do jogo: {Old} -> {New}", existingGame.ExternalId, gameId);
+                        existingGame.ExternalId = gameId;
+                        hasChanges = true;
+                    }
+
                     if (existingGame.HomeTeamScore != homeScore) { existingGame.HomeTeamScore = homeScore; hasChanges = true; }
                     if (existingGame.VisitorTeamScore != awayScore) { existingGame.VisitorTeamScore = awayScore; hasChanges = true; }
                     if (existingGame.Status != status) { existingGame.Status = status; hasChanges = true; }

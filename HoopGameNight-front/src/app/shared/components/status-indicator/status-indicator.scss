@@ -7,31 +7,108 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    animation: pulse 2s infinite;
+    position: relative;
+    z-index: 1;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: -4px;
+      left: -4px;
+      right: -4px;
+      bottom: -4px;
+      border-radius: 50%;
+      z-index: -1;
+      opacity: 0;
+    }
   }
 
   .status-text {
     font-weight: 500;
     font-size: 0.875rem;
+    transition: color var(--transition-normal);
   }
 
+  /* ONLINE STATE */
   &--online {
-    .status-dot { background-color: #10b981; }
-    .status-text { color: #10b981; }
+    .status-dot {
+      background: radial-gradient(circle at 30% 30%, #34d399, #10b981);
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+
+      :root.dark & {
+        box-shadow: 0 0 16px rgba(16, 185, 129, 0.6);
+      }
+
+      &::after {
+        background: rgba(16, 185, 129, 0.4);
+        animation: sonarPulse 2s cubic-bezier(0.25, 0.8, 0.5, 1) infinite;
+      }
+    }
+
+    .status-text {
+      color: #10b981;
+      text-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+    }
   }
 
+  /* OFFLINE STATE */
   &--offline {
-    .status-dot { background-color: #ef4444; }
-    .status-text { color: #ef4444; }
+    .status-dot {
+      background: radial-gradient(circle at 30% 30%, #f87171, #ef4444);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+
+      :root.dark & {
+        box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+      }
+
+      &::after {
+        background: rgba(239, 68, 68, 0.4);
+        animation: sonarPulse 2s cubic-bezier(0.25, 0.8, 0.5, 1) infinite;
+      }
+    }
+
+    .status-text {
+      color: #ef4444;
+      text-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+    }
   }
 
+  /* LOADING STATE */
   &--loading {
-    .status-dot { background-color: #f59e0b; }
-    .status-text { color: #f59e0b; }
+    .status-dot {
+      background: radial-gradient(circle at 30% 30%, #fbbf24, #f59e0b);
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+
+      :root.dark & {
+        box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
+      }
+
+      &::after {
+        background: rgba(245, 158, 11, 0.4);
+        animation: sonarPulse 1.5s cubic-bezier(0.25, 0.8, 0.5, 1) infinite;
+      }
+    }
+
+    .status-text {
+      color: #f59e0b;
+      text-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+    }
   }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(1.1); }
+@keyframes sonarPulse {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.8;
+  }
+
+  70% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
 }

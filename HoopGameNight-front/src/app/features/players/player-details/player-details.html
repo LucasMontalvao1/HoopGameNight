@@ -1,10 +1,5 @@
 <div class="player-details-page">
   <div class="player-details-container">
-    <button class="back-btn" (click)="goBack()">
-      <span class="material-icons">arrow_back</span>
-      Voltar para Jogadores
-    </button>
-
     @if (playersService.isLoading()) {
     <div class="loading-container">
       <div class="loading-spinner"></div>
@@ -16,37 +11,52 @@
     <div class="error-container">
       <span class="material-icons">error_outline</span>
       <p>{{ playersService.error() }}</p>
-      <button (click)="goBack()">Voltar</button>
+      <button class="btn-glass-pill" (click)="goBack()">Voltar</button>
     </div>
     }
 
     @if (playersService.selectedPlayer(); as player) {
-    <div class="player-profile glass-panel animate-fade-in">
-      <div class="profile-header">
-        <div class="player-visual">
-          <div class="player-photo-wrapper">
-            <img [src]="getPlayerPhotoUrl()" [alt]="player.fullName" (error)="onImageError($event)" />
-          </div>
-          <div class="player-team-mini">
+    <!-- Premium Player Hero Banner -->
+    <div class="player-hero animate-fade-in"
+      [style.--team-color-primary]="getTeamColor(player.team.abbreviation, 'primary')"
+      [style.--team-color-secondary]="getTeamColor(player.team.abbreviation, 'secondary')">
+
+      <div class="hero-actions">
+        <button class="btn-glass-pill" (click)="goBack()">
+          <span class="material-icons">west</span>
+          Voltar
+        </button>
+        <button class="btn-glass-pill" (click)="viewTeam(player.team.abbreviation)">
+          <span class="material-icons">groups</span>
+          Ver Time
+        </button>
+      </div>
+
+      <div class="player-hero-content">
+        <div class="hero-logo-wrapper"
+          [style.box-shadow]="'0 0 30px ' + getTeamColor(player.team.abbreviation, 'primary') + '40'">
+          <img [src]="getPlayerPhotoUrl()" [alt]="player.fullName" (error)="onImageError($event)"
+            class="hero-logo-img" />
+          <div class="player-team-mini glow"
+            [style.box-shadow]="'0 0 15px ' + getTeamColor(player.team.abbreviation, 'secondary') + '60'">
             <img [src]="getTeamLogoUrl()" (error)="onTeamLogoError($event)" class="team-mini-logo" />
           </div>
         </div>
 
-        <div class="player-essence">
-          <div class="player-badge">#{{ player.id }} • {{ player.team.abbreviation }}</div>
-          <h1 class="player-name">{{ player.fullName }}</h1>
-          <div class="player-meta">
-            <span class="position-tag">{{ player.positionDisplay }}</span>
-            <span class="meta-divider">|</span>
-            <span class="physical-info">{{ player.height }} • {{ player.weight }}</span>
+        <div class="player-hero-info">
+          <div class="badges-row">
+            <span class="glow-badge glow-badge-primary">#{{ player.id }}</span>
+            <span class="glow-badge glow-badge-secondary">{{ player.team.abbreviation }}</span>
           </div>
-        </div>
-
-        <div class="header-actions">
-          <button class="btn btn--primary btn--sm" (click)="viewTeam(player.team.abbreviation)">
-            <span class="material-icons">groups</span>
-            Ver Time
-          </button>
+          <h1 class="player-name">{{ player.fullName }}</h1>
+          <div class="player-meta-info">
+            <span class="meta-item"><span class="material-icons meta-icon">sports_basketball</span>{{
+              player.positionDisplay }}</span>
+            <span class="meta-divider">•</span>
+            <span class="meta-item"><span class="material-icons meta-icon">height</span>{{ player.height }}</span>
+            <span class="meta-divider">•</span>
+            <span class="meta-item"><span class="material-icons meta-icon">scale</span>{{ player.weight }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -127,6 +137,11 @@
                 </div>
               </div>
             </div>
+
+            <!-- Evolução de Performance (Chart) -->
+            <app-player-performance-chart [games]="statsService.currentPlayerGamelog()?.games || []"
+              [teamColor]="getTeamColor(player.team.abbreviation, 'primary')">
+            </app-player-performance-chart>
 
             <!-- Porcentagens de Arremesso -->
             <div class="stats-category">

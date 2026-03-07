@@ -23,7 +23,7 @@ export class NavigationService {
     },
     {
       id: 'games',
-      label: 'Agenda',
+      label: 'Jogos',
       icon: 'sports_basketball',
       route: '/games'
     },

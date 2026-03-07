@@ -55,10 +55,14 @@ export class Teams implements OnInit {
     this._searchQuery.set(query);
   }
 
-  onConferenceSelect(event: Event): void {
-    const target = event.target as HTMLSelectElement;
-    const value = target.value as 'All' | 'East' | 'West';
-    this.onConferenceChange(value);
+  onConferenceSelect(input: string | Event): void {
+    if (typeof input === 'string') {
+      this.onConferenceChange(input as 'All' | 'East' | 'West');
+    } else {
+      const target = input.target as HTMLSelectElement;
+      const value = target.value as 'All' | 'East' | 'West';
+      this.onConferenceChange(value);
+    }
   }
 
   onConferenceChange(conference: 'All' | 'East' | 'West'): void {
@@ -193,7 +197,6 @@ export class Teams implements OnInit {
   async selectTeam(team: TeamResponse): Promise<void> {
     const teamName = team.displayName || `${team.city} ${team.name}`;
     console.log('Team selected:', teamName);
-    // Navegar para a página de detalhes do time
     this.router.navigate(['/teams', team.abbreviation]);
   }
 

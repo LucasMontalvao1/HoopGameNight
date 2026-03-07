@@ -1,64 +1,80 @@
 <div class="players-page">
   <div class="players-container">
-    <div class="players-header">
-      <h1>
-        <span class="material-icons">sports_basketball</span>
-        Jogadores NBA
-      </h1>
-      <p class="subtitle">Encontre e explore jogadores da NBA</p>
-    </div>
 
-    <!-- Search and Filters -->
-    <div class="filters-section">
-      <div class="search-box">
-        <span class="material-icons search-icon">search</span>
-        <input type="text" placeholder="Procure seu craque favorito..." [ngModel]="searchInput()"
-          (ngModelChange)="updateSearchInput($event)" (keyup.enter)="onSearch()" class="search-input" />
-        @if (searchInput().length > 0) {
-        <button class="clear-btn" (click)="clearFilters()">
-          <span class="material-icons">close</span>
-        </button>
-        }
-        <button class="search-btn" (click)="onSearch()" [disabled]="searchInput().length < 2">
-          Buscar
-        </button>
+    <!-- Ultra-compact Navigation Bar (Glass) -->
+    <div class="players-navbar">
+
+      <!-- Left: Title -->
+      <div class="players-navbar__left">
+        <h1 class="players-navbar__title">Jogadores</h1>
+        <p class="players-navbar__subtitle">NBA Players</p>
       </div>
 
-      <div class="filter-row">
-        <div class="position-filters">
-          <button class="filter-btn" [class.active]="selectedPositionFilter() === ''" (click)="onPositionFilter('')">
+      <!-- Center: Search & Position Filters -->
+      <div class="players-navbar__center">
+        <!-- Search -->
+        <div class="search-input-group">
+          <span class="material-icons">search</span>
+          <input type="text" placeholder="Procurar jogador..." [ngModel]="searchInput()"
+            (ngModelChange)="updateSearchInput($event)" (keyup.enter)="onSearch()">
+          @if (searchInput().length > 0) {
+          <button class="clear-btn" (click)="clearFilters()">
+            <span class="material-icons">close</span>
+          </button>
+          }
+        </div>
+        <button class="btn-search-trigger" (click)="onSearch()" [disabled]="searchInput().length < 2">
+          Buscar
+        </button>
+
+        <!-- Position Pills -->
+        <div class="filter-pills">
+          <button class="pill-btn" [class.active]="selectedPositionFilter() === '' && !favoritesOnly()"
+            (click)="onPositionFilter('')">
             Todos
           </button>
+
+          <button class="pill-btn" [class.active]="favoritesOnly()" (click)="toggleFavoritesFilter()">
+            <span class="material-icons"
+              style="font-size: 14px; margin-right: 4px; vertical-align: middle;">favorite</span>
+            Favoritos
+          </button>
+
+          <span class="pill-divider"
+            style="width: 1px; height: 16px; background: rgba(255,255,255,0.1); margin: 0 4px;"></span>
+
           @for (position of positions; track position) {
-          <button class="filter-btn" [class.active]="selectedPositionFilter() === position"
+          <button class="pill-btn" [class.active]="selectedPositionFilter() === position && !favoritesOnly()"
             (click)="onPositionFilter(position)">
             {{ position }}
           </button>
           }
         </div>
+      </div>
 
+      <!-- Right: View Modes -->
+      <div class="players-navbar__right">
         <div class="view-toggle">
-          <button class="view-btn" [class.active]="viewMode() === 'grid'" (click)="setViewMode('grid')">
+          <button class="view-btn" [class.active]="viewMode() === 'grid'" (click)="setViewMode('grid')" title="Grade">
             <span class="material-icons">grid_view</span>
           </button>
-          <button class="view-btn" [class.active]="viewMode() === 'list'" (click)="setViewMode('list')">
+          <button class="view-btn" [class.active]="viewMode() === 'list'" (click)="setViewMode('list')" title="Lista">
             <span class="material-icons">view_list</span>
           </button>
         </div>
       </div>
-    </div>
+
+    </div> <!-- /players-navbar -->
 
     <!-- Results Info -->
     @if (playersService.hasSearchResults()) {
     <div class="results-info">
-      <span class="results-count">
-        {{ playersService.pagination().totalCount }} craques encontrados
-      </span>
+      <span class="results-count">{{ playersService.pagination().totalCount }} atletas encontrados</span>
       @if (playersService.searchQuery()) {
       <span class="search-term">para "{{ playersService.searchQuery() }}"</span>
       }
       @if (playersService.selectedPosition()) {
-      <span class="position-term">- Posição: {{ getPositionName(playersService.selectedPosition()) }}</span>
+      <span class="position-term">• Posição: {{ getPositionName(playersService.selectedPosition()) }}</span>
       }
     </div>
     }
@@ -66,7 +82,7 @@
     <!-- Loading -->
     @if (playersService.isLoading()) {
     <div class="players-grid" [class.list-view]="viewMode() === 'list'">
-      @for (i of [1,2,3,4,5,6]; track i) {
+      @for (i of [1,2,3,4,5,6,7,8]; track i) {
       <div class="player-card skeleton-card">
         <div class="player-card__photo">
           <app-skeleton-loader width="100%" height="200px" borderRadius="0"></app-skeleton-loader>
@@ -74,10 +90,6 @@
         <div class="player-card__info">
           <app-skeleton-loader width="80%" height="20px" className="mb-2"></app-skeleton-loader>
           <app-skeleton-loader width="40%" height="14px" className="mb-4"></app-skeleton-loader>
-          <div class="player-details">
-            <app-skeleton-loader width="30%" height="12px"></app-skeleton-loader>
-            <app-skeleton-loader width="30%" height="12px"></app-skeleton-loader>
-          </div>
         </div>
       </div>
       }
@@ -86,18 +98,14 @@
 
     <!-- Error -->
     @if (playersService.error()) {
-    <app-error-view title="Erro ao carregar craques" [message]="playersService.error() || ''" (retry)="clearFilters()">
+    <app-error-view title="Erro ao carregar atletas" [message]="playersService.error() || ''" (retry)="clearFilters()">
     </app-error-view>
     }
 
     <!-- Featured Section -->
     @if (showingFeatured() && !playersService.isLoading()) {
     <div class="section-header">
-      <h2>
-        <span class="material-icons">star</span>
-        Jogadores em Destaque
-      </h2>
-      <p>Explore jogadores de diferentes posições</p>
+      <h2><span class="material-icons">star</span> Em Destaque</h2>
     </div>
     }
 
@@ -106,12 +114,15 @@
     <div class="players-grid" [class.list-view]="viewMode() === 'list'">
       @for (player of displayPlayers(); track player.id) {
       <div class="player-card" (click)="selectPlayer(player)">
+
         <div class="player-card__photo">
-          <img [src]="getPlayerPhotoUrl(player)" [alt]="player.fullName" (error)="onImageError($event)" />
-          <div class="player-card__position">{{ player.position }}</div>
+          <img [src]="getPlayerPhotoUrl(player)" [alt]="player.fullName" (error)="onImageError($event)"
+            loading="lazy" />
+          <div class="player-card__position-badge">{{ player.position }}</div>
+
           <button class="favorite-btn" [class.favorite-btn--active]="preferencesStore.isFavoritePlayer(player.id)"
             (click)="$event.stopPropagation(); preferencesStore.toggleFavoritePlayer(player.id)"
-            [title]="preferencesStore.isFavoritePlayer(player.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'">
+            [title]="preferencesStore.isFavoritePlayer(player.id) ? 'Remover' : 'Favoritar'">
             <span class="material-icons">
               {{ preferencesStore.isFavoritePlayer(player.id) ? 'favorite' : 'favorite_border' }}
             </span>
@@ -120,21 +131,17 @@
 
         <div class="player-card__info">
           <h3 class="player-name">{{ player.fullName }}</h3>
-          <p class="player-position">{{ player.positionDisplay }}</p>
+          <p class="player-position-full">{{ player.positionDisplay }}</p>
 
-          <div class="player-details">
-            <div class="detail-item">
-              <span class="material-icons">height</span>
-              <span>{{ player.height }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="material-icons">fitness_center</span>
-              <span>{{ player.weight }}</span>
-            </div>
+          <div class="player-physical-stats">
+            <span class="stat-item" title="Altura"><span class="material-icons">height</span> {{ player.height || '--'
+              }}</span>
+            <span class="stat-item" title="Peso"><span class="material-icons">fitness_center</span> {{ player.weight ||
+              '--' }}</span>
           </div>
 
           <div class="player-team" (click)="viewTeam($event, player.team.abbreviation)">
-            <img [src]="getTeamLogoUrl(player.team.abbreviation)" [alt]="player.team.name" class="team-logo"
+            <img [src]="getTeamLogoUrl(player.team.abbreviation)" [alt]="player.team.name" class="team-logo-small"
               (error)="onTeamLogoError($event)" />
             <span class="team-name">{{ player.team.displayName }}</span>
           </div>
@@ -145,19 +152,17 @@
 
     <!-- Pagination -->
     @if (playersService.hasSearchResults() && playersService.pagination().totalPages > 1) {
-    <div class="pagination">
-      <button class="pagination-btn" [disabled]="!playersService.hasPreviousPage()" (click)="previousPage()">
-        <span class="material-icons">chevron_left</span>
-        Anterior
+    <div class="pagination-bar">
+      <button class="btn btn--secondary" [disabled]="!playersService.hasPreviousPage()" (click)="previousPage()">
+        <span class="material-icons">chevron_left</span> Anterior
       </button>
 
       <span class="pagination-info">
         Página {{ playersService.pagination().currentPage }} de {{ playersService.pagination().totalPages }}
       </span>
 
-      <button class="pagination-btn" [disabled]="!playersService.hasMorePages()" (click)="nextPage()">
-        Próxima
-        <span class="material-icons">chevron_right</span>
+      <button class="btn btn--secondary" [disabled]="!playersService.hasMorePages()" (click)="nextPage()">
+        Próxima <span class="material-icons">chevron_right</span>
       </button>
     </div>
     }
@@ -165,11 +170,13 @@
 
     <!-- No Results -->
     @if (!playersService.isLoading() && displayPlayers().length === 0 && !playersService.error()) {
-    <div class="no-results">
+    <div class="empty-state">
       <span class="material-icons">person_search</span>
-      <p>Nenhum jogador encontrado</p>
-      <button (click)="clearFilters()">Limpar filtros</button>
+      <h3>Nenhum jogador encontrado</h3>
+      <p>Tente nomes diferentes ou remova filtros.</p>
+      <button class="btn btn--primary" (click)="clearFilters()">Limpar Filtros</button>
     </div>
     }
+
   </div>
 </div>

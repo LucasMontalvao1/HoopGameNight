@@ -11,6 +11,38 @@
   z-index: 1000;
   transition: all var(--transition-normal);
   padding: 0; // Reset padding because glass-panel adds it
+  background: var(--surface-primary-alpha); // Aumenta a base sólida
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-sm);
+
+  :root.dark & {
+    background: rgba(15, 23, 42, 0.75); // Fundo escuro levemente acetinado
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  &__gradient-divider {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent,
+        var(--accent-primary) 20%,
+        var(--accent-secondary) 50%,
+        var(--accent-primary) 80%,
+        transparent);
+    background-size: 200% 100%;
+    animation: gradientMove 8s linear infinite;
+    opacity: 0.5;
+
+    :root.dark & {
+      height: 2px;
+      opacity: 0.8;
+      box-shadow: 0 -2px 10px var(--accent-primary-alpha);
+    }
+  }
 
   &__container {
     max-width: var(--max-width);
@@ -44,6 +76,7 @@
     &-icon {
       font-size: 1.75rem;
       filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     &-text {
@@ -52,6 +85,15 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       letter-spacing: -0.5px;
+      transition: all var(--transition-normal);
+
+      :root.dark & {
+        filter: drop-shadow(0 0 12px var(--accent-primary-alpha));
+      }
+    }
+
+    &-link:hover &-icon {
+      transform: scale(1.1) rotate(10deg);
     }
   }
 
@@ -121,22 +163,29 @@
       &:hover {
         color: var(--text-primary);
         background: var(--surface-secondary);
+        transform: translateY(-1px);
       }
 
       &--active {
         color: var(--accent-primary);
-        background: var(--accent-primary-alpha);
+        background: transparent;
+
+        :root.dark & {
+          color: var(--text-primary);
+          text-shadow: 0 0 10px var(--accent-primary-alpha);
+        }
 
         &::after {
           content: '';
           position: absolute;
-          bottom: -2px;
+          bottom: 0;
           left: 50%;
           transform: translateX(-50%);
-          width: 20px;
-          height: 2px;
+          width: 80%;
+          height: 3px;
           background: var(--accent-primary);
-          border-radius: 1px;
+          border-radius: 3px 3px 0 0;
+          box-shadow: 0 -2px 8px var(--accent-primary-alpha);
         }
       }
 
@@ -323,5 +372,15 @@
 
   to {
     opacity: 1;
+  }
+}
+
+@keyframes gradientMove {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
   }
 }

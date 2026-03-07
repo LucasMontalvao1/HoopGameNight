@@ -18,23 +18,25 @@ import { PlayerResponse, PlayerPosition, POSITION_NAMES } from '../../core/inter
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PlayersComponent implements OnInit {
-  // Local signals
   private readonly _searchInput = signal<string>('');
   private readonly _selectedPositionFilter = signal<string>('');
+  private readonly _favoritesOnly = signal<boolean>(false);
   private readonly _viewMode = signal<'grid' | 'list'>('grid');
 
-  // Public readonly
   readonly searchInput = this._searchInput.asReadonly();
   readonly selectedPositionFilter = this._selectedPositionFilter.asReadonly();
+  readonly favoritesOnly = this._favoritesOnly.asReadonly();
   readonly viewMode = this._viewMode.asReadonly();
 
-  // Constants
   readonly positions = Object.values(PlayerPosition);
   readonly positionNames = POSITION_NAMES;
 
-  // Computed
   readonly displayPlayers = computed(() => {
-    return this.playersService.searchResults();
+    let result = this.playersService.searchResults();
+    if (this._favoritesOnly()) {
+      result = result.filter(p => this.preferencesStore.isFavoritePlayer(p.id));
+    }
+    return result;
   });
 
   readonly showingFeatured = computed(() => false); // Sempre mostra resultados paginados
@@ -53,7 +55,6 @@ export class PlayersComponent implements OnInit {
   }
 
   async loadInitialPlayers(): Promise<void> {
-    // Carrega todos os jogadores ao iniciar
     if (this.playersService.searchResults().length === 0) {
       await this.playersService.loadAllPlayers();
     }
@@ -70,13 +71,13 @@ export class PlayersComponent implements OnInit {
   async onPositionFilter(position: string): Promise<void> {
     console.log('onPositionFilter chamado:', position);
     this._selectedPositionFilter.set(position);
+    this._favoritesOnly.set(false);
     this._searchInput.set('');
 
     if (position) {
       console.log('Carregando jogadores por posição:', position);
       await this.playersService.loadPlayersByPosition(position);
     } else {
-      // "Todos" - carrega todos os jogadores
       console.log('Carregando TODOS os jogadores');
       await this.playersService.loadAllPlayers();
     }
@@ -90,7 +91,18 @@ export class PlayersComponent implements OnInit {
   clearFilters(): void {
     this._searchInput.set('');
     this._selectedPositionFilter.set('');
+    this._favoritesOnly.set(false);
     this.playersService.clearSearch();
+  }
+
+  toggleFavoritesFilter(): void {
+    const isNowFavorites = !this._favoritesOnly();
+    this._favoritesOnly.set(isNowFavorites);
+
+    // Se ativou favoritos, limpa o filtro de posição para ver todos os favoritos juntos
+    if (isNowFavorites) {
+      this._selectedPositionFilter.set('');
+    }
   }
 
   setViewMode(mode: 'grid' | 'list'): void {
@@ -121,10 +133,8 @@ export class PlayersComponent implements OnInit {
 
   onImageError(event: Event): void {
     const img = event.target as HTMLImageElement;
-    // Evitar loop infinito verificando se já tentou o fallback
     if (!img.dataset['fallback']) {
       img.dataset['fallback'] = 'true';
-      // Usar um ícone de pessoa genérico do Material Icons via data URI
       img.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiM5OTk5OTkiPjxwYXRoIGQ9Ik0xMiAxMmMyLjc2IDAgNS0yLjI0IDUtNXMtMi4yNC01LTUtNS01IDIuMjQtNSA1IDIuMjQgNSA1IDV6bTAgMmMtMi42NyAwLTggMS4zNC04IDR2Mkg0djJoMTZ2LTJoNHYtMmMwLTIuNjYtNS4zMy00LTgtNHoiLz48L3N2Zz4=';
     }
   }

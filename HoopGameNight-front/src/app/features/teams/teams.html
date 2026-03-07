@@ -1,115 +1,93 @@
 <div class="teams-page">
   <div class="teams-page__container">
 
-    <!-- Header -->
-    <div class="teams-page__header">
-      <h1 class="teams-page__title">Times da NBA</h1>
-      <p class="teams-page__subtitle">Encontre e explore times da NBA</p>
-    </div>
+    <!-- Ultra-compact Navigation Bar (Glass) -->
+    <div class="teams-navbar">
 
-    <!-- Filters Bar -->
-    <div class="filters-bar">
-      <!-- Search -->
-      <div class="search-section">
-        <div class="search-input">
+      <!-- Left: Title & Identity -->
+      <div class="teams-navbar__left">
+        <h1 class="teams-navbar__title">Franquias</h1>
+        <p class="teams-navbar__subtitle">NBA Teams</p>
+      </div>
+
+      <!-- Center: Unified Search & Filters -->
+      <div class="teams-navbar__center">
+        <!-- Search -->
+        <div class="search-input-group">
           <span class="material-icons">search</span>
-          <input type="text" placeholder="Buscar times..." [value]="searchQuery()" (input)="onSearchInput($event)"
-            class="search-field">
+          <input type="text" placeholder="Buscar franquia..." [value]="searchQuery()" (input)="onSearchInput($event)">
+        </div>
+
+        <!-- Conference Pills -->
+        <div class="filter-pills">
+          <button class="pill-btn" [class.active]="selectedConference() === 'All'"
+            (click)="onConferenceSelect('All')">Todas</button>
+          <button class="pill-btn" [class.active]="selectedConference() === 'East'"
+            (click)="onConferenceSelect('East')">Leste</button>
+          <button class="pill-btn" [class.active]="selectedConference() === 'West'"
+            (click)="onConferenceSelect('West')">Oeste</button>
+        </div>
+
+        <!-- Division Select Box -->
+        <div class="filter-select-group">
+          <select [value]="selectedDivision()" (change)="onDivisionSelect($event)">
+            <option value="All">Divisões: Todas</option>
+            @for (division of availableDivisions; track division) {
+            <option [value]="division">{{ division }}</option>
+            }
+          </select>
         </div>
       </div>
 
-      <!-- Conference Filter -->
-      <div class="filter-section">
-        <label class="filter-label">Conferência:</label>
-        <select [value]="selectedConference()" (change)="onConferenceSelect($event)" class="filter-select">
-          <option value="All">Todas</option>
-          <option value="East">Leste</option>
-          <option value="West">Oeste</option>
-        </select>
+      <!-- Right: Sync & View Toggles -->
+      <div class="teams-navbar__right">
+
+        <!-- View Toggle -->
+        <div class="view-toggle">
+          <button class="view-btn" [class.active]="viewMode() === 'grid'" (click)="onViewModeChange('grid')"
+            title="Grade">
+            <span class="material-icons">grid_view</span>
+          </button>
+          <button class="view-btn" [class.active]="viewMode() === 'list'" (click)="onViewModeChange('list')"
+            title="Lista">
+            <span class="material-icons">view_list</span>
+          </button>
+          <button class="view-btn" [class.active]="viewMode() === 'divisions'" (click)="onViewModeChange('divisions')"
+            title="Divisões">
+            <span class="material-icons">category</span>
+          </button>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn btn--secondary btn--icon-only" (click)="refreshTeams()"
+            [disabled]="teamsService.isLoading()" title="Atualizar Tela">
+            <span class="material-icons" [class.rotating]="teamsService.isLoading()">refresh</span>
+          </button>
+          <button class="btn btn--primary btn--compact" (click)="syncTeams()" [disabled]="teamsService.isLoading()">
+            <span class="material-icons">sync</span>
+            <span class="btn-text">Sincronizar</span>
+          </button>
+        </div>
       </div>
 
-      <!-- Division Filter -->
-      <div class="filter-section">
-        <label class="filter-label">Divisão:</label>
-        <select [value]="selectedDivision()" (change)="onDivisionSelect($event)" class="filter-select">
-          <option value="All">Todas</option>
-          @for (division of availableDivisions; track division) {
-          <option [value]="division">{{ division }}</option>
-          }
-        </select>
-      </div>
+    </div> <!-- /teams-navbar -->
 
-      <!-- Sort -->
-      <div class="filter-section">
-        <label class="filter-label">Ordenar:</label>
-        <select [value]="sortBy()" (change)="onSortSelect($event)" class="filter-select">
-          <option value="name">Nome</option>
-          <option value="conference">Conferência</option>
-          <option value="division">Divisão</option>
-        </select>
-      </div>
-
-      <!-- Clear Filters -->
+    <!-- Status & Helpers -->
+    <div class="teams-helpers-bar">
       @if (hasActiveFilters) {
-      <button class="btn btn--ghost btn--sm" (click)="clearFilters()">
-        <span class="material-icons">clear</span>
-        Limpar
-      </button>
+      <button class="btn-clear-filters" (click)="clearFilters()">Limpar Filtros ✕</button>
       }
-    </div>
-
-    <!-- View Mode Toggle -->
-    <div class="view-controls">
-      <div class="view-modes">
-        <button class="view-mode-btn" [class.view-mode-btn--active]="viewMode() === 'grid'"
-          (click)="onViewModeChange('grid')">
-          <span class="material-icons">grid_view</span>
-          Grade
-        </button>
-        <button class="view-mode-btn" [class.view-mode-btn--active]="viewMode() === 'list'"
-          (click)="onViewModeChange('list')">
-          <span class="material-icons">view_list</span>
-          Lista
-        </button>
-        <button class="view-mode-btn" [class.view-mode-btn--active]="viewMode() === 'divisions'"
-          (click)="onViewModeChange('divisions')">
-          <span class="material-icons">category</span>
-          Divisões
-        </button>
-      </div>
-
-      <div class="results-summary">
-        <span>{{ getFilterSummary() }}</span>
-      </div>
-    </div>
-
-    <!-- Actions Bar -->
-    <div class="actions-bar">
-      <div class="actions-bar__info">
-        @if (teamsService.lastUpdate(); as lastUpdate) {
-        <span class="last-update">
-          Atualizado: {{ lastUpdate.toLocaleDateString('pt-BR') }} às {{ lastUpdate.toLocaleTimeString('pt-BR') }}
-        </span>
-        }
-      </div>
-
-      <div class="actions-bar__buttons">
-        <button class="btn btn--secondary" (click)="refreshTeams()" [disabled]="teamsService.isLoading()">
-          <span class="material-icons">refresh</span>
-          Atualizar
-        </button>
-
-        <button class="btn btn--primary" (click)="syncTeams()" [disabled]="teamsService.isLoading()">
-          <span class="material-icons">sync</span>
-          Sincronizar
-        </button>
-      </div>
+      <span class="results-summary">{{ getFilterSummary() }}</span>
+      <span class="spacer"></span>
+      @if (teamsService.lastUpdate(); as lastUpdate) {
+      <span class="last-update-text">Atualizado: {{ lastUpdate.toLocaleTimeString('pt-BR') }}</span>
+      }
     </div>
 
     <!-- Loading State -->
     @if (teamsService.isLoading()) {
     <div class="teams-grid">
-      @for (i of [1,2,3,4,5,6]; track i) {
+      @for (i of [1,2,3,4,5,6,7,8]; track i) {
       <div class="team-card skeleton-card">
         <div class="team-card__header">
           <app-skeleton-loader variant="circle" width="48px" height="48px"></app-skeleton-loader>
@@ -125,15 +103,27 @@
 
     <!-- Error State -->
     @if (teamsService.error(); as error) {
-    <app-error-view title="Erro ao carregar equipes" [message]="error" (retry)="refreshTeams()">
+    <app-error-view title="Erro ao carregar franquias" [message]="error" (retry)="refreshTeams()">
     </app-error-view>
     }
 
     <!-- Teams Content -->
     @if (!teamsService.isLoading() && !teamsService.error()) {
 
+    <!-- Empty State -->
+    @if (getFilteredTeams().length === 0) {
+    <div class="empty-state">
+      <span class="material-icons">search_off</span>
+      <h3>Nenhuma franquia encontrada</h3>
+      <p>Tente ajustar os filtros ou os termos da busca.</p>
+      <button class="btn btn--primary" (click)="clearFilters()">
+        Recarregar Times
+      </button>
+    </div>
+    }
+
     <!-- Grid View -->
-    @if (viewMode() === 'grid') {
+    @if (viewMode() === 'grid' && getFilteredTeams().length > 0) {
     <div class="teams-grid">
       @for (team of getFilteredTeams(); track trackByTeamId($index, team)) {
       <div class="team-card" (click)="selectTeam(team)">
@@ -168,23 +158,29 @@
     }
 
     <!-- List View -->
-    @if (viewMode() === 'list') {
+    @if (viewMode() === 'list' && getFilteredTeams().length > 0) {
     <div class="teams-list">
       @for (team of getFilteredTeams(); track trackByTeamId($index, team)) {
-      <div class="team-list-item" (click)="selectTeam(team)">
-        <div class="team-list-item__logo">
+      <div class="team-card-list" (click)="selectTeam(team)">
+        <div class="team-logo">
           <img [src]="getTeamLogoUrl(team.abbreviation)" [alt]="team.name + ' logo'" class="team-logo__image"
             (error)="handleLogoError($event, team.abbreviation)" loading="lazy">
         </div>
 
-        <div class="team-list-item__info">
+        <div class="team-info-group">
           <h3 class="team-name">{{ getTeamDisplayName(team) }}</h3>
           <p class="team-details">{{ team.division }} Division • {{ team.conference }} Conference</p>
         </div>
 
-        <div class="team-list-item__meta">
+        <div class="team-meta-group">
           <span class="team-abbreviation">{{ team.abbreviation }}</span>
-          <span class="material-icons">chevron_right</span>
+          <button class="favorite-btn" [class.favorite-btn--active]="preferencesStore.isFavoriteTeam(team.id)"
+            (click)="$event.stopPropagation(); preferencesStore.toggleFavoriteTeam(team.id)">
+            <span class="material-icons">
+              {{ preferencesStore.isFavoriteTeam(team.id) ? 'favorite' : 'favorite_border' }}
+            </span>
+          </button>
+          <span class="material-icons nav-icon">chevron_right</span>
         </div>
       </div>
       }
@@ -192,7 +188,7 @@
     }
 
     <!-- Divisions View -->
-    @if (viewMode() === 'divisions') {
+    @if (viewMode() === 'divisions' && getFilteredTeams().length > 0) {
     <div class="divisions-view">
       @for (divisionEntry of getTeamsByDivisionArray(); track divisionEntry.key) {
       <div class="division-section">
@@ -203,7 +199,7 @@
 
         <div class="division-teams">
           @for (team of divisionEntry.value; track trackByTeamId($index, team)) {
-          <div class="division-team" (click)="selectTeam(team)">
+          <div class="team-card-mini" (click)="selectTeam(team)">
             <div class="team-logo team-logo--small">
               <img [src]="getTeamLogoUrl(team.abbreviation)" [alt]="team.name + ' logo'" class="team-logo__image"
                 (error)="handleLogoError($event, team.abbreviation)" loading="lazy">
@@ -220,18 +216,6 @@
         </div>
       </div>
       }
-    </div>
-    }
-
-    <!-- Empty State -->
-    @if (getFilteredTeams().length === 0) {
-    <div class="empty-state">
-      <span class="material-icons">search_off</span>
-      <h3>Nenhum time encontrado</h3>
-      <p>Tente ajustar os filtros ou termos de busca.</p>
-      <button class="btn btn--primary" (click)="clearFilters()">
-        Limpar Filtros
-      </button>
     </div>
     }
     }
