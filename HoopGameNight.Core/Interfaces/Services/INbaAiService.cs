@@ -7,5 +7,6 @@ namespace HoopGameNight.Core.Interfaces.Services
     public interface INbaAiService
     {
         Task<AskResponse> AskAsync(AskRequest request);
+        Task<AskResponse> GetGameSummaryAsync(int gameId);
     }
 }

@@ -11,6 +11,7 @@
         public string ConferenceDisplay { get; set; } = string.Empty;
         public string Division { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
+        public string LogoUrl { get; set; } = string.Empty;
     }
 
     public class TeamSummaryResponse
@@ -20,5 +21,6 @@
         public string Abbreviation { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
+        public string LogoUrl { get; set; } = string.Empty;
     }
 }

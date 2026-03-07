@@ -3,14 +3,17 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { StatsService } from '../../../core/services/stats.service';
 import { GamesService } from '../../../core/services/games.service';
+import { AskApiService } from '../../../core/services/ask-api.service';
 import { SEOService } from '../../../core/services/seo.service';
 import { SkeletonLoader } from '../../../shared/components/skeleton-loader/skeleton-loader';
 import { ErrorView } from '../../../shared/components/error-view/error-view';
+import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
+import { marked } from 'marked';
 
 @Component({
     selector: 'app-game-details',
     standalone: true,
-    imports: [CommonModule, RouterModule, SkeletonLoader, ErrorView],
+    imports: [CommonModule, RouterModule, SkeletonLoader, ErrorView, SafeHtmlPipe],
     templateUrl: './game-details.html',
     styleUrl: './game-details.scss',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -20,10 +23,19 @@ export class GameDetails implements OnInit, OnDestroy {
     public readonly router = inject(Router);
     protected readonly statsService = inject(StatsService);
     protected readonly gamesService = inject(GamesService);
+    private readonly askService = inject(AskApiService);
     private readonly seoService = inject(SEOService);
 
     private readonly _gameId = signal<number | null>(null);
     protected readonly activeTab = signal<'boxscore' | 'summary'>('boxscore');
+    protected readonly gameSummary = signal<string | null>(null);
+    protected readonly isLoadingSummary = signal<boolean>(false);
+
+    protected readonly gameSummaryHtml = computed(() => {
+        const summary = this.gameSummary();
+        // marcado v4+ pode retornar Promise se não configurado. Forçando síncrono.
+        return summary ? (marked.parse(summary, { async: false }) as string) : '';
+    });
 
     constructor() { }
 
@@ -55,8 +67,28 @@ export class GameDetails implements OnInit, OnDestroy {
         }
     }
 
-    setTab(tab: 'boxscore' | 'summary'): void {
+    async setTab(tab: 'boxscore' | 'summary'): Promise<void> {
         this.activeTab.set(tab);
+
+        if (tab === 'summary' && !this.gameSummary()) {
+            await this.loadGameSummary();
+        }
+    }
+
+    private async loadGameSummary(): Promise<void> {
+        const id = this._gameId();
+        if (!id) return;
+
+        this.isLoadingSummary.set(true);
+        try {
+            const response = await this.askService.getGameSummary(id);
+            this.gameSummary.set(response.answer);
+        } catch (error) {
+            console.error('Erro ao carregar resumo IA:', error);
+            this.gameSummary.set('Não foi possível gerar o resumo automático para este jogo no momento.');
+        } finally {
+            this.isLoadingSummary.set(false);
+        }
     }
 
     goBack(): void {

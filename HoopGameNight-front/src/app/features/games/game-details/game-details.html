@@ -244,11 +244,35 @@
     }
     } @else {
     <!-- Summary Content -->
-    <div class="summary-container shadow-sm">
+    <div class="summary-container shadow-sm animate-fade-in">
+        @if (isLoadingSummary()) {
+        <div class="ai-loading-state">
+            <div class="ai-pulse-icon">
+                <span class="material-icons">auto_awesome</span>
+            </div>
+            <p>O Coach Assistant está analisando o boxscore...</p>
+            <app-skeleton-loader width="100%" height="20px" className="mb-2"></app-skeleton-loader>
+            <app-skeleton-loader width="90%" height="20px" className="mb-2"></app-skeleton-loader>
+            <app-skeleton-loader width="70%" height="20px"></app-skeleton-loader>
+        </div>
+        } @else if (gameSummary()) {
+        <div class="ai-response-premium">
+            <div class="ai-response-header">
+                <span class="material-icons">auto_awesome</span>
+                <span>Análise do Coach Assistant</span>
+            </div>
+            <div class="ai-content-body" [innerHTML]="gameSummaryHtml() | safeHtml">
+            </div>
+            <div class="ai-footer">
+                *Análise baseada em dados oficiais da ESPN.
+            </div>
+        </div>
+        } @else {
         <div class="placeholder-content">
             <span class="material-icons">description</span>
             <p>Resumo detalhado gerado por IA em breve...</p>
         </div>
+        }
     </div>
     }
     }

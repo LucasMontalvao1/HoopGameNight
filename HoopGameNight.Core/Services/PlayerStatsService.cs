@@ -70,8 +70,13 @@ namespace HoopGameNight.Core.Services
              
              if (stats == null)
              {
-                 _logger.LogInformation("Stats da temporada não encontrados no banco. Enfileirando Sync para Player {PlayerId} Season {Season}", playerId, season);
-                 _syncQueue.EnqueuePriorityPlayerSync(playerId);
+                 var syncLockKey = $"sync_lock_player_{playerId}";
+                 if (!_cache.TryGetValue(syncLockKey, out _))
+                 {
+                     _logger.LogInformation("Stats da temporada não encontrados no banco. Enfileirando Sync para Player {PlayerId} Season {Season}", playerId, season);
+                     _cache.Set(syncLockKey, true, TimeSpan.FromMinutes(5));
+                     _syncQueue.EnqueuePriorityPlayerSync(playerId);
+                 }
                  return null; 
              }
 
@@ -87,8 +92,13 @@ namespace HoopGameNight.Core.Services
             var stats = await _statsRepository.GetPlayerGameStatsDetailedAsync(playerId, gameId);
             if (stats == null)
             {
-               _logger.LogInformation("Stats do jogo não encontrados no banco. Enfileirando Sync para Player {PlayerId} Game {GameId}", playerId, gameId);
-               _syncQueue.EnqueuePriorityPlayerSync(playerId);
+               var syncLockKey = $"sync_lock_player_{playerId}";
+               if (!_cache.TryGetValue(syncLockKey, out _))
+               {
+                   _logger.LogInformation("Stats do jogo não encontrados no banco. Enfileirando Sync para Player {PlayerId} Game {GameId}", playerId, gameId);
+                   _cache.Set(syncLockKey, true, TimeSpan.FromMinutes(5));
+                   _syncQueue.EnqueuePriorityPlayerSync(playerId);
+               }
                return null;
             }
             if(stats != null) _cache.Set(cacheKey, stats, TimeSpan.FromMinutes(CACHE_MINUTES));
@@ -328,8 +338,13 @@ namespace HoopGameNight.Core.Services
             var stats = await _statsRepository.GetPlayerRecentGamesDetailedAsync(playerId, limit);
             if (stats == null || !stats.Any())
             {
-                _logger.LogInformation("Nenhum dado recente no banco para Player {PlayerId}. Enfileirando Sync...", playerId);
-                _syncQueue.EnqueuePriorityPlayerSync(playerId);
+                var syncLockKey = $"sync_lock_player_{playerId}";
+                if (!_cache.TryGetValue(syncLockKey, out _))
+                {
+                    _logger.LogInformation("Nenhum dado recente no banco para Player {PlayerId}. Enfileirando Sync...", playerId);
+                    _cache.Set(syncLockKey, true, TimeSpan.FromMinutes(5));
+                    _syncQueue.EnqueuePriorityPlayerSync(playerId);
+                }
                 return null;
             }
 
@@ -338,8 +353,13 @@ namespace HoopGameNight.Core.Services
                 var lastSync = await _statsRepository.GetLastSyncDateForPlayerAsync(playerId);
                 if (!lastSync.HasValue || lastSync.Value.Date < DateTime.Now.Date)
                 {
-                    _logger.LogInformation("Poucos jogos no banco para Player {PlayerId} ({Count}/{Limit}). Enfileirando Sync prioritário...", playerId, stats.Count(), limit);
-                    _syncQueue.EnqueuePriorityPlayerSync(playerId);
+                    var syncLockKey = $"sync_lock_player_{playerId}";
+                    if (!_cache.TryGetValue(syncLockKey, out _))
+                    {
+                        _logger.LogInformation("Poucos jogos no banco para Player {PlayerId} ({Count}/{Limit}). Enfileirando Sync prioritário...", playerId, stats.Count(), limit);
+                        _cache.Set(syncLockKey, true, TimeSpan.FromMinutes(5));
+                        _syncQueue.EnqueuePriorityPlayerSync(playerId);
+                    }
                 }
             }
 

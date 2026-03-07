@@ -334,48 +334,21 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
         private async Task<T?> GetAsync<T>(string url, string context) where T : class
         {
-            int maxRetries = 3;
-            int delayMs = 2000;
-
-            for (int i = 0; i < maxRetries; i++)
+            try
             {
-                try
-                {
-                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
-                    
-                    var response = await _httpClient.GetAsync(url, cts.Token);
-                    if (!response.IsSuccessStatusCode) return null;
-                    
-                    var json = await response.Content.ReadAsStringAsync(cts.Token);
-                    return JsonSerializer.Deserialize<T>(json, JsonOptions);
-                }
-                catch (System.Net.Http.HttpRequestException ex)
-                {
-                    _logger.LogWarning("Network error fetching {Context}. Retry {Retry}/{MaxRetries}. Exception: {Message}", context, i + 1, maxRetries, ex.Message);
-                    if (i == maxRetries - 1)
-                    {
-                        _logger.LogError(ex, "Max retries reached. Error fetching {Context}", context);
-                        return null;
-                    }
-                    await Task.Delay(delayMs * (i + 1)); 
-                }
-                catch (TaskCanceledException ex)
-                {
-                    _logger.LogWarning("Timeout fetching {Context}. Retry {Retry}/{MaxRetries}. Exception: {Message}", context, i + 1, maxRetries, ex.Message);
-                    if (i == maxRetries - 1)
-                    {
-                        _logger.LogError(ex, "Max timeouts reached. Error fetching {Context}", context);
-                        return null;
-                    }
-                    await Task.Delay(delayMs * (i + 1)); 
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error fetching {Context}", context);
-                    return null;
-                }
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                
+                var response = await _httpClient.GetAsync(url, cts.Token);
+                if (!response.IsSuccessStatusCode) return null;
+                
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
+                return JsonSerializer.Deserialize<T>(json, JsonOptions);
             }
-            return null;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching {Context}", context);
+                return null;
+            }
         }
 
         private async Task<T?> GetWithCacheAsync<T>(string url, string cacheKey, TimeSpan ttl) where T : class

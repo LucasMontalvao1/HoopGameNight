@@ -10,7 +10,19 @@ import { APP_CONSTANTS } from '../constants/app.constants';
     providedIn: 'root'
 })
 export class AskApiService {
-    private readonly http = inject(HttpClient);
+    constructor(private readonly http: HttpClient) { }
+
+    // GET /api/v1/ask/game/{gameId}
+    async getGameSummary(gameId: number): Promise<AskResponse> {
+        const url = `${this.baseUrl}/game/${gameId}`;
+
+        const response = await firstValueFrom(
+            this.http.get<ApiResponse<AskResponse>>(url)
+                .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+        );
+
+        return response.data;
+    }
     private readonly baseUrl = `${environment.apiUrl}/api/v1/Ask`;
 
     async ask(question: string): Promise<AskResponse> {

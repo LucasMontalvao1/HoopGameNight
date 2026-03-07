@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text.Json;
+using HoopGameNight.Core.Extensions;
 
 namespace HoopGameNight.Core.Services
 {
@@ -533,13 +534,15 @@ namespace HoopGameNight.Core.Services
                     {
                         Id = homeTeam.Id,
                         Name = homeTeam.Name,
-                        Abbreviation = homeTeam.Abbreviation
+                        Abbreviation = homeTeam.Abbreviation,
+                        LogoUrl = TeamExtensions.GetTeamLogoUrl(homeTeam.Abbreviation)
                     },
                     VisitorTeam = new TeamSummaryResponse
                     {
                         Id = awayTeam.Id,
                         Name = awayTeam.Name,
-                        Abbreviation = awayTeam.Abbreviation
+                        Abbreviation = awayTeam.Abbreviation,
+                        LogoUrl = TeamExtensions.GetTeamLogoUrl(awayTeam.Abbreviation)
                     },
                     HomeTeamScore = eg.HomeTeamScore,
                     VisitorTeamScore = eg.AwayTeamScore,
