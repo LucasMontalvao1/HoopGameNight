@@ -33,15 +33,15 @@
 
     .hero-back-btn {
         position: absolute;
-        top: var(--spacing-lg);
+        bottom: var(--spacing-lg);
         left: var(--spacing-lg);
         z-index: 10;
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: var(--text-primary);
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -270,6 +270,97 @@
     gap: var(--spacing-2xl);
 }
 
+// Grid das duas tabelas de jogadores
+.boxscore-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+// Card de comparação lado a lado
+.team-comparison-card {
+    padding: var(--spacing-md) var(--spacing-xl);
+    border: 1px solid var(--border-primary);
+
+    .comp-rows {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .comp-row {
+        display: grid;
+        grid-template-columns: 1fr 80px 1fr;
+        align-items: center;
+        padding: 8px var(--spacing-sm);
+        border-bottom: 1px solid var(--border-primary);
+        transition: background 0.15s ease;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        &:hover {
+            background: var(--surface-tertiary);
+        }
+
+        // Linha de cabeçalho com siglas clicáveis
+        &.comp-header {
+            border-bottom: 2px solid var(--border-primary);
+            padding-bottom: 12px;
+            margin-bottom: 2px;
+
+            .comp-val {
+                font-size: 0.9rem;
+                font-weight: 950;
+                color: var(--accent-primary);
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                cursor: pointer;
+                transition: opacity 0.2s ease;
+
+                &:hover {
+                    opacity: 0.7;
+                }
+            }
+
+            .comp-label {
+                visibility: hidden;
+            }
+        }
+
+        .comp-label {
+            text-align: center;
+            font-size: 0.6rem;
+            font-weight: 900;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .comp-val {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+
+            &.vis {
+                text-align: right;
+                padding-right: var(--spacing-md);
+            }
+
+            &.home {
+                text-align: left;
+                padding-left: var(--spacing-md);
+            }
+        }
+    }
+
+    @media (max-width: 640px) {
+        .comp-row {
+            grid-template-columns: 1fr 60px 1fr;
+        }
+    }
+}
+
 .team-boxscore {
     padding: var(--spacing-xl);
 }
@@ -452,8 +543,8 @@
     &::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.15);
         border-radius: 8px;
-        border: 2px solid transparent; // Adds inner spacing
-        background-clip: padding-box; // Ensures border acts as padding
+        border: 2px solid transparent; 
+        background-clip: padding-box; 
 
         &:hover {
             background-color: var(--accent-primary-alpha);
@@ -530,8 +621,7 @@
         color: var(--text-primary);
         font-family: 'Inter', sans-serif;
         font-weight: 400;
-        display: block; // Ensure it behaves as a block
-        // Honor AI line breaks for non-parsed blocks
+        display: block; 
         white-space: pre-line;
 
         h2 {
@@ -543,13 +633,13 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            display: block; // Counter pre-line if needed
+            display: block; 
             white-space: normal;
         }
 
         p {
             margin-bottom: var(--spacing-md);
-            white-space: normal; // Reset for paragraphs
+            white-space: normal; 
         }
 
         hr {
@@ -563,7 +653,7 @@
         ul {
             padding-left: var(--spacing-xl);
             margin: var(--spacing-lg) 0;
-            list-style-type: disc; // Ensure bullets show
+            list-style-type: disc; 
             white-space: normal;
 
             li {
@@ -589,12 +679,12 @@
             th {
                 background: var(--surface-tertiary);
                 padding: 12px;
-                text-align: center; // Center for better balance
+                text-align: center; 
                 font-weight: 800;
                 font-size: 0.75rem;
                 text-transform: uppercase;
                 letter-spacing: 1px;
-                color: var(--text-primary); // Higher contrast
+                color: var(--text-primary); 
                 border-bottom: 2px solid var(--border-primary);
 
                 &:first-child {
@@ -674,5 +764,155 @@
         font-size: 48px;
         margin-bottom: var(--spacing-md);
         opacity: 0.3;
+    }
+}
+
+// ===== TOTALS SUMMARY CARD =====
+.totals-summary-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    gap: var(--spacing-xl);
+    border-radius: var(--border-radius-xl);
+    border: 1px solid var(--border-primary);
+    @include glass;
+
+    .summary-team {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+
+        &:hover {
+            transform: translateY(-2px);
+        }
+
+        .summary-logo {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+        }
+
+        .summary-info {
+            display: flex;
+            flex-direction: column;
+
+            .abbr {
+                font-size: 0.7rem;
+                font-weight: 800;
+                color: var(--text-tertiary);
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            .val {
+                font-size: 1.6rem;
+                font-weight: 950;
+                color: var(--text-primary);
+                line-height: 1;
+            }
+        }
+
+        &.home .summary-info {
+            text-align: right;
+        }
+    }
+
+    .summary-divider {
+        font-weight: 900;
+        font-size: 0.7rem;
+        color: var(--text-tertiary);
+        opacity: 0.4;
+        letter-spacing: 2px;
+    }
+
+    .key-totals-row {
+        display: flex;
+        gap: var(--spacing-2xl);
+        padding-left: var(--spacing-xl);
+        border-left: 1px solid var(--border-primary);
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+
+            .label {
+                font-size: 0.6rem;
+                font-weight: 800;
+                color: var(--text-tertiary);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+
+            .values {
+                font-size: 0.85rem;
+                font-weight: 900;
+                color: var(--text-secondary);
+                white-space: nowrap;
+            }
+        }
+    }
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        align-items: stretch;
+
+        .summary-divider {
+            display: none;
+        }
+
+        .key-totals-row {
+            border-left: none;
+            border-top: 1px solid var(--border-primary);
+            padding-left: 0;
+            padding-top: var(--spacing-md);
+            justify-content: space-around;
+        }
+    }
+}
+
+// ===== SORTABLE TH =====
+th.sortable {
+    cursor: pointer !important;
+    transition: background 0.2s ease, color 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+
+    &:hover {
+        background: var(--surface-secondary) !important;
+        color: var(--accent-primary) !important;
+    }
+
+    .sort-icon {
+        font-size: 14px;
+        vertical-align: middle;
+        color: var(--accent-primary);
+        line-height: 1;
+    }
+}
+
+// ===== LINHA DE TOTAIS DO TIME =====
+.team-totals-row {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-top: 2px solid var(--border-primary) !important;
+
+    td {
+        font-weight: 800 !important;
+        color: var(--text-primary) !important;
+        padding-top: 12px !important;
+        padding-bottom: 12px !important;
+        border-bottom: none !important;
+    }
+
+    .totals-label {
+        color: var(--accent-primary) !important;
+        font-size: 0.7rem !important;
+        letter-spacing: 1px !important;
+        text-transform: uppercase !important;
     }
 }

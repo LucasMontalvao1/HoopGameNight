@@ -8,7 +8,8 @@ import {
   ApiResponse,
   PaginatedResponse,
   PlayerResponse,
-  SearchPlayerRequest
+  SearchPlayerRequest,
+  StatLeadersResponse
 } from '../interfaces/api.interface';
 import { APP_CONSTANTS } from '../constants/app.constants';
 
@@ -18,7 +19,7 @@ import { APP_CONSTANTS } from '../constants/app.constants';
 export class PlayersApiService {
   private readonly baseUrl = `${environment.apiUrl}/api/v1/players`;
 
-  constructor(private readonly http: HttpClient) {}
+  constructor(private readonly http: HttpClient) { }
 
   // GET /api/v1/players/search
   async searchPlayers(request: SearchPlayerRequest): Promise<PaginatedResponse<PlayerResponse>> {
@@ -99,5 +100,31 @@ export class PlayersApiService {
     );
 
     return response;
+  }
+
+  // GET /api/v1/playerstats/leaders
+  async getLeagueLeaders(season: number = 2024): Promise<StatLeadersResponse> {
+    const url = `${environment.apiUrl}/api/v1/playerstats/leaders?season=${season}`;
+
+    const response = await firstValueFrom(
+      this.http.get<ApiResponse<StatLeadersResponse>>(url)
+        .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+    );
+
+    return response.data;
+  }
+
+  // GET /api/v1/players/batch?ids=1,2,3
+  async getPlayersByIds(ids: number[]): Promise<PlayerResponse[]> {
+    if (!ids || ids.length === 0) return [];
+
+    const url = `${this.baseUrl}/batch?ids=${ids.join(',')}`;
+
+    const response = await firstValueFrom(
+      this.http.get<ApiResponse<PlayerResponse[]>>(url)
+        .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+    );
+
+    return response.data;
   }
 }

@@ -209,6 +209,7 @@ namespace HoopGameNight.Core.DTOs.Response
     {
         public int Rank { get; set; }
         public int PlayerId { get; set; }
+        public int? ExternalId { get; set; }
         public string PlayerName { get; set; } = string.Empty;
         public string Team { get; set; } = string.Empty;
         public decimal Value { get; set; }

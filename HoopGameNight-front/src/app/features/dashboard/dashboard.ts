@@ -14,11 +14,12 @@ import { PreferencesStore } from '../../core/services/preferences.store';
 import { AssistantService } from '../../core/services/assistant.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
 import { ApiStatus, PlayerResponse } from '../../core/interfaces/api.interface';
+import { LeagueLeadersComponent } from '../players/league-leaders/league-leaders.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule],
+  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule, LeagueLeadersComponent],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -27,7 +28,6 @@ export class Dashboard implements OnInit {
   readonly ApiStatusEnum = ApiStatus;
   protected selectedDateOption: string = 'today';
 
-  // Player search
   protected playerSearchQuery = signal<string>('');
   protected playerSearchResults = signal<PlayerResponse[]>([]);
   protected isSearchingPlayers = signal<boolean>(false);
@@ -36,6 +36,10 @@ export class Dashboard implements OnInit {
   protected readonly favoriteTeams = computed(() => {
     const favoriteIds = this.preferencesStore.favoriteTeamIds();
     return this.teamsService.allTeams().filter(t => favoriteIds.includes(t.id));
+  });
+
+  protected readonly favoritePlayers = computed(() => {
+    return this.playersService.favoritePlayers();
   });
 
   private destroy$ = new Subject<void>();

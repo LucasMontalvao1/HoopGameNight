@@ -1,0 +1,168 @@
+.league-leaders {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    height: 100%;
+    padding: var(--spacing-lg);
+
+    &__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border-primary);
+        padding-bottom: var(--spacing-md);
+
+        .title-group {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+
+            .icon-gold {
+                color: #f59e0b;
+                font-size: 24px;
+            }
+
+            h3 {
+                font-size: var(--font-size-lg);
+                margin: 0;
+            }
+        }
+
+        .tab-group {
+            display: flex;
+            background: var(--background-tertiary);
+            padding: 4px;
+            border-radius: var(--border-radius-md);
+            gap: 2px;
+
+            button {
+                border: none;
+                background: transparent;
+                color: var(--text-secondary);
+                font-size: 11px;
+                font-weight: 700;
+                padding: 6px 10px;
+                border-radius: var(--border-radius-sm);
+                cursor: pointer;
+                transition: all var(--transition-fast);
+
+                &.active {
+                    background: var(--surface-primary);
+                    color: var(--accent-primary);
+                    box-shadow: var(--shadow-sm);
+                }
+
+                &:hover:not(.active) {
+                    color: var(--text-primary);
+                }
+            }
+        }
+    }
+
+    &__body {
+        flex: 1;
+        overflow-y: auto;
+    }
+}
+
+.leaders-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.leader-item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius-lg);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    gap: var(--spacing-md);
+
+    &:hover {
+        background: var(--surface-secondary);
+        transform: translateX(4px);
+    }
+
+    &__rank {
+        font-size: var(--font-size-sm);
+        font-weight: 900;
+        color: var(--text-tertiary);
+        width: 20px;
+        text-align: center;
+    }
+
+    .player-info {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-md);
+        flex: 1;
+
+        .player-photo {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--border-radius-full);
+            background: var(--background-tertiary);
+            object-fit: cover;
+            border: 1px solid var(--border-primary);
+        }
+
+        .player-meta {
+            display: flex;
+            flex-direction: column;
+
+            .player-name {
+                font-size: var(--font-size-sm);
+                font-weight: 700;
+                color: var(--text-primary);
+                line-height: 1.2;
+            }
+
+            .player-team {
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+        }
+    }
+
+    &__value {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+
+        .val {
+            font-family: var(--font-family-display);
+            font-size: var(--font-size-lg);
+            font-weight: 900;
+            color: var(--accent-primary);
+            line-height: 1;
+        }
+
+        .unit {
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-tertiary);
+            letter-spacing: 0.05em;
+        }
+    }
+}
+
+.skeleton-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-xl);
+    color: var(--text-tertiary);
+    font-size: var(--font-size-sm);
+}

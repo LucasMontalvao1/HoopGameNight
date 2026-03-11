@@ -1,0 +1,48 @@
+<div class="league-leaders glass-panel animate-fade-in">
+    <div class="league-leaders__header">
+        <div class="title-group">
+            <span class="material-icons icon-gold">military_tech</span>
+            <h3>Líderes da Temporada</h3>
+        </div>
+
+        <div class="tab-group">
+            <button [class.active]="activeTab() === 'pts'" (click)="setTab('pts')">PTS</button>
+            <button [class.active]="activeTab() === 'reb'" (click)="setTab('reb')">REB</button>
+            <button [class.active]="activeTab() === 'ast'" (click)="setTab('ast')">AST</button>
+        </div>
+    </div>
+
+    <div class="league-leaders__body">
+        @if (isLoading()) {
+        <div class="skeleton-container">
+            @for (i of [1,2,3,4,5]; track i) {
+            <div class="skeleton-row">
+                <div class="skeleton skeleton--circle" style="width: 32px; height: 32px"></div>
+                <div class="skeleton skeleton--text" style="width: 60%"></div>
+            </div>
+            }
+        </div>
+        } @else {
+        <div class="leaders-list">
+            @for (leader of getLeadersByTab(); track leader.playerId + '-' + leader.rank) {
+            <div class="leader-item" [routerLink]="['/players', leader.playerId]">
+                <div class="leader-item__rank">{{ leader.rank }}</div>
+                <div class="player-info">
+                    <img [src]="getPlayerPhoto(leader)" class="player-photo">
+                    <div class="player-meta">
+                        <span class="player-name">{{ leader.playerName }}</span>
+                        <span class="player-team">{{ leader.team }}</span>
+                    </div>
+                </div>
+                <div class="leader-item__value">
+                    <span class="val">{{ leader.value | number:'1.1-1' }}</span>
+                    <span class="unit">{{ activeTab().toUpperCase() }}</span>
+                </div>
+            </div>
+            } @empty {
+            <div class="empty-state">Nenhum dado disponível</div>
+            }
+        </div>
+        }
+    </div>
+</div>

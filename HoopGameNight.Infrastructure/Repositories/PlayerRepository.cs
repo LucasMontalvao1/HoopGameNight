@@ -111,6 +111,26 @@ namespace HoopGameNight.Infrastructure.Repositories
             return (players, totalCount);
         }
 
+        public async Task<IEnumerable<Player>> GetByIdsAsync(IEnumerable<int> ids)
+        {
+            if (ids == null || !ids.Any()) return Enumerable.Empty<Player>();
+
+            Logger.LogDebug("Getting players by IDs: {Ids}", string.Join(",", ids));
+
+            var sql = @"
+                SELECT 
+                    p.id, p.external_id AS ExternalId, p.nba_stats_id AS NbaStatsId, p.espn_id AS EspnId,
+                    p.first_name AS FirstName, p.last_name AS LastName, p.position,
+                    p.height_feet AS HeightFeet, p.height_inches AS HeightInches, p.weight_pounds AS WeightPounds,
+                    p.team_id AS TeamId, p.created_at AS CreatedAt, p.updated_at AS UpdatedAt
+                FROM players p 
+                WHERE p.id IN @Ids";
+
+            var players = await ExecuteQueryWithTeamAsync(sql, new { Ids = ids });
+            Logger.LogDebug("Found {Count} players for the provided IDs", players.Count());
+            return players;
+        }
+
         public async Task<Player?> GetByIdAsync(int id)
         {
             Logger.LogDebug("Getting player by ID: {PlayerId}", id);
@@ -128,8 +148,9 @@ namespace HoopGameNight.Infrastructure.Repositories
             Logger.LogDebug("Getting player by external ID: {ExternalId}", externalId);
 
             var sql = await LoadSqlAsync("GetByExternalId");
-            var player = await ExecuteQuerySingleOrDefaultAsync<Player>(sql, new { ExternalId = externalId });
+            var players = await ExecuteQueryWithTeamAsync(sql, new { ExternalId = externalId });
 
+            var player = players.FirstOrDefault();
             Logger.LogDebug("Player {Found} with external ID: {ExternalId}", player != null ? "found" : "not found", externalId);
             return player;
         }
@@ -139,8 +160,9 @@ namespace HoopGameNight.Infrastructure.Repositories
             Logger.LogDebug("Getting player by ESPN ID: {EspnId}", espnId);
 
             var sql = "SELECT * FROM players WHERE espn_id = @EspnId";
-            var player = await ExecuteQuerySingleOrDefaultAsync<Player>(sql, new { EspnId = espnId });
+            var players = await ExecuteQueryWithTeamAsync(sql, new { EspnId = espnId });
 
+            var player = players.FirstOrDefault();
             Logger.LogDebug("Player {Found} with ESPN ID: {EspnId}", player != null ? "found" : "not found", espnId);
             return player;
         }

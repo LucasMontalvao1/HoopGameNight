@@ -4,6 +4,7 @@ import { StorageService } from './storage.service';
 import {
   PlayerResponse,
   SearchPlayerRequest,
+  StatLeadersResponse,
   PaginatedResponse,
   PlayerPosition
 } from '../interfaces/api.interface';
@@ -19,13 +20,15 @@ interface CacheEntry<T> {
   providedIn: 'root'
 })
 export class PlayersService {
-  // Private signals
   private readonly _searchResults = signal<PlayerResponse[]>([]);
   private readonly _featuredPlayers = signal<PlayerResponse[]>([]);
   private readonly _selectedPlayer = signal<PlayerResponse | null>(null);
   private readonly _teamPlayers = signal<PlayerResponse[]>([]);
   private readonly _isLoading = signal<boolean>(false);
   private readonly _error = signal<string | null>(null);
+  private readonly _leagueLeaders = signal<StatLeadersResponse | null>(null);
+  private readonly _favoritePlayerIds = signal<number[]>([]);
+  private readonly _favoritePlayers = signal<PlayerResponse[]>([]);
   private readonly _searchQuery = signal<string>('');
   private readonly _selectedPosition = signal<string | null>(null);
   private readonly _pagination = signal<{
@@ -41,7 +44,6 @@ export class PlayersService {
   });
   private readonly _lastUpdate = signal<Date | null>(null);
 
-  // Public readonly signals
   readonly searchResults = this._searchResults.asReadonly();
   readonly featuredPlayers = this._featuredPlayers.asReadonly();
   readonly selectedPlayer = this._selectedPlayer.asReadonly();
@@ -52,8 +54,10 @@ export class PlayersService {
   readonly selectedPosition = this._selectedPosition.asReadonly();
   readonly pagination = this._pagination.asReadonly();
   readonly lastUpdate = this._lastUpdate.asReadonly();
+  readonly leagueLeaders = this._leagueLeaders.asReadonly();
+  readonly favoritePlayerIds = this._favoritePlayerIds.asReadonly();
+  readonly favoritePlayers = this._favoritePlayers.asReadonly();
 
-  // Computed signals
   readonly hasSearchResults = computed(() => this._searchResults().length > 0);
   readonly hasMorePages = computed(() => this._pagination().currentPage < this._pagination().totalPages);
   readonly hasPreviousPage = computed(() => this._pagination().currentPage > 1);
@@ -73,7 +77,6 @@ export class PlayersService {
     return groups;
   });
 
-  // Cache
   private cache = new Map<string, CacheEntry<any>>();
 
   constructor(
@@ -81,9 +84,9 @@ export class PlayersService {
     private readonly storageService: StorageService
   ) {
     this.loadFeaturedPlayersFromCache();
+    this.loadFavoritesFromStorage();
   }
 
-  // Search players
   async searchPlayers(query: string, page: number = 1, pageSize: number = 20): Promise<void> {
     if (!query || query.trim().length < 2) {
       this._error.set('Digite pelo menos 2 caracteres para buscar');
@@ -134,7 +137,6 @@ export class PlayersService {
     }
   }
 
-  // Load players by team
   async loadPlayersByTeam(teamId: number, page: number = 1, pageSize: number = 20): Promise<void> {
     this._isLoading.set(true);
     this._error.set(null);
@@ -175,7 +177,6 @@ export class PlayersService {
     }
   }
 
-  // Load players by position
   async loadPlayersByPosition(position: string, page: number = 1, pageSize: number = 20): Promise<void> {
     console.log('loadPlayersByPosition:', { position, page, pageSize });
     this._isLoading.set(true);
@@ -221,7 +222,6 @@ export class PlayersService {
     }
   }
 
-  // Load player details
   async loadPlayerById(playerId: number): Promise<void> {
     this._isLoading.set(true);
     this._error.set(null);
@@ -249,7 +249,6 @@ export class PlayersService {
     }
   }
 
-  // Load all players (no filter)
   async loadAllPlayers(page: number = 1, pageSize: number = 20): Promise<void> {
     console.log('PlayersService.loadAllPlayers - page:', page, 'pageSize:', pageSize);
     this._isLoading.set(true);
@@ -298,7 +297,6 @@ export class PlayersService {
     }
   }
 
-  // Load featured players (random sample from different teams)
   async loadFeaturedPlayers(): Promise<void> {
     this._isLoading.set(true);
     this._error.set(null);
@@ -312,7 +310,6 @@ export class PlayersService {
         return;
       }
 
-      // Load players from different positions as "featured"
       const positions = [PlayerPosition.PG, PlayerPosition.SG, PlayerPosition.SF, PlayerPosition.PF, PlayerPosition.C];
       const featured: PlayerResponse[] = [];
 
@@ -323,14 +320,12 @@ export class PlayersService {
             featured.push(...response.data);
           }
         } catch {
-          // Continue with next position
         }
       }
 
       this._featuredPlayers.set(featured);
       this.setCache(cacheKey, featured, APP_CONSTANTS.GAMES_CACHE_DURATION * 4);
 
-      // Save to storage for faster initial load
       this.storageService.setAppData('players', 'featured', featured);
     } catch (err: any) {
       console.error('Error loading featured players:', err);
@@ -340,7 +335,61 @@ export class PlayersService {
     }
   }
 
-  // Pagination
+  async loadLeagueLeaders(season: number = 2024): Promise<void> {
+    this._isLoading.set(true);
+    try {
+      const data = await this.playersApiService.getLeagueLeaders(season);
+      this._leagueLeaders.set(data);
+    } catch (err) {
+      console.error('Error loading league leaders:', err);
+    } finally {
+      this._isLoading.set(false);
+    }
+  }
+
+  isFavorite(playerId: number): boolean {
+    return this._favoritePlayerIds().includes(playerId);
+  }
+
+  async toggleFavorite(playerId: number): Promise<void> {
+    const current = [...this._favoritePlayerIds()];
+    const index = current.indexOf(playerId);
+
+    if (index === -1) {
+      current.push(playerId);
+    } else {
+      current.splice(index, 1);
+    }
+
+    this._favoritePlayerIds.set(current);
+    await this.storageService.setAppData('players', 'favorites', current);
+
+    await this.loadFavoritePlayers();
+  }
+
+  async loadFavoritePlayers(): Promise<void> {
+    const ids = this._favoritePlayerIds();
+    if (ids.length === 0) {
+      this._favoritePlayers.set([]);
+      return;
+    }
+
+    try {
+      const players = await this.playersApiService.getPlayersByIds(ids);
+      this._favoritePlayers.set(players);
+    } catch (err) {
+      console.error('Error loading favorite players:', err);
+    }
+  }
+
+  private async loadFavoritesFromStorage(): Promise<void> {
+    const favorites = await this.storageService.getAppData<number[]>('players', 'favorites');
+    if (favorites) {
+      this._favoritePlayerIds.set(favorites);
+      await this.loadFavoritePlayers();
+    }
+  }
+
   async nextPage(): Promise<void> {
     if (!this.hasMorePages()) return;
 
@@ -384,7 +433,6 @@ export class PlayersService {
     }
   }
 
-  // Clear state
   clearSearch(): void {
     this._searchResults.set([]);
     this._searchQuery.set('');
@@ -406,17 +454,14 @@ export class PlayersService {
     this._teamPlayers.set([]);
   }
 
-  // Get player photo URL (ESPN CDN)
   getPlayerPhotoUrl(playerId: number | string): string {
     return `https://a.espncdn.com/i/headshots/nba/players/full/${playerId}.png`;
   }
 
-  // Get team logo URL
   getTeamLogoUrl(abbreviation: string): string {
     return `https://a.espncdn.com/i/teamlogos/nba/500/${abbreviation.toLowerCase()}.png`;
   }
 
-  // Private methods
   private loadFeaturedPlayersFromCache(): void {
     const cached = this.getFromCache<PlayerResponse[]>('featured');
     if (cached && cached.length > 0) {

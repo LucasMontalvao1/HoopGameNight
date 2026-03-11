@@ -140,10 +140,10 @@
               '--' }}</span>
           </div>
 
-          <div class="player-team" (click)="viewTeam($event, player.team.abbreviation)">
-            <img [src]="getTeamLogoUrl(player.team.abbreviation)" [alt]="player.team.name" class="team-logo-small"
-              (error)="onTeamLogoError($event)" />
-            <span class="team-name">{{ player.team.displayName }}</span>
+          <div class="player-team" (click)="viewTeam($event, player.team?.abbreviation || '')">
+            <img [src]="getTeamLogoUrl(player.team?.abbreviation || '')" [alt]="player.team?.name"
+              class="team-logo-small" (error)="onTeamLogoError($event)" />
+            <span class="team-name">{{ player.team?.displayName }}</span>
           </div>
         </div>
       </div>

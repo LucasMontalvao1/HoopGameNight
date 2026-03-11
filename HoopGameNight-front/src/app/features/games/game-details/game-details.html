@@ -9,11 +9,11 @@
     <app-error-view [message]="statsService.error() || ''" (retry)="ngOnInit()"></app-error-view>
     } @else {
     @if (gamesService.selectedGame(); as game) {
+
     <!-- Scoreboard Section (Hero) -->
     <section class="scoreboard glass-panel animate-fade-in">
         <div class="scoreboard__bg-gradient"></div>
 
-        <!-- Integrated Back Button -->
         <button class="hero-back-btn" (click)="goBack()" title="Voltar para Agenda">
             <span class="material-icons">arrow_back</span>
         </button>
@@ -80,160 +80,247 @@
     @if (activeTab() === 'boxscore') {
     @if (statsService.currentGameBoxscore(); as boxscore) {
     <div class="boxscore-container">
-        <!-- Visitor Team Boxscore -->
-        <div class="team-boxscore glass-panel animate-fade-in" style="animation-delay: 0.2s">
-            <div class="team-box-header">
-                <div class="team-brand">
-                    <img [src]="getTeamLogo(game.visitorTeam.abbreviation)" class="mini-logo">
-                    <h3>{{ game.visitorTeam.displayName }}</h3>
-                </div>
-                <div class="team-totals-brief">
-                    <span class="total-label">FALTAS:</span> 18 | <span class="total-label">TOV:</span> 12
-                </div>
-            </div>
-            <div class="table-modern-wrapper">
-                <table class="boxscore-table-premium">
-                    <thead>
-                        <tr>
-                            <th class="sticky-col">ATLETA</th>
-                            <th title="Minutos em Quadra">MIN</th>
-                            <th title="Pontos">PTS</th>
-                            <th title="Rebotes">REB</th>
-                            <th title="Assistências">AST</th>
-                            <th title="Roubos de Bola">STL</th>
-                            <th title="Tocos">BLK</th>
-                            <th title="Arremessos de Quadra (Convertidos/Tentados)">FG</th>
-                            <th title="Apenas Arremessos de 3 Pontos">3P</th>
-                            <th title="Lances Livres">FT</th>
-                            <th title="Saldo de Pontos (Plus/Minus)">+/-</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (stat of boxscore.visitorTeamStats; track stat.playerId) {
-                        <tr class="player-row" [class.is-starter]="stat.isStarter">
-                            <td class="player-identity sticky-col">
-                                <div class="player-name-box">
-                                    @if (stat.didNotPlay) { <span class="dnp-badge">DNP</span> }
-                                    <a [routerLink]="['/players', stat.playerId]" class="player-link">
-                                        {{ stat.playerFullName }}
-                                    </a>
-                                    <span class="player-pos-tab">{{ stat.position }}</span>
-                                </div>
-                            </td>
-                            <td>{{ stat.minutesFormatted }}</td>
-                            <td class="stat-highlight">{{ stat.points }}</td>
-                            <td>{{ stat.totalRebounds }}</td>
-                            <td>{{ stat.assists }}</td>
-                            <td>{{ stat.steals }}</td>
-                            <td>{{ stat.blocks }}</td>
-                            <td class="shooting-stat">{{ stat.fieldGoalsFormatted }}</td>
-                            <td class="shooting-stat">{{ stat.threePointersFormatted }}</td>
-                            <td class="shooting-stat">{{ stat.freeThrowsFormatted }}</td>
-                            <td [class.pos]="stat.plusMinus > 0" [class.neg]="stat.plusMinus < 0">
-                                {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
-                            </td>
-                        </tr>
-                        }
-                    </tbody>
-                    @if (statsService.visitorTeamTotals(); as totals) {
-                    <tfoot>
-                        <tr class="team-totals-row">
-                            <td class="sticky-col totals-label">TOTAL</td>
-                            <td>—</td>
-                            <td class="stat-highlight">{{ totals.points }}</td>
-                            <td>{{ totals.totalRebounds }}</td>
-                            <td>{{ totals.assists }}</td>
-                            <td>{{ totals.steals }}</td>
-                            <td>{{ totals.blocks }}</td>
-                            <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
-                            <td class="shooting-stat">—</td>
-                            <td class="shooting-stat">—</td>
-                            <td>—</td>
-                        </tr>
-                    </tfoot>
-                    }
-                </table>
-            </div>
-        </div>
 
-        <!-- Home Team Boxscore -->
-        <div class="team-boxscore glass-panel animate-fade-in" style="animation-delay: 0.3s">
-            <div class="team-box-header">
-                <div class="team-brand">
-                    <img [src]="getTeamLogo(game.homeTeam.abbreviation)" class="mini-logo">
-                    <h3>{{ game.homeTeam.displayName }}</h3>
+        <!-- ===== TEAM COMPARISON CARD ===== -->
+        @if (visitorTotals(); as vTotals) {
+        @if (homeTotals(); as hTotals) {
+        <div class="team-comparison-card glass-panel animate-fade-in" style="animation-delay: 0.15s">
+            <div class="comp-rows">
+                <div class="comp-row comp-header">
+                    <span class="comp-val vis" [routerLink]="['/teams', game.visitorTeam.id]">{{ game.visitorTeam.abbreviation }}</span>
+                    <span class="comp-label">—</span>
+                    <span class="comp-val home" [routerLink]="['/teams', game.homeTeam.id]">{{ game.homeTeam.abbreviation }}</span>
                 </div>
-                <div class="team-totals-brief">
-                    <span class="total-label">FALTAS:</span> 21 | <span class="total-label">TOV:</span> 15
+                <div class="comp-row">
+                    <span class="comp-val vis" [class.winner]="vTotals.totalRebounds > hTotals.totalRebounds">
+                        {{ vTotals.totalRebounds }}
+                    </span>
+                    <span class="comp-label">REB</span>
+                    <span class="comp-val home" [class.winner]="hTotals.totalRebounds > vTotals.totalRebounds">
+                        {{ hTotals.totalRebounds }}
+                    </span>
                 </div>
-            </div>
-            <div class="table-modern-wrapper">
-                <table class="boxscore-table-premium">
-                    <thead>
-                        <tr>
-                            <th class="sticky-col">ATLETA</th>
-                            <th title="Minutos em Quadra">MIN</th>
-                            <th title="Pontos">PTS</th>
-                            <th title="Rebotes">REB</th>
-                            <th title="Assistências">AST</th>
-                            <th title="Roubos de Bola">STL</th>
-                            <th title="Tocos">BLK</th>
-                            <th title="Arremessos de Quadra (Convertidos/Tentados)">FG</th>
-                            <th title="Apenas Arremessos de 3 Pontos">3P</th>
-                            <th title="Lances Livres">FT</th>
-                            <th title="Saldo de Pontos (Plus/Minus)">+/-</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @for (stat of boxscore.homeTeamStats; track stat.playerId) {
-                        <tr class="player-row" [class.is-starter]="stat.isStarter">
-                            <td class="player-identity sticky-col">
-                                <div class="player-name-box">
-                                    @if (stat.didNotPlay) { <span class="dnp-badge">DNP</span> }
-                                    <a [routerLink]="['/players', stat.playerId]" class="player-link">
-                                        {{ stat.playerFullName }}
-                                    </a>
-                                    <span class="player-pos-tab">{{ stat.position }}</span>
-                                </div>
-                            </td>
-                            <td>{{ stat.minutesFormatted }}</td>
-                            <td class="stat-highlight">{{ stat.points }}</td>
-                            <td>{{ stat.totalRebounds }}</td>
-                            <td>{{ stat.assists }}</td>
-                            <td>{{ stat.steals }}</td>
-                            <td>{{ stat.blocks }}</td>
-                            <td class="shooting-stat">{{ stat.fieldGoalsFormatted }}</td>
-                            <td class="shooting-stat">{{ stat.threePointersFormatted }}</td>
-                            <td class="shooting-stat">{{ stat.freeThrowsFormatted }}</td>
-                            <td [class.pos]="stat.plusMinus > 0" [class.neg]="stat.plusMinus < 0">
-                                {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
-                            </td>
-                        </tr>
-                        }
-                    </tbody>
-                    @if (statsService.homeTeamTotals(); as totals) {
-                    <tfoot>
-                        <tr class="team-totals-row">
-                            <td class="sticky-col totals-label">TOTAL</td>
-                            <td>—</td>
-                            <td class="stat-highlight">{{ totals.points }}</td>
-                            <td>{{ totals.totalRebounds }}</td>
-                            <td>{{ totals.assists }}</td>
-                            <td>{{ totals.steals }}</td>
-                            <td>{{ totals.blocks }}</td>
-                            <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
-                            <td class="shooting-stat">—</td>
-                            <td class="shooting-stat">—</td>
-                            <td>—</td>
-                        </tr>
-                    </tfoot>
-                    }
-                </table>
+                <div class="comp-row">
+                    <span class="comp-val vis" [class.winner]="vTotals.assists > hTotals.assists">
+                        {{ vTotals.assists }}
+                    </span>
+                    <span class="comp-label">AST</span>
+                    <span class="comp-val home" [class.winner]="hTotals.assists > vTotals.assists">
+                        {{ hTotals.assists }}
+                    </span>
+                </div>
+                <div class="comp-row">
+                    <span class="comp-val vis" [class.winner]="vTotals.steals > hTotals.steals">
+                        {{ vTotals.steals }}
+                    </span>
+                    <span class="comp-label">STL</span>
+                    <span class="comp-val home" [class.winner]="hTotals.steals > vTotals.steals">
+                        {{ hTotals.steals }}
+                    </span>
+                </div>
+                <div class="comp-row">
+                    <span class="comp-val vis" [class.winner]="vTotals.blocks > hTotals.blocks">
+                        {{ vTotals.blocks }}
+                    </span>
+                    <span class="comp-label">BLK</span>
+                    <span class="comp-val home" [class.winner]="hTotals.blocks > vTotals.blocks">
+                        {{ hTotals.blocks }}
+                    </span>
+                </div>
+                <div class="comp-row">
+                    <span class="comp-val vis" [class.winner]="getFgPct(vTotals) > getFgPct(hTotals)">
+                        {{ getFgPct(vTotals) }}%
+                    </span>
+                    <span class="comp-label">FG%</span>
+                    <span class="comp-val home" [class.winner]="getFgPct(hTotals) > getFgPct(vTotals)">
+                        {{ getFgPct(hTotals) }}%
+                    </span>
+                </div>
+                <div class="comp-row">
+                    <span class="comp-val vis" [class.winner]="vTotals.turnovers < hTotals.turnovers">
+                        {{ vTotals.turnovers }}
+                    </span>
+                    <span class="comp-label">TOV</span>
+                    <span class="comp-val home" [class.winner]="hTotals.turnovers < vTotals.turnovers">
+                        {{ hTotals.turnovers }}
+                    </span>
+                </div>
             </div>
         </div>
-    </div>
+        }
+        }
+
+        <!-- ===== BOXSCORE TABLES GRID ===== -->
+        <div class="boxscore-grid">
+
+            <!-- Visitante -->
+            <div class="team-boxscore glass-panel animate-fade-in" style="animation-delay: 0.2s">
+                <div class="team-box-header">
+                    <div class="team-brand" [routerLink]="['/teams', game.visitorTeam.id]" style="cursor: pointer">
+                        <img [src]="getTeamLogo(game.visitorTeam.abbreviation)" class="mini-logo">
+                        <h3>{{ game.visitorTeam.displayName }}</h3>
+                    </div>
+                </div>
+                <div class="table-modern-wrapper">
+                    <table class="boxscore-table-premium">
+                        <thead>
+                            <tr>
+                                <th class="sticky-col">ATLETA</th>
+                                <th title="Minutos em Quadra">MIN</th>
+                                <th title="Pontos" (click)="toggleSort('points')" class="sortable">
+                                    PTS @if(sortField() === 'points') { <span class="material-icons sort-icon">{{
+                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
+                                </th>
+                                <th title="Rebotes" (click)="toggleSort('totalRebounds')" class="sortable">
+                                    REB @if(sortField() === 'totalRebounds') { <span class="material-icons sort-icon">{{
+                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
+                                </th>
+                                <th title="Assistências" (click)="toggleSort('assists')" class="sortable">
+                                    AST @if(sortField() === 'assists') { <span class="material-icons sort-icon">{{
+                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
+                                </th>
+                                <th title="Roubos de Bola">STL</th>
+                                <th title="Tocos">BLK</th>
+                                <th title="Arremessos de Quadra">FG</th>
+                                <th title="3 Pontos">3P</th>
+                                <th title="Lances Livres">FT</th>
+                                <th title="+/-">+/-</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (stat of sortedVisitorStats(); track stat.playerId) {
+                            <tr class="player-row" [class.is-starter]="stat.isStarter">
+                                <td class="player-identity sticky-col">
+                                    <div class="player-name-box">
+                                        @if (stat.didNotPlay) { <span class="dnp-badge">DNP</span> }
+                                        <a [routerLink]="['/players', stat.playerId]" class="player-link">{{
+                                            stat.playerFullName }}</a>
+                                        <span class="player-pos-tab">{{ stat.position }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ stat.minutesFormatted }}</td>
+                                <td class="stat-highlight">{{ stat.points }}</td>
+                                <td>{{ stat.totalRebounds }}</td>
+                                <td>{{ stat.assists }}</td>
+                                <td>{{ stat.steals }}</td>
+                                <td>{{ stat.blocks }}</td>
+                                <td class="shooting-stat">{{ stat.fieldGoalsFormatted }}</td>
+                                <td class="shooting-stat">{{ stat.threePointersFormatted }}</td>
+                                <td class="shooting-stat">{{ stat.freeThrowsFormatted }}</td>
+                                <td [class.pos]="stat.plusMinus > 0" [class.neg]="stat.plusMinus < 0">
+                                    {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
+                                </td>
+                            </tr>
+                            }
+                        </tbody>
+                        @if (statsService.visitorTeamTotals(); as totals) {
+                        <tfoot>
+                            <tr class="team-totals-row">
+                                <td class="sticky-col totals-label">TOTAL</td>
+                                <td>—</td>
+                                <td class="stat-highlight">{{ totals.points }}</td>
+                                <td>{{ totals.totalRebounds }}</td>
+                                <td>{{ totals.assists }}</td>
+                                <td>{{ totals.steals }}</td>
+                                <td>{{ totals.blocks }}</td>
+                                <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
+                                <td class="shooting-stat">—</td>
+                                <td class="shooting-stat">—</td>
+                                <td>—</td>
+                            </tr>
+                        </tfoot>
+                        }
+                    </table>
+                </div>
+            </div>
+
+            <!-- Mandante -->
+            <div class="team-boxscore glass-panel animate-fade-in" style="animation-delay: 0.3s">
+                <div class="team-box-header">
+                    <div class="team-brand" [routerLink]="['/teams', game.homeTeam.id]" style="cursor: pointer">
+                        <img [src]="getTeamLogo(game.homeTeam.abbreviation)" class="mini-logo">
+                        <h3>{{ game.homeTeam.displayName }}</h3>
+                    </div>
+                </div>
+                <div class="table-modern-wrapper">
+                    <table class="boxscore-table-premium">
+                        <thead>
+                            <tr>
+                                <th class="sticky-col">ATLETA</th>
+                                <th title="Minutos em Quadra">MIN</th>
+                                <th title="Pontos" (click)="toggleSort('points')" class="sortable">
+                                    PTS @if(sortField() === 'points') { <span class="material-icons sort-icon">{{
+                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
+                                </th>
+                                <th title="Rebotes" (click)="toggleSort('totalRebounds')" class="sortable">
+                                    REB @if(sortField() === 'totalRebounds') { <span class="material-icons sort-icon">{{
+                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
+                                </th>
+                                <th title="Assistências" (click)="toggleSort('assists')" class="sortable">
+                                    AST @if(sortField() === 'assists') { <span class="material-icons sort-icon">{{
+                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
+                                </th>
+                                <th title="Roubos de Bola">STL</th>
+                                <th title="Tocos">BLK</th>
+                                <th title="Arremessos de Quadra">FG</th>
+                                <th title="3 Pontos">3P</th>
+                                <th title="Lances Livres">FT</th>
+                                <th title="+/-">+/-</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (stat of sortedHomeStats(); track stat.playerId) {
+                            <tr class="player-row" [class.is-starter]="stat.isStarter">
+                                <td class="player-identity sticky-col">
+                                    <div class="player-name-box">
+                                        @if (stat.didNotPlay) { <span class="dnp-badge">DNP</span> }
+                                        <a [routerLink]="['/players', stat.playerId]" class="player-link">{{
+                                            stat.playerFullName }}</a>
+                                        <span class="player-pos-tab">{{ stat.position }}</span>
+                                    </div>
+                                </td>
+                                <td>{{ stat.minutesFormatted }}</td>
+                                <td class="stat-highlight">{{ stat.points }}</td>
+                                <td>{{ stat.totalRebounds }}</td>
+                                <td>{{ stat.assists }}</td>
+                                <td>{{ stat.steals }}</td>
+                                <td>{{ stat.blocks }}</td>
+                                <td class="shooting-stat">{{ stat.fieldGoalsFormatted }}</td>
+                                <td class="shooting-stat">{{ stat.threePointersFormatted }}</td>
+                                <td class="shooting-stat">{{ stat.freeThrowsFormatted }}</td>
+                                <td [class.pos]="stat.plusMinus > 0" [class.neg]="stat.plusMinus < 0">
+                                    {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
+                                </td>
+                            </tr>
+                            }
+                        </tbody>
+                        @if (statsService.homeTeamTotals(); as totals) {
+                        <tfoot>
+                            <tr class="team-totals-row">
+                                <td class="sticky-col totals-label">TOTAL</td>
+                                <td>—</td>
+                                <td class="stat-highlight">{{ totals.points }}</td>
+                                <td>{{ totals.totalRebounds }}</td>
+                                <td>{{ totals.assists }}</td>
+                                <td>{{ totals.steals }}</td>
+                                <td>{{ totals.blocks }}</td>
+                                <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
+                                <td class="shooting-stat">—</td>
+                                <td class="shooting-stat">—</td>
+                                <td>—</td>
+                            </tr>
+                        </tfoot>
+                        }
+                    </table>
+                </div>
+            </div>
+
+        </div><!-- /boxscore-grid -->
+    </div><!-- /boxscore-container -->
     }
+
     } @else {
+
     <!-- Summary Content -->
     <div class="summary-container shadow-sm animate-fade-in">
         @if (isLoadingSummary()) {

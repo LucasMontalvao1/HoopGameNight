@@ -249,9 +249,15 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("Consultando BANCO para jogador {PlayerId}...", id);
                 var player = await _playerRepository.GetByIdAsync(id);
 
+                if (player == null && id > 0)
+                {
+                    _logger.LogInformation("Jogador não encontrado por ID interno {Id}, tentando como ExternalId...", id);
+                    player = await _playerRepository.GetByExternalIdAsync(id);
+                }
+
                 if (player == null)
                 {
-                    _logger.LogWarning("Jogador não encontrado no BANCO: {PlayerId}", id);
+                    _logger.LogWarning("Jogador não encontrado no BANCO com ID ou ExternalId: {PlayerId}", id);
                     return null;
                 }
 
@@ -267,6 +273,27 @@ namespace HoopGameNight.Core.Services
             {
                 _logger.LogError(ex, "Erro ao buscar jogador por ID: {PlayerId}", id);
                 throw new BusinessException($"Falha ao recuperar o jogador {id}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Get multiple players by IDs
+        /// </summary>
+        public async Task<List<PlayerResponse>> GetPlayersByIdsAsync(IEnumerable<int> ids)
+        {
+            if (ids == null || !ids.Any()) return new List<PlayerResponse>();
+
+            try
+            {
+                _logger.LogInformation("GET PLAYERS BY IDS: {Count} ids", ids.Count());
+
+                var players = await _playerRepository.GetByIdsAsync(ids);
+                return _mapper.Map<List<PlayerResponse>>(players);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao buscar múltiplos jogadores");
+                throw new BusinessException("Falha ao recuperar lote de jogadores", ex);
             }
         }
 

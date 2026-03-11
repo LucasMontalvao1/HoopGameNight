@@ -128,7 +128,7 @@ namespace HoopGameNight.Core.Services
                 var espnData = await _espnApiService.GetPlayerGamelogAsync(player.EspnId!);
                 if (espnData == null) return null;
 
-                var response = MapEspnGamelogToResponse(espnData, playerId, player.FullName, 100);
+                    var response = MapEspnGamelogToResponse(espnData, playerId, player.FullName, 100);
 
                 if (response != null && response.Games.Any())
                 {
@@ -1108,7 +1108,7 @@ namespace HoopGameNight.Core.Services
                 }
 
                 response.Games = recentGamesList
-                    .OrderBy(g => g.GameDate) // Ordenar ascendente para o gráfico (lado esquerdo = mais antigo)
+                    .OrderByDescending(g => g.GameDate) 
                     .ToList();
                 return response;
             }
@@ -1124,7 +1124,6 @@ namespace HoopGameNight.Core.Services
             if (element.ValueKind != JsonValueKind.Object) return default;
             if (element.TryGetProperty(propertyName, out var prop)) return prop;
             
-            // Busca case-insensitive manual se falhar
             foreach (var p in element.EnumerateObject())
             {
                 if (p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
@@ -1457,6 +1456,55 @@ namespace HoopGameNight.Core.Services
                 return null;
             }
         }
+        public async Task<StatLeadersResponse> GetLeagueLeadersAsync(int season)
+        {
+            var cacheKey = $"league_leaders_{season}";
+            if (_cache.TryGetValue(cacheKey, out StatLeadersResponse? cached)) return cached!;
+
+            var response = new StatLeadersResponse { LastUpdated = DateTime.UtcNow };
+
+            try {
+                var scoringData = await _statsRepository.GetScoringLeadersAsync(season, 10, 5);
+                response.ScoringLeaders = scoringData.Select((d, index) => new StatLeader {
+                    PlayerId = d.PlayerId != null ? (int)d.PlayerId : 0,
+                    ExternalId = d.ExternalId != null ? (int)d.ExternalId : (int?)null,
+                    PlayerName = d.PlayerName?.ToString() ?? "Unknown",
+                    Team = d.TeamAbbreviation?.ToString() ?? "-",
+                    Value = d.AverageValue != null ? (decimal)d.AverageValue : 0m,
+                    GamesPlayed = d.GamesPlayed != null ? (int)d.GamesPlayed : 0,
+                    Rank = index + 1
+                }).ToList();
+
+                var reboundData = await _statsRepository.GetReboundLeadersAsync(season, 10, 5);
+                response.ReboundLeaders = reboundData.Select((d, index) => new StatLeader {
+                    PlayerId = d.PlayerId != null ? (int)d.PlayerId : 0,
+                    ExternalId = d.ExternalId != null ? (int)d.ExternalId : (int?)null,
+                    PlayerName = d.PlayerName?.ToString() ?? "Unknown",
+                    Team = d.TeamAbbreviation?.ToString() ?? "-",
+                    Value = d.AverageValue != null ? (decimal)d.AverageValue : 0m,
+                    GamesPlayed = d.GamesPlayed != null ? (int)d.GamesPlayed : 0,
+                    Rank = index + 1
+                }).ToList();
+
+                var assistData = await _statsRepository.GetAssistLeadersAsync(season, 10, 5);
+                response.AssistLeaders = assistData.Select((d, index) => new StatLeader {
+                    PlayerId = d.PlayerId != null ? (int)d.PlayerId : 0,
+                    ExternalId = d.ExternalId != null ? (int)d.ExternalId : (int?)null,
+                    PlayerName = d.PlayerName?.ToString() ?? "Unknown",
+                    Team = d.TeamAbbreviation?.ToString() ?? "-",
+                    Value = d.AverageValue != null ? (decimal)d.AverageValue : 0m,
+                    GamesPlayed = d.GamesPlayed != null ? (int)d.GamesPlayed : 0,
+                    Rank = index + 1
+                }).ToList();
+
+                _cache.Set(cacheKey, response, TimeSpan.FromHours(1));
+            } catch (Exception ex) {
+                _logger.LogError(ex, "Error fetching league leaders for season {Season}", season);
+            }
+
+            return response;
+        }
+
         private System.Text.Json.JsonElement GetProperty(System.Text.Json.JsonElement? element, string name)
         {
             if (element == null || element.Value.ValueKind == System.Text.Json.JsonValueKind.Undefined) return default;

@@ -14,22 +14,18 @@ import { PlayerPerformanceChartComponent } from '../player-performance-chart/pla
   styleUrl: './player-details.scss'
 })
 export class PlayerDetailsComponent implements OnInit, OnDestroy {
-  // Signals para estatísticas
   private readonly _selectedSeason = signal<number>(2025);
   private readonly _seasonStats = signal<PlayerSeasonStats | null>(null);
   private readonly _availableSeasons = signal<number[]>([]);
   private readonly _loadingStats = signal<boolean>(false);
   private readonly _currentPlayerId = signal<number | null>(null);
 
-  // Cache de todos os dados de temporada do jogador
   private _allStatsData: PlayerSeasonStats[] = [];
 
-  // Getter para a tabela da carreira
   get allCareerStats(): PlayerSeasonStats[] {
     return this._allStatsData.sort((a, b) => b.season - a.season);
   }
 
-  // Getters públicos
   readonly selectedSeason = this._selectedSeason.asReadonly();
   readonly seasonStats = this._seasonStats.asReadonly();
   readonly availableSeasons = this._availableSeasons.asReadonly();
@@ -58,8 +54,13 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
       if (playerId) {
         this._currentPlayerId.set(+playerId);
         await this.playersService.loadPlayerById(+playerId);
-        await this.loadPlayerStats(+playerId);
-        await this.loadRecentGamelog();
+
+        const player = this.playersService.selectedPlayer();
+        if (player) {
+          this._currentPlayerId.set(player.id);
+          await this.loadPlayerStats(player.id);
+          await this.loadRecentGamelog(player.id);
+        }
       }
     });
   }
@@ -88,7 +89,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
   getTeamLogoUrl(): string {
     const player = this.playersService.selectedPlayer();
     if (!player) return '';
-    return this.playersService.getTeamLogoUrl(player.team.abbreviation);
+    return this.playersService.getTeamLogoUrl(player.team?.abbreviation || '');
   }
 
   onImageError(event: Event): void {
@@ -101,7 +102,6 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     img.style.display = 'none';
   }
 
-  // --- Funções de UI Dinâmicas ---
   private readonly TEAM_COLORS: Record<string, { primary: string; secondary: string }> = {
     'BOS': { primary: '#007A33', secondary: '#BA9653' },
     'MIA': { primary: '#98002E', secondary: '#F9A01B' },
@@ -143,15 +143,11 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
 
   private async loadPlayerStats(playerId: number): Promise<void> {
     try {
-      console.log(`🏀 PLAYER DETAILS: Iniciando carregamento de stats para jogador ${playerId}`);
       this._loadingStats.set(true);
 
-      // Buscar todas as temporadas disponíveis via /career
-      console.log(`→ Chamando playerStatsService.getPlayerAllSeasons(${playerId})`);
       const allSeasons = await this.playerStatsService.getPlayerAllSeasons(playerId);
 
       this._allStatsData = allSeasons || [];
-      console.log(`Recebido ${this._allStatsData.length} registros de temporada:`, this._allStatsData);
 
       if (this._allStatsData.length > 0) {
         const seasons = this._allStatsData
@@ -159,15 +155,10 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
           .filter((v, i, a) => a.indexOf(v) === i)
           .sort((a, b) => b - a);
 
-        console.log(`Temporadas únicas:`, seasons);
         this._availableSeasons.set(seasons);
 
-        // Selecionar a temporada mais recente
         const latestSeason = seasons[0];
-        console.log(`Selecionando temporada inicial: ${latestSeason}`);
         await this.selectSeason(latestSeason);
-      } else {
-        console.warn('Nenhuma estatística disponível via API de carreira');
       }
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
@@ -177,19 +168,14 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
   }
 
   async selectSeason(season: number): Promise<void> {
-    console.log(`Selecionando temporada: ${season}`);
     this._selectedSeason.set(season);
 
-    // Prioridade 1: Procurar nos dados de carreira (ESPN) que já carregamos
     const statsFromCareer = this._allStatsData.find(s => s.season === season && s.isPlayoffs === false)
       || this._allStatsData.find(s => s.season === season);
 
     if (statsFromCareer) {
-      console.log('Usando stats do cache de carreira (ESPN):', statsFromCareer);
       this._seasonStats.set(statsFromCareer);
     } else {
-      // Prioridade 2: Buscar do nosso banco de dados (Calculado via View)
-      console.log(`Stats não encontradas no cache. Buscando via API para season ${season}`);
       await this.loadSeasonStatsFromDb(season);
     }
   }
@@ -201,8 +187,8 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async loadRecentGamelog(): Promise<void> {
-    const playerId = this._currentPlayerId();
+  private async loadRecentGamelog(idOverride?: number): Promise<void> {
+    const playerId = idOverride || this._currentPlayerId();
     if (playerId) {
       await this.statsService.loadPlayerGamelog(playerId);
     }
@@ -244,5 +230,17 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(numValue)) return '-';
     return numValue.toFixed(1);
+  }
+
+  isFavorite(): boolean {
+    const player = this.playersService.selectedPlayer();
+    return player ? this.playersService.isFavorite(player.id) : false;
+  }
+
+  toggleFavorite(): void {
+    const player = this.playersService.selectedPlayer();
+    if (player) {
+      this.playersService.toggleFavorite(player.id);
+    }
   }
 }

@@ -112,5 +112,15 @@ namespace HoopGameNight.Api.Controllers.V1
                 return Ok(data);
             });
         }
+        [HttpGet("leaders")]
+        [ProducesResponseType(typeof(ApiResponse<StatLeadersResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<StatLeadersResponse>>> GetLeagueLeaders([FromQuery] int season = 2024)
+        {
+            return await ExecuteAsync<StatLeadersResponse>(async () =>
+            {
+                var data = await _playerStatsService.GetLeagueLeadersAsync(season);
+                return Ok(data);
+            });
+        }
     }
 }

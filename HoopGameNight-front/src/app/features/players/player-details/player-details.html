@@ -18,15 +18,15 @@
     @if (playersService.selectedPlayer(); as player) {
     <!-- Premium Player Hero Banner -->
     <div class="player-hero animate-fade-in"
-      [style.--team-color-primary]="getTeamColor(player.team.abbreviation, 'primary')"
-      [style.--team-color-secondary]="getTeamColor(player.team.abbreviation, 'secondary')">
+      [style.--team-color-primary]="getTeamColor(player.team?.abbreviation || '', 'primary')"
+      [style.--team-color-secondary]="getTeamColor(player.team?.abbreviation || '', 'secondary')">
 
       <div class="hero-actions">
         <button class="btn-glass-pill" (click)="goBack()">
           <span class="material-icons">west</span>
           Voltar
         </button>
-        <button class="btn-glass-pill" (click)="viewTeam(player.team.abbreviation)">
+        <button class="btn-glass-pill" (click)="viewTeam(player.team?.abbreviation || '')">
           <span class="material-icons">groups</span>
           Ver Time
         </button>
@@ -34,19 +34,23 @@
 
       <div class="player-hero-content">
         <div class="hero-logo-wrapper"
-          [style.box-shadow]="'0 0 30px ' + getTeamColor(player.team.abbreviation, 'primary') + '40'">
+          [style.box-shadow]="'0 0 30px ' + getTeamColor(player.team?.abbreviation || '', 'primary') + '40'">
           <img [src]="getPlayerPhotoUrl()" [alt]="player.fullName" (error)="onImageError($event)"
             class="hero-logo-img" />
           <div class="player-team-mini glow"
-            [style.box-shadow]="'0 0 15px ' + getTeamColor(player.team.abbreviation, 'secondary') + '60'">
+            [style.box-shadow]="'0 0 15px ' + getTeamColor(player.team?.abbreviation, 'secondary') + '60'">
             <img [src]="getTeamLogoUrl()" (error)="onTeamLogoError($event)" class="team-mini-logo" />
           </div>
+          <button class="favorite-toggle-btn" [class.is-favorite]="isFavorite()" (click)="toggleFavorite()"
+            title="Toggle Favorite">
+            <span class="material-icons">{{ isFavorite() ? 'favorite' : 'favorite_border' }}</span>
+          </button>
         </div>
 
         <div class="player-hero-info">
           <div class="badges-row">
             <span class="glow-badge glow-badge-primary">#{{ player.id }}</span>
-            <span class="glow-badge glow-badge-secondary">{{ player.team.abbreviation }}</span>
+            <span class="glow-badge glow-badge-secondary">{{ player.team?.abbreviation }}</span>
           </div>
           <h1 class="player-name">{{ player.fullName }}</h1>
           <div class="player-meta-info">
@@ -140,7 +144,7 @@
 
             <!-- Evolução de Performance (Chart) -->
             <app-player-performance-chart [games]="statsService.currentPlayerGamelog()?.games || []"
-              [teamColor]="getTeamColor(player.team.abbreviation, 'primary')">
+              [teamColor]="getTeamColor(player.team?.abbreviation, 'primary')">
             </app-player-performance-chart>
 
             <!-- Porcentagens de Arremesso -->
@@ -347,7 +351,8 @@
                 </tr>
               </thead>
               <tbody>
-                @for (season of allCareerStats; track season.season) {
+                @for (season of allCareerStats; track season.season + '-' + (season.teamId || 0) + '-' +
+                season.seasonType) {
                 <tr class="game-row">
                   <td class="opponent-cell sticky-col">
                     <span class="game-date-mini">{{ season.season }}/{{ (season.season + 1).toString().slice(-2)
@@ -395,13 +400,13 @@
         </div>
 
         <div class="info-card-modern glass-panel animate-fade-in" style="animation-delay: 0.4s"
-          (click)="viewTeam(player.team.abbreviation)">
+          (click)="viewTeam(player.team?.abbreviation || '')">
           <h3 class="sidebar-title"><span class="material-icons">hub</span> Time</h3>
           <div class="sidebar-team">
             <img [src]="getTeamLogoUrl()" class="sidebar-team-logo" (error)="onTeamLogoError($event)" />
             <div class="sidebar-team-info">
-              <span class="sidebar-team-name">{{ player.team.displayName }}</span>
-              <span class="sidebar-team-city">{{ player.team.city }}</span>
+              <span class="sidebar-team-name">{{ player.team?.displayName }}</span>
+              <span class="sidebar-team-city">{{ player.team?.city }}</span>
             </div>
           </div>
         </div>

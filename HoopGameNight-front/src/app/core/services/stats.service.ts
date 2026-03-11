@@ -6,51 +6,82 @@ import {
     PlayerGameStatsDetailedResponse
 } from '../interfaces/api.interface';
 
+export interface TeamTotals {
+    points: number;
+    totalRebounds: number;
+    assists: number;
+    steals: number;
+    blocks: number;
+    turnovers: number;
+    personalFouls: number;
+    fieldGoalsMade: number;
+    fieldGoalsAttempted: number;
+    threePointersMade: number;
+    threePointersAttempted: number;
+    freeThrowsMade: number;
+    freeThrowsAttempted: number;
+}
+
 @Injectable({
     providedIn: 'root'
 })
 export class StatsService {
     private readonly apiService = inject(StatsApiService);
 
-    // State
     private readonly _currentGameBoxscore = signal<GamePlayerStatsResponse | null>(null);
     private readonly _currentPlayerGamelog = signal<PlayerGamelogResponse | null>(null);
     private readonly _isLoading = signal<boolean>(false);
     private readonly _error = signal<string | null>(null);
 
-    // Public State
     readonly currentGameBoxscore = this._currentGameBoxscore.asReadonly();
     readonly currentPlayerGamelog = this._currentPlayerGamelog.asReadonly();
     readonly isLoading = this._isLoading.asReadonly();
     readonly error = this._error.asReadonly();
 
-    // Computed Totals
-    readonly homeTeamTotals = computed(() => this.calculateTeamTotals(this.currentGameBoxscore()?.homeTeamStats || []));
-    readonly visitorTeamTotals = computed(() => this.calculateTeamTotals(this.currentGameBoxscore()?.visitorTeamStats || []));
+    readonly homeTeamTotals = computed(() =>
+        this.calculateTeamTotals(this.currentGameBoxscore()?.homeTeamStats || [])
+    );
+    readonly visitorTeamTotals = computed(() =>
+        this.calculateTeamTotals(this.currentGameBoxscore()?.visitorTeamStats || [])
+    );
 
-    private calculateTeamTotals(stats: PlayerGameStatsDetailedResponse[]): Partial<PlayerGameStatsDetailedResponse> {
-        if (stats.length === 0) return {};
+    private readonly EMPTY_TOTALS: TeamTotals = {
+        points: 0,
+        totalRebounds: 0,
+        assists: 0,
+        steals: 0,
+        blocks: 0,
+        turnovers: 0,
+        personalFouls: 0,
+        fieldGoalsMade: 0,
+        fieldGoalsAttempted: 0,
+        threePointersMade: 0,
+        threePointersAttempted: 0,
+        freeThrowsMade: 0,
+        freeThrowsAttempted: 0,
+    };
+
+    private calculateTeamTotals(stats: PlayerGameStatsDetailedResponse[]): TeamTotals {
+        if (stats.length === 0) return { ...this.EMPTY_TOTALS };
 
         return stats.reduce((acc, curr) => {
             if (curr.didNotPlay) return acc;
-
             return {
-                points: (acc.points || 0) + (curr.points || 0),
-                totalRebounds: (acc.totalRebounds || 0) + (curr.totalRebounds || 0),
-                assists: (acc.assists || 0) + (curr.assists || 0),
-                steals: (acc.steals || 0) + (curr.steals || 0),
-                blocks: (acc.blocks || 0) + (curr.blocks || 0),
-                turnovers: (acc.turnovers || 0) + (curr.turnovers || 0),
-                personalFouls: (acc.personalFouls || 0) + (curr.personalFouls || 0),
-                // Para shooting stats, somamos os made/attempted separadamente
-                fieldGoalsMade: (acc.fieldGoalsMade || 0) + (curr.fieldGoalsMade || 0),
-                fieldGoalsAttempted: (acc.fieldGoalsAttempted || 0) + (curr.fieldGoalsAttempted || 0),
-                threePointersMade: (acc.threePointersMade || 0) + (curr.threePointersMade || 0),
-                threePointersAttempted: (acc.threePointersAttempted || 0) + (curr.threePointersAttempted || 0),
-                freeThrowsMade: (acc.freeThrowsMade || 0) + (curr.freeThrowsMade || 0),
-                freeThrowsAttempted: (acc.freeThrowsAttempted || 0) + (curr.freeThrowsAttempted || 0),
+                points:                  acc.points                  + (curr.points                  || 0),
+                totalRebounds:           acc.totalRebounds           + (curr.totalRebounds           || 0),
+                assists:                 acc.assists                  + (curr.assists                 || 0),
+                steals:                  acc.steals                   + (curr.steals                  || 0),
+                blocks:                  acc.blocks                   + (curr.blocks                  || 0),
+                turnovers:               acc.turnovers               + (curr.turnovers               || 0),
+                personalFouls:           acc.personalFouls           + (curr.personalFouls           || 0),
+                fieldGoalsMade:          acc.fieldGoalsMade          + (curr.fieldGoalsMade          || 0),
+                fieldGoalsAttempted:     acc.fieldGoalsAttempted     + (curr.fieldGoalsAttempted     || 0),
+                threePointersMade:       acc.threePointersMade       + (curr.threePointersMade       || 0),
+                threePointersAttempted:  acc.threePointersAttempted  + (curr.threePointersAttempted  || 0),
+                freeThrowsMade:          acc.freeThrowsMade          + (curr.freeThrowsMade          || 0),
+                freeThrowsAttempted:     acc.freeThrowsAttempted     + (curr.freeThrowsAttempted     || 0),
             };
-        }, {} as Partial<PlayerGameStatsDetailedResponse>);
+        }, { ...this.EMPTY_TOTALS });
     }
 
     async loadGameBoxscore(gameId: number): Promise<void> {

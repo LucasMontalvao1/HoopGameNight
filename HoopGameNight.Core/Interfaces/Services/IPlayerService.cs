@@ -11,6 +11,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<(List<PlayerResponse> Players, int TotalCount)> GetPlayersByTeamAsync(int teamId, int page, int pageSize);
         Task<(List<PlayerResponse> Players, int TotalCount)> GetAllPlayersAsync(int page, int pageSize);
         Task<PlayerResponse?> GetPlayerByIdAsync(int id);
+        Task<List<PlayerResponse>> GetPlayersByIdsAsync(IEnumerable<int> ids);
         Task SyncPlayersAsync(string? searchTerm = null);
     }
 }

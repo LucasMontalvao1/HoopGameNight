@@ -17,5 +17,6 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<bool> SyncPlayerGameStatsAsync(int playerId, int gameId);   
         Task<object?> GetPlayerGameStatsDirectAsync(int playerId, int gameId);
         Task<bool> UpdatePlayerCareerStatsAsync(int playerId);
+        Task<StatLeadersResponse> GetLeagueLeadersAsync(int season);
     }
 }

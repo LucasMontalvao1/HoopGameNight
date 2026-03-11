@@ -278,12 +278,22 @@
 // ===== SECONDARY GRID =====
 .secondary-content-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-md);
+  grid-template-columns: 1fr 340px;
+  gap: var(--spacing-lg);
 
-  @media (max-width: 640px) {
+  @media (max-width: 1024px) {
     grid-template-columns: 1fr;
   }
+}
+
+.secondary-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.leaders-container {
+  min-height: 400px;
 }
 
 .premium-card {
@@ -348,6 +358,52 @@
     font-size: 9px;
     font-weight: 700;
     color: var(--text-secondary);
+  }
+}
+
+.favorite-players-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.mini-player-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--surface-tertiary);
+    transform: translateX(4px);
+  }
+
+  .avatar-xs {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--background-tertiary);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .mini-info {
+    display: flex;
+    flex-direction: column;
+
+    .name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .team {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
   }
 }
 
@@ -752,5 +808,61 @@
   .material-icons {
     font-size: 48px;
     opacity: 0.3;
+  }
+}
+
+// ========================================
+// RESPONSIVIDADE (DASHBOARD)
+// ========================================
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    text-align: center;
+    padding: var(--spacing-lg);
+
+    &__meta {
+      justify-content: center;
+      margin-top: var(--spacing-sm);
+    }
+  }
+
+  .section-header {
+    flex-direction: column;
+    gap: var(--spacing-md);
+    align-items: flex-start;
+
+    .section-actions {
+      width: 100%;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+  }
+
+  .date-selector-group {
+    width: 100%;
+    justify-content: center;
+
+    button {
+      flex: 1;
+      padding: 8px 4px;
+    }
+  }
+
+  .games-grid-premium {
+    grid-template-columns: 1fr;
+  }
+
+  .secondary-content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-pane {
+    height: 420px;
+  }
+
+  .dashboard-sidebar {
+    position: relative;
+    top: 0;
   }
 }

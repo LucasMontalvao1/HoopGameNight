@@ -10,6 +10,7 @@ namespace HoopGameNight.Core.Interfaces.Repositories
         Task<(IEnumerable<Player> Players, int TotalCount)> SearchPlayersAsync(SearchPlayerRequest request);
         Task<(IEnumerable<Player> Players, int TotalCount)> GetPlayersByTeamAsync(int teamId, int page, int pageSize);
         Task<(IEnumerable<Player> Players, int TotalCount)> GetAllPlayersAsync(int page, int pageSize);
+        Task<IEnumerable<Player>> GetByIdsAsync(IEnumerable<int> ids);
         Task<Player?> GetByExternalIdAsync(int externalId);
         Task<Player?> GetByEspnIdAsync(string espnId);
         Task<bool> ExistsAsync(int externalId);

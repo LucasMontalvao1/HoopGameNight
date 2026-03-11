@@ -132,56 +132,87 @@
 
         <!-- Secondary Content Area -->
         <div class="secondary-content-grid">
-          <!-- Favoritos -->
-          <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.1s">
-            <div class="premium-card__header">
-              <span class="material-icons icon-gold">grade</span>
-              <h3>Seguindo</h3>
-            </div>
-            <div class="favorite-teams-scroll">
-              @for (team of favoriteTeams(); track team.id) {
-              <div class="mini-fav-item" (click)="navigateToTeam(team.abbreviation)">
-                <img [src]="getTeamLogoUrl(team.abbreviation)" [title]="team.displayName" class="mini-logo-fav">
-                <span class="mini-fav-item__abbr">{{ team.abbreviation }}</span>
-              </div>
-              } @empty {
-              <div class="empty-state-mini">
-                <p>Siga times para acesso rápido</p>
-                <button class="btn btn--ghost btn--sm" routerLink="/teams">Explorar</button>
-              </div>
-              }
-            </div>
-          </section>
+          <!-- League Leaders SECTION -->
+          <div class="leaders-container">
+            <app-league-leaders></app-league-leaders>
+          </div>
 
-          <!-- Busca Rápida -->
-          <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.2s">
-            <div class="premium-card__header">
-              <span class="material-icons">person_search</span>
-              <h3>Quick Search</h3>
-            </div>
-            <div class="premium-search-box">
-              <div class="search-input-group">
-                <span class="material-icons">search</span>
-                <input type="text" placeholder="Buscar jogador..." [ngModel]="playerSearchQuery()"
-                  (ngModelChange)="updatePlayerSearch($event)">
+          <div class="secondary-side-stack">
+            <!-- Favoritos: Times -->
+            <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.1s">
+              <div class="premium-card__header">
+                <span class="material-icons icon-gold">grade</span>
+                <h3>Times</h3>
               </div>
-
-              @if (showPlayerResults()) {
-              <div class="quick-results glass-panel">
-                @for (player of playerSearchResults().slice(0,5); track player.id) {
-                <div class="quick-result-row" (click)="selectPlayer(player)">
-                  <img [src]="getPlayerPhotoUrl(player)" class="avatar-xs">
-                  <div class="quick-result-info">
-                    <span class="name">{{ player.fullName }}</span>
-                    <span class="meta">{{ player.team.abbreviation }} • {{ player.position }}</span>
-                  </div>
+              <div class="favorite-teams-scroll">
+                @for (team of favoriteTeams(); track team.id) {
+                <div class="mini-fav-item" (click)="navigateToTeam(team.abbreviation)">
+                  <img [src]="getTeamLogoUrl(team.abbreviation)" [title]="team.displayName" class="mini-logo-fav">
+                  <span class="mini-fav-item__abbr">{{ team.abbreviation }}</span>
+                </div>
+                } @empty {
+                <div class="empty-state-mini">
+                  <p>Siga times para acesso rápido</p>
+                  <button class="btn btn--ghost btn--sm" routerLink="/teams">Explorar</button>
                 </div>
                 }
               </div>
+            </section>
+
+            <!-- Favoritos: Atletas -->
+            <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.15s">
+              <div class="premium-card__header">
+                <span class="material-icons icon-gold">person_add</span>
+                <h3>Atletas</h3>
+              </div>
+              <div class="favorite-players-list">
+                @for (player of favoritePlayers(); track player.id) {
+                <div class="mini-player-row" (click)="selectPlayer(player)">
+                  <img [src]="getPlayerPhotoUrl(player)" class="avatar-xs">
+                  <div class="mini-info">
+                    <span class="name">{{ player.fullName }}</span>
+                    <span class="team">{{ player.team?.abbreviation }}</span>
+                  </div>
+                </div>
+                } @empty {
+                <div class="empty-state-mini">
+                  <p>Favorite atletas para acesso rápido</p>
+                  <button class="btn btn--ghost btn--sm" routerLink="/players">Buscar</button>
+                </div>
+                }
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- Busca Rápida -->
+        <section class="premium-card glass-panel animate-fade-in" style="animation-delay: 0.2s">
+          <div class="premium-card__header">
+            <span class="material-icons">person_search</span>
+            <h3>Quick Search</h3>
+          </div>
+          <div class="premium-search-box">
+            <div class="search-input-group">
+              <span class="material-icons">search</span>
+              <input type="text" placeholder="Buscar jogador..." [ngModel]="playerSearchQuery()"
+                (ngModelChange)="updatePlayerSearch($event)">
+            </div>
+
+            @if (showPlayerResults()) {
+            <div class="quick-results glass-panel">
+              @for (player of playerSearchResults().slice(0,5); track player.id) {
+              <div class="quick-result-row" (click)="selectPlayer(player)">
+                <img [src]="getPlayerPhotoUrl(player)" class="avatar-xs">
+                <div class="quick-result-info">
+                  <span class="name">{{ player.fullName }}</span>
+                  <span class="meta">{{ player.team?.abbreviation }} • {{ player.position }}</span>
+                </div>
+              </div>
               }
             </div>
-          </section>
-        </div>
+            }
+          </div>
+        </section>
       </main>
 
       <!-- SIDEBAR: Coach Assistant -->

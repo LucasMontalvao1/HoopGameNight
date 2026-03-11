@@ -229,5 +229,34 @@ namespace HoopGameNight.Api.Controllers.V1
                 totalCount,
                 $"Jogadores da posição {position} recuperados com sucesso");
         }
+
+        /// <summary>
+        /// Buscar múltiplos jogadores por IDs
+        /// </summary>
+        /// <param name="ids">Lista de IDs separados por vírgula</param>
+        /// <returns>Lista de jogadores</returns>
+        [HttpGet("batch")]
+        [ProducesResponseType(typeof(ApiResponse<List<PlayerResponse>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<List<PlayerResponse>>>> GetPlayersByIds([FromQuery] string ids)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                if (string.IsNullOrWhiteSpace(ids))
+                    return Ok(new List<PlayerResponse>(), "Nenhum ID fornecido");
+
+                var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                .Select(s => int.TryParse(s, out var val) ? val : 0)
+                                .Where(val => val > 0)
+                                .ToList();
+
+                if (!idList.Any())
+                    return Ok(new List<PlayerResponse>(), "Nenhum ID válido fornecido");
+
+                Logger.LogInformation("Buscando lote de {Count} jogadores", idList.Count);
+                
+                var players = await _playerService.GetPlayersByIdsAsync(idList);
+                return Ok(players, $"{players.Count} jogadores recuperados com sucesso");
+            });
+        }
     }
 }

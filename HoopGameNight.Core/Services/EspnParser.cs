@@ -503,7 +503,8 @@ namespace HoopGameNight.Core.Services
 
         private void ParseAndAddStat(List<EspnStatDto> targetStats, string key, string valStr)
         {
-            if (valStr.Contains("-"))
+            // Only split for known composite keys like "FGM-FGA"
+            if (valStr.Contains("-") && (key.Contains("Made-") || key.Contains("Attempted") || key.Contains("fieldGoals") || key.Contains("threePoint") || key.Contains("freeThrows")))
             {
                 var parts = valStr.Split('-');
                 if (parts.Length == 2)
@@ -512,23 +513,25 @@ namespace HoopGameNight.Core.Services
                     {
                         targetStats.Add(new EspnStatDto { Name = "fieldGoalsMade", Value = (double)SafeParseDecimal(parts[0]) });
                         targetStats.Add(new EspnStatDto { Name = "fieldGoalsAttempted", Value = (double)SafeParseDecimal(parts[1]) });
+                        return;
                     }
                     else if (key == "threePointFieldGoalsMade-threePointFieldGoalsAttempted")
                     {
                         targetStats.Add(new EspnStatDto { Name = "threePointFieldGoalsMade", Value = (double)SafeParseDecimal(parts[0]) });
                         targetStats.Add(new EspnStatDto { Name = "threePointFieldGoalsAttempted", Value = (double)SafeParseDecimal(parts[1]) });
+                        return;
                     }
                     else if (key == "freeThrowsMade-freeThrowsAttempted")
                     {
                         targetStats.Add(new EspnStatDto { Name = "freeThrowsMade", Value = (double)SafeParseDecimal(parts[0]) });
                         targetStats.Add(new EspnStatDto { Name = "freeThrowsAttempted", Value = (double)SafeParseDecimal(parts[1]) });
+                        return;
                     }
                 }
             }
-            else
-            {
-                targetStats.Add(new EspnStatDto { Name = key, Value = (double)SafeParseDecimal(valStr) });
-            }
+            
+            // Fallback for normal stats, including negative numbers like plusMinus "-5"
+            targetStats.Add(new EspnStatDto { Name = key, Value = (double)SafeParseDecimal(valStr) });
         }
 
         public PlayerPosition? ParsePosition(string? pos)

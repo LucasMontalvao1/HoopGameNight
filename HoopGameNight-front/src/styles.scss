@@ -2,7 +2,7 @@
 @use './styles/design-system' as *;
 
 // Import Google Fonts
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Outfit:wght@400;500;600;700;900&display=swap');
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
 // ===== RESET =====
@@ -37,9 +37,11 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family-display);
+  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-tight);
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 h1 {
@@ -294,5 +296,31 @@ a {
   &--circle {
     border-radius: var(--border-radius-full);
     flex-shrink: 0;
+  }
+}
+
+// ===== RESPONSIVE UTILITIES =====
+.hide-mobile {
+  @media (max-width: 640px) {
+    display: none !important;
+  }
+}
+
+.show-mobile {
+  @media (min-width: 641px) {
+    display: none !important;
+  }
+}
+
+.full-width-mobile {
+  @media (max-width: 640px) {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+.stack-mobile {
+  @media (max-width: 640px) {
+    flex-direction: column !important;
   }
 }

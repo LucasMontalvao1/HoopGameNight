@@ -31,10 +31,23 @@ export class GameDetails implements OnInit, OnDestroy {
     protected readonly gameSummary = signal<string | null>(null);
     protected readonly isLoadingSummary = signal<boolean>(false);
 
+    protected readonly sortField = signal<string | null>(null);
+    protected readonly sortDirection = signal<'asc' | 'desc'>('desc');
+
+    protected readonly visitorTotals = computed(() => this.statsService.visitorTeamTotals());
+    protected readonly homeTotals = computed(() => this.statsService.homeTeamTotals());
+
     protected readonly gameSummaryHtml = computed(() => {
         const summary = this.gameSummary();
-        // marcado v4+ pode retornar Promise se não configurado. Forçando síncrono.
         return summary ? (marked.parse(summary, { async: false }) as string) : '';
+    });
+
+    protected readonly sortedVisitorStats = computed(() => {
+        return this.sortStats(this.statsService.currentGameBoxscore()?.visitorTeamStats || []);
+    });
+
+    protected readonly sortedHomeStats = computed(() => {
+        return this.sortStats(this.statsService.currentGameBoxscore()?.homeTeamStats || []);
     });
 
     constructor() { }
@@ -69,7 +82,6 @@ export class GameDetails implements OnInit, OnDestroy {
 
     async setTab(tab: 'boxscore' | 'summary'): Promise<void> {
         this.activeTab.set(tab);
-
         if (tab === 'summary' && !this.gameSummary()) {
             await this.loadGameSummary();
         }
@@ -95,7 +107,32 @@ export class GameDetails implements OnInit, OnDestroy {
         this.router.navigate(['/games']);
     }
 
+    toggleSort(field: string): void {
+        if (this.sortField() === field) {
+            this.sortDirection.set(this.sortDirection() === 'asc' ? 'desc' : 'asc');
+        } else {
+            this.sortField.set(field);
+            this.sortDirection.set('desc');
+        }
+    }
+
+    private sortStats(stats: any[]): any[] {
+        const field = this.sortField();
+        const direction = this.sortDirection();
+        if (!field) return stats;
+        return [...stats].sort((a, b) => {
+            const valA = a[field] ?? 0;
+            const valB = b[field] ?? 0;
+            return direction === 'asc' ? valA - valB : valB - valA;
+        });
+    }
+
     getTeamLogo(abbr: string): string {
         return `https://a.espncdn.com/i/teamlogos/nba/500/${abbr.toLowerCase()}.png`;
+    }
+
+    getFgPct(totals: { fieldGoalsMade?: number; fieldGoalsAttempted?: number } | undefined | null): string {
+        if (!totals || !totals.fieldGoalsAttempted) return '—';
+        return ((totals.fieldGoalsMade! / totals.fieldGoalsAttempted) * 100).toFixed(1);
     }
 }

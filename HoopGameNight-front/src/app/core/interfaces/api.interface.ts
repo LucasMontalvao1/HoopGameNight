@@ -148,7 +148,7 @@ export interface PlayerResponse {
   positionDisplay: string;
   height: string;
   weight: string;
-  team: TeamSummaryResponse;
+  team?: TeamSummaryResponse | null;
   displayName: string;
 }
 
@@ -271,4 +271,21 @@ export interface AskResponse {
   gamesAnalyzed: number;
   fromCache: boolean;
   timestamp: string;
+}
+
+export interface StatLeader {
+  rank: number;
+  playerId: number;
+  externalId?: number;
+  playerName: string;
+  team: string;
+  value: number;
+  gamesPlayed?: number;
+}
+
+export interface StatLeadersResponse {
+  scoringLeaders: StatLeader[];
+  reboundLeaders: StatLeader[];
+  assistLeaders: StatLeader[];
+  lastUpdated: string;
 }
