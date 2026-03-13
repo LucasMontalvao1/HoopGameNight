@@ -715,12 +715,72 @@
         }
     }
 
+    .ai-highlights {
+        margin-top: var(--spacing-2xl);
+        padding-top: var(--spacing-xl);
+        border-top: 1px dashed rgba(255, 255, 255, 0.1);
+
+        .highlights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        .highlight-card {
+            @include glass;
+            padding: var(--spacing-lg);
+            border-radius: var(--border-radius-lg);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease;
+
+            &:hover {
+                transform: translateY(-4px);
+                border-color: var(--accent-primary-alpha);
+            }
+
+            &.performance { border-left: 4px solid #10b981; }
+            &.stat { border-left: 4px solid var(--accent-primary); }
+            &.moment { border-left: 4px solid #f59e0b; }
+            &.bench { border-left: 4px solid #8b5cf6; }
+
+            .h-header {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 8px;
+
+                .material-icons {
+                    font-size: 20px;
+                    color: var(--text-secondary);
+                }
+
+                .h-title {
+                    font-weight: 800;
+                    font-size: 0.95rem;
+                    color: var(--text-primary);
+                }
+            }
+
+            .h-desc {
+                font-size: 0.85rem;
+                color: var(--text-secondary);
+                line-height: 1.5;
+                margin: 0;
+            }
+        }
+    }
+
     .ai-footer {
         margin-top: var(--spacing-2xl);
         font-size: 0.75rem;
         color: var(--text-tertiary);
         font-style: italic;
     }
+}
+
+// Remover brilho branco dos títulos de seção conforme pedido
+.section-title, .panel-title, h3 {
+    text-shadow: none !important;
 }
 
 @keyframes ai-glow {

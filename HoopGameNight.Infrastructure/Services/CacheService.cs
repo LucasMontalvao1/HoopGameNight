@@ -264,14 +264,22 @@ namespace HoopGameNight.Infrastructure.Services
                 if (_connectionMultiplexer != null)
                 {
                     var endpoints = _connectionMultiplexer.GetEndPoints();
+                    var deleteTasks = new List<Task>();
+
                     foreach (var endpoint in endpoints)
                     {
                         var server = _connectionMultiplexer.GetServer(endpoint);
                         foreach (var key in server.Keys(pattern: pattern))
                         {
-                            await _distributedCache!.RemoveAsync(key!);
+                            deleteTasks.Add(_distributedCache!.RemoveAsync(key!));
                             _memoryCache.Remove(key!); 
                         }
+                    }
+
+                    if (deleteTasks.Any())
+                    {
+                        await Task.WhenAll(deleteTasks);
+                        _logger.LogDebug("Pattern '{Pattern}': {Count} keys removed from Redis", pattern, deleteTasks.Count);
                     }
                 }
             }

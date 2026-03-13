@@ -9,10 +9,10 @@ namespace HoopGameNight.Core.Interfaces.Services
     public interface IGameSyncService
     {
         /// <summary>Sincroniza jogos de hoje com a ESPN.</summary>
-        Task SyncTodayGamesAsync();
+        Task SyncTodayGamesAsync(bool bypassCache = false);
 
         /// <summary>Sincroniza jogos de uma data específica.</summary>
-        Task<int> SyncGamesByDateAsync(DateTime date);
+        Task<int> SyncGamesByDateAsync(DateTime date, bool bypassCache = false);
 
         /// <summary>Sincroniza jogos de um período (day-by-day).</summary>
         Task<int> SyncGamesForPeriodAsync(DateTime startDate, DateTime endDate);

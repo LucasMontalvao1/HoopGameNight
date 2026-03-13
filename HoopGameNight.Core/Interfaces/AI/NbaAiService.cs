@@ -1,4 +1,4 @@
-﻿using HoopGameNight.Core.DTOs.Request;
+using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
@@ -25,8 +25,10 @@ namespace HoopGameNight.Core.Services.AI
         private readonly IGameStatsService _gameStatsService;
         private readonly ILogger<NbaAiService> _logger;
 
-        private readonly Dictionary<string, string> _teamKeywords = new();
-        private readonly Dictionary<string, string> _playerKeywords = new();
+        private static readonly Dictionary<string, string> _teamKeywords = new();
+        private static readonly Dictionary<string, string> _playerKeywords = new();
+        private static bool _keywordsLoaded = false;
+        private static readonly object _lock = new();
 
         public NbaAiService(
             IGameService gameService,
@@ -51,8 +53,18 @@ namespace HoopGameNight.Core.Services.AI
             _gameStatsService = gameStatsService;
             _logger = logger;
 
-            LoadTeamKeywords();
-            LoadPlayerKeywords();
+            if (!_keywordsLoaded)
+            {
+                lock (_lock)
+                {
+                    if (!_keywordsLoaded)
+                    {
+                        LoadTeamKeywords();
+                        LoadPlayerKeywords();
+                        _keywordsLoaded = true;
+                    }
+                }
+            }
         }
 
         private void LoadTeamKeywords()
@@ -202,85 +214,113 @@ namespace HoopGameNight.Core.Services.AI
 
             return response;
         }
-    
+
         public async Task<AskResponse> GetGameSummaryAsync(int gameId)
         {
-            _logger.LogInformation("Gerando resumo IA para o jogo ID: {GameId}", gameId);
+            _logger.LogInformation("Gerando resumo IA estruturado para o jogo ID: {GameId}", gameId);
     
-            // Chave de cache única por jogo
-            var cacheKey = $"ai:summary:game:{gameId}";
+            var cacheKey = $"ai:summary:game:{gameId}:v2";
 
-            // 1. Verificar cache primeiro (mais rápido que banco)
-            var cached = await _cacheService.GetAsync<string>(cacheKey);
-            if (!string.IsNullOrEmpty(cached))
+            var cachedJson = await _cacheService.GetAsync<string>(cacheKey);
+            if (!string.IsNullOrEmpty(cachedJson))
             {
-                _logger.LogInformation("Retornando resumo do CACHE para o jogo {GameId}", gameId);
+                _logger.LogInformation("Retornando resumo estruturado do CACHE para o jogo {GameId}", gameId);
                 return new AskResponse
                 {
                     Question = $"Resumo do jogo {gameId}",
-                    Answer = cached,
+                    Answer = cachedJson,
                     GamesAnalyzed = 1,
                     FromCache = true,
                     DataSource = "Cache (Permanent)"
                 };
             }
 
-            // 2. Buscar jogo no banco (como entidade para acesso a AiSummary)
             var gameEntity = await _gameRepository.GetByIdAsync(gameId);
             if (gameEntity == null) return new AskResponse { Answer = "Jogo não encontrado." };
 
-            // 3. Se já tiver resumo no banco e o jogo terminou, use-o e resalva no cache
-            if (gameEntity.IsCompleted && !string.IsNullOrEmpty(gameEntity.AiSummary))
+            if (gameEntity.IsCompleted && !string.IsNullOrEmpty(gameEntity.AiSummary) && !string.IsNullOrEmpty(gameEntity.AiHighlights))
             {
-                _logger.LogInformation("Retornando resumo do BANCO e populando cache para o jogo {GameId}", gameId);
-                // Salva no cache permanente (sem expiração – jogo finalizado não muda)
-                await _cacheService.SetAsync(cacheKey, gameEntity.AiSummary, expiration: null);
+                var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                var combined = JsonSerializer.Serialize(new { summary = gameEntity.AiSummary, highlights = JsonSerializer.Deserialize<JsonElement>(gameEntity.AiHighlights) }, options);
+                await _cacheService.SetAsync(cacheKey, combined, expiration: null);
+                
                 return new AskResponse
                 {
                     Question = $"Resumo do jogo {gameEntity.GameTitle}",
-                    Answer = gameEntity.AiSummary,
+                    Answer = combined,
                     GamesAnalyzed = 1,
                     DataSource = "Database (Persisted)"
                 };
             }
 
-            // 4. Buscar jogo como Response (para consistência com o PromptBuilder)
             var game = await _gameService.GetGameByIdAsync(gameId);
             if (game == null) return new AskResponse { Answer = "Detalhes do jogo não localizados." };
     
-            // 5. Calcular líderes direto do banco (sem chamar ESPN - muito mais rápido e confiável)
             var leaders = await CalculateLeadersFromBoxscoreAsync(gameId);
-            
-            // 5.1 Buscar Boxscore completo para análise profunda
             var boxscore = await _gameStatsService.GetGamePlayerStatsAsync(gameId);
 
-            // 6. Montar Prompt Especializado
-            var prompt = _promptBuilder.BuildGameSummaryPrompt(game, leaders, boxscore);
-    
-            // 7. Chamar Groq
-            var answer = await _groqClient.GenerateAsync(prompt);
-
-            // 8. Persistência: Banco + Cache Permanente (apenas jogos encerrados)
-            if (gameEntity.IsCompleted && !string.IsNullOrEmpty(answer))
+            var prompt = _promptBuilder.BuildGameSummaryJsonPrompt(game, leaders, boxscore);
+            var rawResponse = await _groqClient.GenerateAsync(prompt);
+            
+            try 
             {
-                // 8.1 Salva no banco
-                gameEntity.AiSummary = answer;
-                await _gameRepository.UpdateAsync(gameEntity);
-                _logger.LogInformation("Resumo salvo no banco de dados para o jogo {GameId}", gameId);
+                var cleanerResponse = rawResponse.Trim();
+                if (cleanerResponse.StartsWith("```json")) cleanerResponse = cleanerResponse.Substring(7);
+                if (cleanerResponse.EndsWith("```")) cleanerResponse = cleanerResponse.Substring(0, cleanerResponse.Length - 3);
+                cleanerResponse = cleanerResponse.Trim();
 
-                // 8.2 Salva no cache permanente (sem expiração – jogo finalizado não muda)
-                await _cacheService.SetAsync(cacheKey, answer, expiration: null);
-                _logger.LogInformation("Resumo salvo no cache permanente para o jogo {GameId}", gameId);
+                var aiData = JsonSerializer.Deserialize<AiGameStory>(cleanerResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                if (aiData != null && !string.IsNullOrEmpty(aiData.Summary))
+                {
+                    var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                    if (gameEntity.IsCompleted)
+                    {
+                        gameEntity.AiSummary = aiData.Summary;
+                        gameEntity.AiHighlights = JsonSerializer.Serialize(aiData.Highlights, options);
+                        await _gameRepository.UpdateAsync(gameEntity);
+                        
+                        var cacheData = JsonSerializer.Serialize(new { summary = aiData.Summary, highlights = aiData.Highlights }, options);
+                        await _cacheService.SetAsync(cacheKey, cacheData, expiration: null);
+                        
+                        _logger.LogInformation("Resumo e Highlights salvos para o jogo {GameId}", gameId);
+                    }
+
+                    return new AskResponse
+                    {
+                        Question = $"Resumo do jogo {game.VisitorTeam.Abbreviation} vs {game.HomeTeam.Abbreviation}",
+                        Answer = JsonSerializer.Serialize(new { summary = aiData.Summary, highlights = aiData.Highlights }, options),
+                        GamesAnalyzed = 1,
+                        DataSource = "Database (Processed)",
+                        DetectedTeams = new List<string> { game.HomeTeam.Abbreviation, game.VisitorTeam.Abbreviation }
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao parsear resposta JSON da IA. Retornando texto bruto.");
             }
     
             return new AskResponse
             {
                 Question = $"Resumo do jogo {game.VisitorTeam.Abbreviation} vs {game.HomeTeam.Abbreviation}",
-                Answer = answer,
+                Answer = rawResponse,
                 GamesAnalyzed = 1,
-                DataSource = "Database (Processed)",
-                DetectedTeams = new List<string> { game.HomeTeam.Abbreviation, game.VisitorTeam.Abbreviation }
+                DataSource = "Database (Raw Error Fallback)"
             };
+        }
+
+        private class AiGameStory
+        {
+            public string Summary { get; set; } = string.Empty;
+            public List<AiHighlight> Highlights { get; set; } = new();
+        }
+
+        private class AiHighlight
+        {
+            public string Title { get; set; } = string.Empty;
+            public string Description { get; set; } = string.Empty;
+            public string Type { get; set; } = string.Empty;
         }
 
         private async Task<GameLeadersResponse?> CalculateLeadersFromBoxscoreAsync(int gameId)

@@ -6,6 +6,7 @@ using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.Extensions.Logging;
 using RedLockNet;
 using Hangfire;
+using HoopGameNight.Core.Constants;
 
 namespace HoopGameNight.Infrastructure.Jobs
 {
@@ -14,6 +15,8 @@ namespace HoopGameNight.Infrastructure.Jobs
         private readonly IGameService _gameService;
         private readonly IGameSyncService _gameSyncService;
         private readonly ITeamService _teamService;
+        private readonly IPlayerService _playerService;
+        private readonly IPlayerStatsService _playerStatsService;
         private readonly IPlayerStatsSyncService _playerStatsSyncService;
         private readonly IBackgroundSyncService _backgroundSyncService;
         private readonly ICacheService _cacheService;
@@ -24,6 +27,8 @@ namespace HoopGameNight.Infrastructure.Jobs
             IGameService gameService,
             IGameSyncService gameSyncService,
             ITeamService teamService,
+            IPlayerService playerService,
+            IPlayerStatsService playerStatsService,
             IPlayerStatsSyncService playerStatsSyncService,
             IBackgroundSyncService backgroundSyncService,
             ICacheService cacheService,
@@ -33,6 +38,8 @@ namespace HoopGameNight.Infrastructure.Jobs
             _gameService = gameService;
             _gameSyncService = gameSyncService;
             _teamService = teamService;
+            _playerService = playerService;
+            _playerStatsService = playerStatsService;
             _playerStatsSyncService = playerStatsSyncService;
             _backgroundSyncService = backgroundSyncService;
             _cacheService = cacheService;
@@ -57,7 +64,7 @@ namespace HoopGameNight.Infrastructure.Jobs
         {
             var resource = "lock:hangfire:game_sync";
             var expiry = TimeSpan.FromMinutes(10);
-            
+
             if (_lockFactory != null)
             {
                 using (var redLock = await _lockFactory.CreateLockAsync(resource, expiry))
@@ -77,9 +84,9 @@ namespace HoopGameNight.Infrastructure.Jobs
             }
         }
 
-        private async Task ExecuteGameSyncLogic()
+        private async Task ExecuteGameSyncLogic(bool bypassCache = false)
         {
-            _logger.LogInformation("Iniciando Sincronização de Jogos");
+            _logger.LogInformation("Iniciando Sincronização de Jogos (BypassCache: {Bypass})", bypassCache);
 
             var teams = await _teamService.GetAllTeamsAsync();
             if (teams.Count < 30)
@@ -87,15 +94,54 @@ namespace HoopGameNight.Infrastructure.Jobs
                 await _teamService.SyncAllTeamsAsync();
             }
 
-            await _gameSyncService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1));
-            await _gameSyncService.SyncTodayGamesAsync();
+            await _gameSyncService.SyncGamesByDateAsync(DateTime.Today.AddDays(-1), bypassCache);
+            await _gameSyncService.SyncTodayGamesAsync(bypassCache);
             await _gameSyncService.SyncFutureGamesAsync(7);
 
             _logger.LogInformation("Sincronização de Jogos concluída com sucesso");
         }
 
+        [AutomaticRetry(Attempts = 1)]
+        [Queue("sync")]
+        public async Task SyncLiveGamesAsync()
+        {
+            var resource = "lock:hangfire:live_game_sync";
+            var expiry = TimeSpan.FromSeconds(45);
+            
+            if (_lockFactory != null)
+            {
+                using (var redLock = await _lockFactory.CreateLockAsync(resource, expiry))
+                {
+                    if (!redLock.IsAcquired) return;
+                    await ExecuteLiveGameSyncLogic();
+                }
+            }
+            else
+            {
+                await ExecuteLiveGameSyncLogic();
+            }
+        }
+
+        private async Task ExecuteLiveGameSyncLogic()
+        {
+            var todayGames = await _gameService.GetTodayGamesAsync();
+            
+            // Verifica se há algum jogo acontecendo agora ou prestes a começar
+            var activeGames = todayGames.Any(g => 
+                g.Status == GameStatus.Live.ToString() || 
+                (g.Status == GameStatus.Scheduled.ToString() && g.DateTime >= DateTime.UtcNow.AddMinutes(-10) && g.DateTime <= DateTime.UtcNow.AddMinutes(10))
+            );
+
+            if (activeGames)
+            {
+                _logger.LogInformation("LIVE SYNC: Jogos ativos detectados. Sincronizando...");
+                await _gameSyncService.SyncTodayGamesAsync(bypassCache: true);
+            }
+        }
+
         [AutomaticRetry(Attempts = 2)]
         [Queue("stats")]
+
         public async Task SyncPlayerStatsAsync()
         {
             var resource = "lock:hangfire:player_stats_sync";
@@ -139,6 +185,77 @@ namespace HoopGameNight.Infrastructure.Jobs
             await _cacheService.RemoveByPatternAsync("leaders_assists_*");
 
             _logger.LogInformation("Sincronização de Estatísticas concluída");
+        }
+        [AutomaticRetry(Attempts = 0)]
+        [Queue("sync")]
+        public async Task SyncManualEssentialJobAsync()
+        {
+            _logger.LogInformation("MANUAL SYNC: Iniciando Sincronização Essencial (On-Demand)");
+            await ExecuteGameSyncLogic(bypassCache: true);
+            _logger.LogInformation("MANUAL SYNC: Sincronização Essencial concluída");
+        }
+
+        [AutomaticRetry(Attempts = 0)]
+        [Queue("sync")]
+        public async Task SyncManualFullJobAsync()
+        {
+            _logger.LogInformation("MANUAL SYNC: Iniciando Sincronização TOTAL (On-Demand)");
+            
+            // 1. Teams
+            _logger.LogInformation("Step 1/4: Sincronizando Times...");
+            await _teamService.SyncAllTeamsAsync();
+            
+            // 2. Players
+            _logger.LogInformation("Step 2/4: Sincronizando Jogadores...");
+            await _playerService.SyncPlayersAsync(null);
+            
+            var (players, total) = await _playerService.GetAllPlayersAsync(1, 1500);
+            _logger.LogInformation("Step 3/4: Sincronizando Estatísticas para {Count} jogadores...", total);
+
+            int statsSyncedCount = 0;
+            foreach (var p in players)
+            {
+                try 
+                {
+                    await _playerStatsService.GetPlayerCareerStatsFromEspnAsync(p.Id);
+                    await _playerStatsService.GetPlayerGamelogFromEspnAsync(p.Id);
+                    statsSyncedCount++;
+                    
+                    if (statsSyncedCount % 50 == 0)
+                        _logger.LogInformation("Progresso Stats: {Count}/{Total} concluídos", statsSyncedCount, total);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Falha ao sincronizar dados do jogador {PlayerId}: {Error}", p.Id, ex.Message);
+                }
+            }
+
+            // 4. Games
+            _logger.LogInformation("Step 4/4: Sincronizando Jogos de Hoje...");
+            await _gameSyncService.SyncTodayGamesAsync(bypassCache: true);
+
+            _cacheService.Clear();
+            _logger.LogInformation("MANUAL SYNC: Sincronização TOTAL concluída com sucesso!");
+        }
+
+        [AutomaticRetry(Attempts = 0)]
+        [Queue("sync")]
+        public async Task SyncManualTodayGamesJobAsync()
+        {
+            _logger.LogInformation("MANUAL SYNC: Sincronizando jogos de hoje");
+            await _gameSyncService.SyncTodayGamesAsync(bypassCache: true);
+            _cacheService.Remove(CacheKeys.TodayGames());
+            _logger.LogInformation("MANUAL SYNC: Jogos de hoje sincronizados");
+        }
+
+        [AutomaticRetry(Attempts = 0)]
+        [Queue("sync")]
+        public async Task SyncManualGamesByDateJobAsync(DateTime date)
+        {
+            _logger.LogInformation("MANUAL SYNC: Sincronizando jogos para a data {Date}", date.ToString("yyyy-MM-dd"));
+            await _gameSyncService.SyncGamesByDateAsync(date, bypassCache: true);
+            _cacheService.Remove(CacheKeys.GamesByDate(date));
+            _logger.LogInformation("MANUAL SYNC: Jogos para a data {Date} sincronizados", date.ToString("yyyy-MM-dd"));
         }
     }
 }

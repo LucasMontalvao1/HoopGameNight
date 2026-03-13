@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS teams (
+CREATE TABLE IF NOT EXISTS teams (
     id INT AUTO_INCREMENT PRIMARY KEY,
     external_id INT NOT NULL UNIQUE COMMENT 'Legacy external ID',
     external_espn_id VARCHAR(50) DEFAULT NULL UNIQUE COMMENT 'ESPN Team ID (string)',

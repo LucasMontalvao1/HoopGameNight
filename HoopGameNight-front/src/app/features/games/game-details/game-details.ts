@@ -28,7 +28,8 @@ export class GameDetails implements OnInit, OnDestroy {
 
     private readonly _gameId = signal<number | null>(null);
     protected readonly activeTab = signal<'boxscore' | 'summary'>('boxscore');
-    protected readonly gameSummary = signal<string | null>(null);
+    protected readonly gameSummaryMarkdown = signal<string | null>(null);
+    protected readonly gameSummaryHighlights = signal<any[]>([]);
     protected readonly isLoadingSummary = signal<boolean>(false);
 
     protected readonly sortField = signal<string | null>(null);
@@ -38,7 +39,7 @@ export class GameDetails implements OnInit, OnDestroy {
     protected readonly homeTotals = computed(() => this.statsService.homeTeamTotals());
 
     protected readonly gameSummaryHtml = computed(() => {
-        const summary = this.gameSummary();
+        const summary = this.gameSummaryMarkdown();
         return summary ? (marked.parse(summary, { async: false }) as string) : '';
     });
 
@@ -82,7 +83,7 @@ export class GameDetails implements OnInit, OnDestroy {
 
     async setTab(tab: 'boxscore' | 'summary'): Promise<void> {
         this.activeTab.set(tab);
-        if (tab === 'summary' && !this.gameSummary()) {
+        if (tab === 'summary' && !this.gameSummaryMarkdown()) {
             await this.loadGameSummary();
         }
     }
@@ -94,10 +95,19 @@ export class GameDetails implements OnInit, OnDestroy {
         this.isLoadingSummary.set(true);
         try {
             const response = await this.askService.getGameSummary(id);
-            this.gameSummary.set(response.answer);
+            // Backend retorna JSON: {summary: "markdown...", highlights: [...]}
+            try {
+                const parsed = JSON.parse(response.answer);
+                this.gameSummaryMarkdown.set(parsed.summary ?? response.answer);
+                this.gameSummaryHighlights.set(parsed.highlights ?? []);
+            } catch {
+                // Fallback: resposta já é texto puro
+                this.gameSummaryMarkdown.set(response.answer);
+                this.gameSummaryHighlights.set([]);
+            }
         } catch (error) {
             console.error('Erro ao carregar resumo IA:', error);
-            this.gameSummary.set('Não foi possível gerar o resumo automático para este jogo no momento.');
+            this.gameSummaryMarkdown.set('Não foi possível gerar o resumo automático para este jogo no momento.');
         } finally {
             this.isLoadingSummary.set(false);
         }

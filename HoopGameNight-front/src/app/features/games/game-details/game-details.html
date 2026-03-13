@@ -333,14 +333,34 @@
             <app-skeleton-loader width="90%" height="20px" className="mb-2"></app-skeleton-loader>
             <app-skeleton-loader width="70%" height="20px"></app-skeleton-loader>
         </div>
-        } @else if (gameSummary()) {
+        } @else if (gameSummaryMarkdown()) {
         <div class="ai-response-premium">
             <div class="ai-response-header">
                 <span class="material-icons">auto_awesome</span>
                 <span>Análise do Coach Assistant</span>
             </div>
+
             <div class="ai-content-body" [innerHTML]="gameSummaryHtml() | safeHtml">
             </div>
+
+            <!-- Highlights Section -->
+            @if (gameSummaryHighlights().length > 0) {
+            <div class="ai-highlights">
+                <div class="highlights-grid">
+                    @for (highlight of gameSummaryHighlights(); track highlight.title || highlight.Title) {
+                    <div class="highlight-card" [class]="(highlight.type || highlight.Type || '').toLowerCase()">
+                        <div class="h-header">
+                            <span class="material-icons">{{ (highlight.type || highlight.Type || '').toLowerCase() === 'performance' ? 'trending_up' : 
+                                                          (highlight.type || highlight.Type || '').toLowerCase() === 'stat' ? 'numbers' : 'star' }}</span>
+                            <span class="h-title">{{ highlight.title || highlight.Title }}</span>
+                        </div>
+                        <p class="h-desc">{{ highlight.description || highlight.Description }}</p>
+                    </div>
+                    }
+                </div>
+            </div>
+            }
+
             <div class="ai-footer">
                 *Análise baseada em dados oficiais da ESPN.
             </div>

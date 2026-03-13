@@ -1,4 +1,4 @@
-﻿using HoopGameNight.Core.DTOs.Response;
+using HoopGameNight.Core.DTOs.Response;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,24 +11,20 @@ namespace HoopGameNight.Core.Services.AI
         {
             var gamesText = FormatGames(games, leaders);
             var statsText = string.IsNullOrWhiteSpace(playerStatsText)
-                ? "Nenhum dado estatístico de jogador foi encontrado."
+                ? "Nenhum dado estatístico de jogador foi encontrado nos registros locais."
                 : playerStatsText;
 
-            return $@"Você é o **Coach Assistant**, um analista sênior da NBA responsável por responder perguntas de fãs de basquete.
+            return $@"Você é o **Coach Assistant**, um analista técnico da NBA. Responda de forma DIRETA, CURTA e OBJETIVA.
 
-### 📋 REGRAS CRÍTICAS DE RESPOSTA:
-1. **BASE DE DADOS:** Use **APENAS** os dados fornecidos em ""DADOS DISPONÍVEIS"".
-2. **VERACIDADE:** Nunca invente estatísticas, eventos, jogadores ou resultados. Se não houver dados, responda: ""Não encontrei essa informação nos registros oficiais.""
-3. **TONALIDADE:** Responda de forma natural, clara e objetiva, como um resumo esportivo de um portal de notícias (ex: ESPN, Globo Esporte).
-4. **FOCO:** Responda apenas sobre NBA. Para outros temas, informe que seu conhecimento é restrito ao basquete.
-5. **ESTRUTURA:** Use Markdown (negrito, tabelas e listas) para organizar a resposta e facilitar a leitura.
-6. **PROMPT DE JOGOS:** Se a pergunta for sobre como foi um jogo, siga a ordem: Resultado -> Destaque -> Análise curta.
+### 📋 REGRAS DE OURO:
+1. **OBJETIVIDADE:** Vá direto ao ponto. Use listas e negrito.
+2. **SEM DESCULPAS:** Se os dados de jogos estão listados abaixo, NÃO diga ""infelizmente não tenho informações"". Use o que está nos DADOS DISPONÍVEIS.
+3. **FORMATO:** 
+   - Se perguntarem ""quais jogos"", liste apenas os confrontos, horários e placares.
+   - Se perguntarem sobre um jogo específico, use: Placar -> Destaque -> Breve Comentário.
+4. **VERACIDADE:** Se um dado (como rebotes de um jogador específico) não estiver nos DADOS DISPONÍVEIS, apenas não mencione ou diga que o registro local não possui detalhes deste scout.
 
----
-
-### 📋 DADOS DISPONÍVEIS PARA CONSULTA:
-
-**DATA E HORA ATUAL:** {DateTime.Now:dd/MM/yyyy HH:mm} (Brasília)
+### 📋 DADOS DISPONÍVEIS ({DateTime.Now:dd/MM/yyyy HH:mm}):
 
 **JOGOS:**
 {gamesText}
@@ -37,14 +33,12 @@ namespace HoopGameNight.Core.Services.AI
 {statsText}
 
 ---
+**PERGUNTA:** ""{question}""
 
-### 💬 PERGUNTA DO USUÁRIO:
-""{question}""
-
-Responda agora de forma profissional em Português do Brasil:";
+Responda agora (Português Brasil):";
         }
 
-        public string BuildGameSummaryPrompt(GameResponse game, GameLeadersResponse? leaders, GamePlayerStatsResponse? boxscore = null)
+        public string BuildGameSummaryJsonPrompt(GameResponse game, GameLeadersResponse? leaders, GamePlayerStatsResponse? boxscore = null)
         {
             var homeTeam = game.HomeTeam;
             var awayTeam = game.VisitorTeam;
@@ -52,58 +46,31 @@ Responda agora de forma profissional em Português do Brasil:";
             var boxscoreText = FormatFullBoxscore(boxscore);
 
             return $@"
-Você é um analista de jogos da NBA responsável por gerar um resumo envolvente para um aplicativo de fãs de basquete.
-O resumo deve ser baseado APENAS nos dados do boxscore fornecidos abaixo.
+Você é um analista de jogos da NBA. Sua tarefa é gerar um resumo em JSON estruturado para um aplicativo.
+O JSON DEVE seguir este formato exato:
+{{
+  ""summary"": ""Texto em MarkDown do resumo aqui..."",
+  ""highlights"": [
+    {{ ""title"": ""Destaque 1"", ""description"": ""Descrição curta"", ""type"": ""performance"" }},
+    {{ ""title"": ""Destaque 2"", ""description"": ""Descrição curta"", ""type"": ""moment"" }}
+  ]
+}}
 
-### REGRAS IMPORTANTES:
+### REGRAS DO CONTEÚDO:
 - Use APENAS os dados presentes no boxscore.
-- Não invente eventos do jogo (runs, viradas, momentos de quarto, etc.).
-- Baseie todos os insights em números concretos.
-- Evite frases genéricas como ""grande jogo"" ou ""partida intensa"".
-- O resumo deve ser em Português do Brasil.
-- Não gere insights muito longos.
+- O campo 'summary' deve conter o resumo tradicional em MarkDown (Análise da Partida, Líderes e Insights).
+- O campo 'highlights' deve conter de 3 a 5 destaques curtos e impactantes.
+- Tipos válidos para highlights: 'performance', 'stat', 'moment', 'bench'.
+- Responda APENAS o JSON, sem textos explicativos antes ou depois.
 
-### ANÁLISE DO BOXSCORE (OBRIGATÓRIO):
-Ao gerar insights, considere:
-- Diferença de pontuação entre os times ({game.VisitorTeamScore} x {game.HomeTeamScore})
-- Rebotes totais e Assistências totais
-- Roubos de bola e tocos
-- Aproveitamento de arremessos (FG%, 3PT%, FT%)
-- Jogadores com alto aproveitamento (FG > 60%)
-- Jogadores com alto +/- (impacto em quadra)
-- Jogadores que marcaram muitos pontos em poucos minutos
-- Contribuição do banco
-
-### ESTRUTURA DA RESPOSTA (OBRIGATÓRIO):
-
-## Análise da Partida
-Um parágrafo curto explicando quem venceu, a diferença de pontos e o destaque geral baseado nos números.
-
-## Líderes Estatísticos
-| Categoria | {awayTeam.Abbreviation} | {homeTeam.Abbreviation} |
-| :--- | :--- | :--- |
-| **Pontos** | [Nome] ([Valor]) | [Nome] ([Valor]) |
-| **Rebotes** | [Nome] ([Valor]) | [Nome] ([Valor]) |
-| **Assistências** | [Nome] ([Valor]) | [Nome] ([Valor]) |
-
-## Insights da Partida
-Gerar de 4 a 6 insights curtos, cada um em sua própria linha.
-**Formato:** Use o caractere ""•"" seguido do insight.
-
----
-
-### 📋 DADOS PARA O RESUMO:
+### DADOS PARA O RESUMO:
 - Placar Final: {awayTeam.DisplayName} {game.VisitorTeamScore} x {game.HomeTeamScore} {homeTeam.DisplayName}
 - {leadersText}
 
 **BOXSCORE DETALHADO:**
 {boxscoreText}
 
-### TOM DO TEXTO:
-- Natural, claro, objetivo e funcional.
-- Semelhante a um resumo esportivo de site de notícias.
-
-Gere o resumo agora:";
+Gere o JSON agora:";
         }
 
         public string FormatFullBoxscore(GamePlayerStatsResponse? boxscore)

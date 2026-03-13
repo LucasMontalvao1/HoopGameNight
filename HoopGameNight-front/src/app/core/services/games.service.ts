@@ -2,6 +2,7 @@ import { Injectable, signal, computed, effect } from '@angular/core';
 import { GameResponse, GetGamesRequest, SyncStatusResponse } from '../interfaces/api.interface';
 import { GamesApiService } from './games-api.service';
 import { APP_CONSTANTS } from '../constants/app.constants';
+import { SignalrService } from './signalr.service';
 
 @Injectable({
   providedIn: 'root'
@@ -65,14 +66,85 @@ export class GamesService {
 
   private readonly cache = new Map<string, { data: any; timestamp: number; ttl?: number }>();
 
-  constructor(private readonly gamesApi: GamesApiService) {
+  constructor(
+    private readonly gamesApi: GamesApiService,
+    private readonly signalrService: SignalrService
+  ) {
+    this.signalrService.startConnection();
+
     effect(() => {
-      if (this.hasLiveGames()) {
+      const liveUpdates = this.signalrService.liveGamesUpdates();
+      if (liveUpdates && liveUpdates.length > 0) {
+        this.applySignalrUpdates(liveUpdates);
+      }
+    }, { allowSignalWrites: true });
+
+    effect(() => {
+      const live = this.hasLiveGames();
+      if (live) {
         this.startAutoRefresh();
+      } else {
+        this.stopAutoRefresh();
       }
     });
 
-    console.log('GamesService inicializado');
+    console.log('GamesService inicializado com suporte a SignalR');
+  }
+
+  private lastSignalrUpdate = 0;
+  private signalrUpdateBuffer: GameResponse[] = [];
+  private signalrUpdateTimeout?: any;
+
+  private applySignalrUpdates(updatedGames: GameResponse[]): void {
+    if (!updatedGames?.length) return;
+
+    // Buffer de atualizações para evitar jitter quando chegam muitas mensagens em rajada
+    this.signalrUpdateBuffer = [...this.signalrUpdateBuffer, ...updatedGames];
+    
+    if (this.signalrUpdateTimeout) {
+      clearTimeout(this.signalrUpdateTimeout);
+    }
+
+    this.signalrUpdateTimeout = setTimeout(() => {
+      this.processBufferedUpdates();
+      this.signalrUpdateTimeout = undefined;
+    }, 100); // 100ms de debounce
+  }
+
+  private processBufferedUpdates(): void {
+    if (this.signalrUpdateBuffer.length === 0) return;
+
+    const updates = this.signalrUpdateBuffer;
+    this.signalrUpdateBuffer = [];
+
+    // Atualiza jogos de hoje (Merge stateful)
+    const currentToday = [...this._todayGames()];
+    let changedToday = false;
+
+    // Processa os updates de trás pra frente ou apenas o mais recente de cada ID
+    const uniqueUpdates = new Map<number, GameResponse>();
+    updates.forEach(u => uniqueUpdates.set(u.id, u));
+
+    uniqueUpdates.forEach((update, id) => {
+      const idx = currentToday.findIndex(g => g.id === id);
+      if (idx !== -1) {
+        currentToday[idx] = { ...currentToday[idx], ...update };
+        changedToday = true;
+      }
+    });
+
+    if (changedToday) {
+      this._todayGames.set(currentToday);
+    }
+    
+    // Atualiza jogo selecionado atual, se aplicável
+    const selected = this._selectedGame();
+    if (selected) {
+      const match = uniqueUpdates.get(selected.id);
+      if (match) {
+        this._selectedGame.set({ ...selected, ...match });
+      }
+    }
   }
 
   async loadTodayGames(forceRefresh = false): Promise<void> {
@@ -380,8 +452,9 @@ export class GamesService {
   private autoRefreshTimer?: number;
 
   private startAutoRefresh(): void {
-    this.stopAutoRefresh();
+    if (this.autoRefreshTimer) return; // Já está rodando
 
+    console.log('Iniciando Auto-Refresh (Live Games)');
     this.autoRefreshTimer = window.setInterval(async () => {
       if (this.hasLiveGames()) {
         console.log('Auto-refresh: atualizando jogos ao vivo...');

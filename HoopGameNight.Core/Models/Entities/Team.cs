@@ -1,4 +1,4 @@
-﻿using HoopGameNight.Core.Enums;
+using HoopGameNight.Core.Enums;
 
 namespace HoopGameNight.Core.Models.Entities
 {
@@ -12,6 +12,8 @@ namespace HoopGameNight.Core.Models.Entities
         public string City { get; set; } = string.Empty;
         public Conference Conference { get; set; }
         public string Division { get; set; } = string.Empty;
+        public int? Wins { get; set; }
+        public int? Losses { get; set; }
         public string DisplayName => $"{City} {Name}";
         public string ConferenceDisplay => Conference.ToString();
 

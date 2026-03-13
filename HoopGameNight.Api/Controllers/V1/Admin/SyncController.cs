@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +9,8 @@ using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Services;
 using HoopGameNight.Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
+using Hangfire;
+using HoopGameNight.Infrastructure.Jobs;
 
 namespace HoopGameNight.Api.Controllers.V1.Admin
 {
@@ -19,6 +21,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
     [ApiExplorerSettings(GroupName = "admin")]
     public class SyncController : BaseApiController
     {
+        private static readonly System.Threading.SemaphoreSlim _syncLock = new(1, 1);
         private readonly IGameService _gameService;
         private readonly IGameSyncService _gameSyncService;
         private readonly ITeamService _teamService;
@@ -28,6 +31,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         private readonly ICacheService _cacheService;
         private readonly ISyncHealthService _healthService;
         private readonly IBackgroundSyncService _backgroundSyncService;
+        private readonly IBackgroundJobClient _backgroundJobClient;
 
         public SyncController(
             IGameService gameService,
@@ -39,6 +43,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
             ICacheService cacheService,
             ISyncHealthService healthService,
             IBackgroundSyncService backgroundSyncService,
+            IBackgroundJobClient backgroundJobClient,
             ILogger<SyncController> logger) : base(logger)
         {
             _gameService = gameService;
@@ -50,171 +55,61 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
             _cacheService = cacheService;
             _healthService = healthService;
             _backgroundSyncService = backgroundSyncService;
+            _backgroundJobClient = backgroundJobClient;
         }
 
         /// <summary>
         /// Sincroniza dados fundamentais para o funcionamento do sistema (Times e Jogos de hoje).
         /// </summary>
         [HttpPost("essential")]
-        [ProducesResponseType(typeof(ApiResponse<SyncResult>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<SyncResult>>> SyncEssential()
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
+        public async Task<ActionResult<ApiResponse<object>>> SyncEssential()
         {
-            return await ExecuteAsync(async () =>
+            if (!_syncLock.Wait(0))
             {
-                var startTime = DateTime.UtcNow;
-                var errors = new List<string>();
-                int teamsCount = 0, gamesCount = 0;
+                return Conflict(new { message = "Uma sincronização já está em andamento. Aguarde alguns instantes." });
+            }
 
-                try
-                {
-                    await _teamService.SyncAllTeamsAsync();
-                    var teams = await _teamService.GetAllTeamsAsync();
-                    teamsCount = teams.Count;
-                    _cacheService.InvalidatePattern(ApiConstants.CacheKeys.TEAM_PATTERN);
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"Teams sync failed: {ex.Message}");
-                    Logger.LogError(ex, "Failed to sync teams");
-                }
-
-                try
-                {
-                    await _gameSyncService.SyncTodayGamesAsync();
-                    var games = await _gameService.GetTodayGamesAsync();
-                    gamesCount = games.Count;
-                    _cacheService.InvalidatePattern(ApiConstants.CacheKeys.GAMES_PATTERN);
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"Games sync failed: {ex.Message}");
-                    Logger.LogError(ex, "Failed to sync games");
-                }
-
-                var duration = DateTime.UtcNow - startTime;
-                var success = errors.Count == 0;
-
-                if (success)
-                {
-                    _syncMetricsService.RecordSuccess("EssentialSync", duration, teamsCount + gamesCount);
-                }
-                else
-                {
-                    _syncMetricsService.RecordFailure("EssentialSync", duration);
-                }
-
-                var result = new SyncResult
-                {
-                    Success = success,
-                    Duration = duration,
-                    TeamsCount = teamsCount,
-                    GamesCount = gamesCount,
-                    Errors = errors,
-                    Timestamp = DateTime.UtcNow
-                };
-
-                return Ok(result, success ? "Essential sync completed" : "Sync completed with errors");
-            });
+            try
+            {
+                var jobId = _backgroundJobClient.Enqueue<SyncJobs>(job => job.SyncManualEssentialJobAsync());
+                
+                return Accepted(ApiResponse<object>.SuccessResult(new { 
+                    jobId, 
+                    status = "Accepted"
+                }, "Sincronização essencial iniciada em segundo plano."));
+            }
+            finally
+            {
+                _syncLock.Release();
+            }
         }
 
         /// <summary>
         /// Realiza a sincronização completa do sistema: Times, Jogadores, Estatísticas de Carreira e Jogos de hoje.
         /// </summary>
         [HttpPost("full")]
-        [ProducesResponseType(typeof(ApiResponse<SyncResult>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<SyncResult>>> SyncFull()
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
+        public async Task<ActionResult<ApiResponse<object>>> SyncFull()
         {
-            return await ExecuteAsync(async () =>
+            if (!_syncLock.Wait(0))
             {
-                var startTime = DateTime.UtcNow;
-                var errors = new List<string>();
-                int teamsCount = 0;
-                int gamesCount = 0;
-                int playersCount = 0;
-                int statsSyncedCount = 0;
-
-                Logger.LogInformation("Iniciando sincronização TOTAL do sistema...");
-
-                // 1. Sincronizar Times
-                try
-                {
-                    await _teamService.SyncAllTeamsAsync();
-                    var teams = await _teamService.GetAllTeamsAsync();
-                    teamsCount = teams.Count;
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"Teams sync failed: {ex.Message}");
-                }
-
-                // 2. Sincronizar Jogadores (Todos os elenco da liga)
-                try
-                {
-                    await _playerService.SyncPlayersAsync(null);
-                    var (players, total) = await _playerService.GetAllPlayersAsync(1, 1000);
-                    playersCount = total;
-
-                    Logger.LogInformation("Sincronizando estatísticas para {Count} jogadores...", playersCount);
-                    
-                    // 3. Sincronizar Estatísticas de Carreira e Jogos Recentes para cada jogador
-
-            foreach (var p in players)
-            {
-                try 
-                {
-                    // Career Stats
-                    await _playerStatsService.GetPlayerCareerStatsFromEspnAsync(p.Id);
-                    
-                    // Recent Games (Last 20)
-                    await _playerStatsService.GetPlayerGamelogFromEspnAsync(p.Id);
-
-                    statsSyncedCount++;
-                    
-                    if (statsSyncedCount % 50 == 0)
-                        Logger.LogInformation("Sincronização de estatísticas/jogos: {Count}/{Total} concluídos", statsSyncedCount, playersCount);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning("Falha ao sincronizar dados do jogador {PlayerId}: {Error}", p.Id, ex.Message);
-                }
+                return Conflict(new { message = "Uma sincronização robusta já está em execução no momento." });
             }
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"Players/Stats sync failed: {ex.Message}");
-                }
 
-                // 4. Sincronizar Jogos de Hoje
-                try
-                {
-                    await _gameSyncService.SyncTodayGamesAsync();
-                    var games = await _gameService.GetTodayGamesAsync();
-                    gamesCount = games.Count;
-                }
-                catch (Exception ex)
-                {
-                    errors.Add($"Games sync failed: {ex.Message}");
-                }
-
-                var duration = DateTime.UtcNow - startTime;
-                var success = errors.Count == 0;
-
-                _cacheService.Clear();
-
-                var result = new SyncResult
-                {
-                    Success = success,
-                    Duration = duration,
-                    TeamsCount = teamsCount,
-                    GamesCount = gamesCount,
-                    PlayersCount = playersCount,
-                    StatsSyncedCount = statsSyncedCount,
-                    Errors = errors,
-                    Timestamp = DateTime.UtcNow
-                };
-
-                return Ok(result, success ? "Full sync completed successfully" : "Full sync completed with errors");
-            });
+            try
+            {
+                var jobId = _backgroundJobClient.Enqueue<SyncJobs>(job => job.SyncManualFullJobAsync());
+                
+                return Accepted(ApiResponse<object>.SuccessResult(new { 
+                    jobId, 
+                    status = "Accepted"
+                }, "Sincronização total (Times, Jogadores e Stats) iniciada em segundo plano. Isso pode levar alguns minutos."));
+            }
+            finally
+            {
+                _syncLock.Release();
+            }
         }
 
         /// <summary>

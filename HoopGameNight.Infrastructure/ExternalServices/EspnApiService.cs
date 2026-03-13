@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -41,12 +41,36 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
         #region Games/Events
 
-        public async Task<List<EspnGameDto>> GetGamesByDateAsync(DateTime date)
+        public async Task<List<EspnGameDto>> GetGamesByDateAsync(DateTime date, bool bypassCache = false)
         {
             var dateStr = date.ToString("yyyyMMdd");
-            return await GetWithParsingAsync($"{BASE_URL}/scoreboard?dates={dateStr}", 
+            var cacheKey = $"espn_scoreboard_{dateStr}";
+            
+            // Se NÃO for bypass, tenta buscar do cache de 15s
+            if (!bypassCache)
+            {
+                var cached = await _cacheService.GetAsync<List<EspnGameDto>>(cacheKey);
+                if (cached != null) return cached;
+            }
+
+            // Se for bypass, adicionamos um timestamp para forçar refresh no CDN da ESPN
+            var url = $"{BASE_URL}/scoreboard?dates={dateStr}";
+            if (bypassCache)
+            {
+                url += $"&t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+            }
+
+            var result = await GetWithParsingAsync(url, 
                 json => _espnParser.ParseScoreboardResponse(json), 
-                $"games for date {dateStr}");
+                $"games for date {dateStr} (Bypass: {bypassCache})");
+
+            if (result != null && result.Any())
+            {
+                // Sempre salvamos no cache para beneficiar requisições subsequentes da UI
+                await _cacheService.SetAsync(cacheKey, result, TimeSpan.FromSeconds(15));
+            }
+
+            return result;
         }
 
         public async Task<List<EspnGameDto>> GetFutureGamesAsync(int days = 7)
@@ -365,9 +389,19 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         {
             try
             {
-                var response = await _httpClient.GetAsync(url);
+                // Timeout estrito de 10s para evitar que requisições de polling travem o servidor
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(10));
+                
+                var response = await _httpClient.GetAsync(url, cts.Token);
                 if (!response.IsSuccessStatusCode) return new T();
-                return parser(await response.Content.ReadAsStringAsync());
+                
+                var json = await response.Content.ReadAsStringAsync(cts.Token);
+                return parser(json);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Timeout (10s) na chamada para ESPN: {Context}", context);
+                return new T();
             }
             catch (Exception ex)
             {

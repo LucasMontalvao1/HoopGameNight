@@ -28,6 +28,7 @@ namespace HoopGameNight.Core.Services
         private readonly ICacheService _cacheService;
         private readonly IEspnParser _espnParser;
         private readonly IBackgroundSyncQueue _backgroundSyncQueue;
+        private readonly IGameUpdateNotifier _gameUpdateNotifier;
         private readonly ILogger<GameSyncService> _logger;
 
         public GameSyncService(
@@ -38,6 +39,7 @@ namespace HoopGameNight.Core.Services
             ICacheService cacheService,
             IEspnParser espnParser,
             IBackgroundSyncQueue backgroundSyncQueue,
+            IGameUpdateNotifier gameUpdateNotifier,
             ILogger<GameSyncService> logger)
         {
             _gameRepository = gameRepository;
@@ -47,16 +49,23 @@ namespace HoopGameNight.Core.Services
             _cacheService = cacheService;
             _espnParser = espnParser;
             _backgroundSyncQueue = backgroundSyncQueue;
+            _gameUpdateNotifier = gameUpdateNotifier;
             _logger = logger;
         }
 
 
-        public async Task SyncTodayGamesAsync()=> await SyncGamesByDateAsync(DateTime.Today);
+        public async Task SyncTodayGamesAsync(bool bypassCache = false)
+        {
+            await SyncGamesByDateAsync(DateTime.Today, bypassCache);
+        }
 
-        public async Task<int> SyncGamesByDateAsync(DateTime date)
+        public async Task<int> SyncGamesByDateAsync(DateTime date, bool bypassCache = false)
         {
             var syncCount = 0;
             var updateCount = 0;
+            var updatedGamesToNotify = new List<Game>();
+
+            _logger.LogInformation("Sincronizando jogos de {Date} (BypassCache: {Bypass})", date.ToShortDateString(), bypassCache);
 
             try
             {
@@ -65,7 +74,7 @@ namespace HoopGameNight.Core.Services
                 List<EspnGameDto> espnGames;
                 try
                 {
-                    espnGames = await _espnService.GetGamesByDateAsync(date);
+                    espnGames = await _espnService.GetGamesByDateAsync(date, bypassCache);
                     _logger.LogInformation("ESPN retornou {Count} jogos para {Date}", espnGames.Count, date.ToString("yyyy-MM-dd"));
                 }
                 catch (Exception ex)
@@ -121,6 +130,7 @@ namespace HoopGameNight.Core.Services
                             syncCount++;
                             affectedTeamIds.Add(homeTeamId);
                             affectedTeamIds.Add(visitorTeamId);
+                            updatedGamesToNotify.Add(newGame);
                             
                             if (newGame.Status == GameStatus.Final)
                             {
@@ -139,6 +149,7 @@ namespace HoopGameNight.Core.Services
                                 updateCount++;
                                 affectedTeamIds.Add(homeTeamId);
                                 affectedTeamIds.Add(visitorTeamId);
+                                updatedGamesToNotify.Add(existingGame);
 
                                 if (oldStatus != GameStatus.Final && existingGame.Status == GameStatus.Final)
                                 {
@@ -153,10 +164,11 @@ namespace HoopGameNight.Core.Services
                     }
                 }
 
-                await InvalidateCacheForDate(date);
-                foreach (var teamId in affectedTeamIds)
+                await InvalidateCacheForDate(date, affectedTeamIds);
+
+                if (updatedGamesToNotify.Any())
                 {
-                    await InvalidateCacheForDate(date, teamId);
+                    await _gameUpdateNotifier.NotifyGamesUpdatedAsync(updatedGamesToNotify);
                 }
 
                 _logger.LogInformation("Sincronização concluída para {Date}: {New} novos, {Updated} atualizados",
@@ -306,8 +318,7 @@ namespace HoopGameNight.Core.Services
                             _backgroundSyncQueue.EnqueuePostGameProcessing(gameId);
                         }
                         
-                        await InvalidateCacheForDate(gameDate.Date, homeTeamId);
-                        await InvalidateCacheForDate(gameDate.Date, visitorTeamId);
+                        await InvalidateCacheForDate(gameDate.Date, new[] { homeTeamId, visitorTeamId });
                     }
 
                     return 1;
@@ -428,21 +439,24 @@ namespace HoopGameNight.Core.Services
         private int GetSeasonYear(DateTime date)
             => date.Month >= 10 ? date.Year : date.Year - 1;
 
-        private async Task InvalidateCacheForDate(DateTime date, int? teamId = null)
+        private async Task InvalidateCacheForDate(DateTime date, IEnumerable<int>? teamIds = null)
         {
+            // Operações atômicas/diretas (IDs fixos)
             await _cacheService.RemoveAsync(CacheKeys.TodayGames());
             await _cacheService.RemoveAsync(CacheKeys.GamesByDate(date));
             
+            // Operações por padrão (SCAN no Redis) - Executar apenas uma vez por lote
             await _cacheService.RemoveByPatternAsync("games:range:*");
-            
-            if (teamId.HasValue)
-            {
-                await _cacheService.RemoveByPatternAsync($"games:team:{teamId.Value}:*");
-            }
             
             if (date.Date == DateTime.Today)
             {
                 await _cacheService.RemoveByPatternAsync("games:today:*");
+            }
+
+            if (teamIds != null && teamIds.Any())
+            {
+                // Invalida o padrão de times uma única vez para evitar múltiplos SCANs pesados no Redis
+                await _cacheService.RemoveByPatternAsync("games:team:*");
             }
         }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -144,6 +144,9 @@ namespace HoopGameNight.Api.Extensions
         {
             // Controllers
             app.MapControllers();
+
+            // SignalR Hubs
+            app.MapHub<HoopGameNight.Api.Hubs.GameHub>("/hubs/games");
 
             // Health Checks
             app.MapHealthChecks("/health", new HealthCheckOptions
@@ -489,6 +492,14 @@ namespace HoopGameNight.Api.Extensions
                         "sync-games",
                         job => job.SyncGamesAsync(),
                         "0 */6 * * *",
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
+                    );
+
+                    // Job ultra-rápido para jogos ao vivo (A cada 1 minuto)
+                    recurringJobManager.AddOrUpdate<SyncJobs>(
+                        "sync-live-games",
+                        job => job.SyncLiveGamesAsync(),
+                        "* * * * *",
                         new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
                     );
 

@@ -1,4 +1,4 @@
-﻿namespace HoopGameNight.Core.DTOs.Response
+namespace HoopGameNight.Core.DTOs.Response
 {
     public class TeamResponse
     {
@@ -12,6 +12,8 @@
         public string Division { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string LogoUrl { get; set; } = string.Empty;
+        public int? Wins { get; set; }
+        public int? Losses { get; set; }
     }
 
     public class TeamSummaryResponse
@@ -22,5 +24,7 @@
         public string City { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
         public string LogoUrl { get; set; } = string.Empty;
+        public int? Wins { get; set; }
+        public int? Losses { get; set; }
     }
 }

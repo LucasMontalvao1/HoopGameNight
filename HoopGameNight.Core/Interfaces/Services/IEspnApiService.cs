@@ -1,4 +1,4 @@
-﻿using HoopGameNight.Core.DTOs.External;
+using HoopGameNight.Core.DTOs.External;
 using HoopGameNight.Core.DTOs.External.ESPN;
 using System;
 using System.Collections.Generic;
@@ -14,9 +14,9 @@ namespace HoopGameNight.Core.Interfaces.Services
         #region Games/Events - Jogos e Eventos
 
         /// <summary>
-        /// Busca jogos por data específica
+        /// Busca jogos por data específica com opção de ignorar cache e forçar refresh na ESPN
         /// </summary>
-        Task<List<EspnGameDto>> GetGamesByDateAsync(DateTime date);
+        Task<List<EspnGameDto>> GetGamesByDateAsync(DateTime date, bool bypassCache = false);
 
         /// <summary>
         /// Busca jogos futuros (próximos N dias)

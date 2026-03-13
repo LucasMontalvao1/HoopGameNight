@@ -16,10 +16,10 @@ namespace HoopGameNight.Core.Configuration
         // ===== GAMES =====
 
         /// <summary>
-        /// Cache para jogos de hoje (5 minutos)
-        /// TTL curto pois dados mudam frequentemente durante jogos ao vivo
+        /// Cache para jogos de hoje (2 minutos)
+        /// TTL reduzido para melhor sincronia com o background job
         /// </summary>
-        public static TimeSpan TodayGames => TimeSpan.FromMinutes(5);
+        public static TimeSpan TodayGames => TimeSpan.FromMinutes(2);
 
         /// <summary>
         /// Cache para jogos por data (15 minutos)
@@ -38,10 +38,10 @@ namespace HoopGameNight.Core.Configuration
         public static TimeSpan FutureGames => TimeSpan.FromMinutes(30);
 
         /// <summary>
-        /// Cache para jogos ao vivo (30 segundos)
-        /// TTL muito curto para atualização de polling
+        /// Cache para jogos ao vivo (15 segundos)
+        /// TTL ultra-curto para refletir mudanças do sync em tempo real
         /// </summary>
-        public static TimeSpan LiveGames => TimeSpan.FromSeconds(30);
+        public static TimeSpan LiveGames => TimeSpan.FromSeconds(15);
 
         // ===== TEAMS =====
 

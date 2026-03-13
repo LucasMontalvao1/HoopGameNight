@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -334,6 +334,9 @@ namespace HoopGameNight.Infrastructure.Repositories
             {
                 var results = await connection.QueryAsync(sql, parameters);
                 var games = new List<Game>();
+                
+                // Cache local para evitar N+1 conexões durante o loop
+                var teamCache = new Dictionary<int, Team>();
 
                 foreach (IDictionary<string, object> row in results)
                 {
@@ -356,6 +359,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                         UpdatedAt = row.ContainsKey("updated_at") && row["updated_at"] != null ? (DateTime)row["updated_at"] : System.DateTime.UtcNow
                     };
 
+                    // Home Team Mapping
                     if (row.ContainsKey("HomeTeam_Id") && row["HomeTeam_Id"] != null && (int)row["HomeTeam_Id"] > 0)
                     {
                         game.HomeTeam = new Team
@@ -374,9 +378,15 @@ namespace HoopGameNight.Infrastructure.Repositories
                     }
                     else
                     {
-                        game.HomeTeam = await GetTeamByIdAsync(game.HomeTeamId);
+                        if (!teamCache.TryGetValue(game.HomeTeamId, out var cachedTeam))
+                        {
+                            cachedTeam = await GetTeamByIdAsync(game.HomeTeamId);
+                            if (cachedTeam != null) teamCache[game.HomeTeamId] = cachedTeam;
+                        }
+                        game.HomeTeam = cachedTeam;
                     }
 
+                    // Visitor Team Mapping
                     if (row.ContainsKey("VisitorTeam_Id") && row["VisitorTeam_Id"] != null && (int)row["VisitorTeam_Id"] > 0)
                     {
                         game.VisitorTeam = new Team
@@ -395,13 +405,18 @@ namespace HoopGameNight.Infrastructure.Repositories
                     }
                     else
                     {
-                        game.VisitorTeam = await GetTeamByIdAsync(game.VisitorTeamId);
+                        if (!teamCache.TryGetValue(game.VisitorTeamId, out var cachedTeam))
+                        {
+                            cachedTeam = await GetTeamByIdAsync(game.VisitorTeamId);
+                            if (cachedTeam != null) teamCache[game.VisitorTeamId] = cachedTeam;
+                        }
+                        game.VisitorTeam = cachedTeam;
                     }
 
                     games.Add(game);
                 }
 
-                Logger.LogDebug("FALLBACK MAPPING completed - {GameCount} games", games.Count);
+                Logger.LogDebug("FALLBACK MAPPING completed - {GameCount} games (Cached {TeamCount} teams)", games.Count, teamCache.Count);
                 return games;
             }
             catch (Exception ex)

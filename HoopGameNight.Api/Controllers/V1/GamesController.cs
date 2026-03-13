@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,6 +10,8 @@ using HoopGameNight.Core.DTOs.Request;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
+using Hangfire;
+using HoopGameNight.Infrastructure.Jobs;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -22,18 +24,21 @@ namespace HoopGameNight.Api.Controllers.V1
         private readonly IGameSyncService _gameSyncService;
         private readonly IEspnApiService _espnService;
         private readonly IMemoryCache _cache;
+        private readonly IBackgroundJobClient _backgroundJobClient;
 
         public GamesController(
             IGameService gameService,
             IGameSyncService gameSyncService,
             IEspnApiService espnService,
             IMemoryCache cache,
+            IBackgroundJobClient backgroundJobClient,
             ILogger<GamesController> logger) : base(logger)
         {
             _gameService = gameService;
             _gameSyncService = gameSyncService;
             _espnService = espnService;
             _cache = cache;
+            _backgroundJobClient = backgroundJobClient;
         }
 
         /// <summary>
@@ -523,32 +528,23 @@ namespace HoopGameNight.Api.Controllers.V1
         /// </summary>
         /// <returns>Resultado da sincronização</returns>
         [HttpPost("sync/today")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
         public async Task<ActionResult<ApiResponse<object>>> SyncTodayGames()
         {
             try
             {
-                Logger.LogInformation("Iniciando sincronização manual dos jogos de hoje");
+                Logger.LogInformation("Enfileirando sincronização dos jogos de hoje");
+                var jobId = _backgroundJobClient.Enqueue<SyncJobs>(job => job.SyncManualTodayGamesJobAsync());
 
-                await _gameSyncService.SyncTodayGamesAsync();
-
-                _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
-
-                var games = await _gameService.GetTodayGamesAsync();
-
-                var result = new
-                {
-                    message = "Jogos de hoje sincronizados com sucesso",
-                    gameCount = games.Count,
-                    timestamp = DateTime.UtcNow
-                };
-
-                Logger.LogInformation("Sincronização manual concluída - {GameCount} jogos", games.Count);
-                return Ok((object)result, "Jogos de hoje sincronizados com sucesso");
+                return Accepted(ApiResponse<object>.SuccessResult(new 
+                { 
+                    jobId, 
+                    status = "Accepted"
+                }, "Sincronização dos jogos de hoje iniciada em segundo plano."));
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Erro na sincronização manual dos jogos de hoje");
+                Logger.LogError(ex, "Erro ao enfileirar sincronização dos jogos de hoje");
                 throw;
             }
         }
@@ -559,7 +555,7 @@ namespace HoopGameNight.Api.Controllers.V1
         /// <param name="date">Data para sincronizar (yyyy-MM-dd)</param>
         /// <returns>Resultado da sincronização</returns>
         [HttpPost("sync/date/{date}")]
-        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         public async Task<ActionResult<ApiResponse<object>>> SyncGamesByDate(DateTime date)
         {
@@ -570,35 +566,18 @@ namespace HoopGameNight.Api.Controllers.V1
                     return BadRequest(ApiResponse<object>.ErrorResult("Não é possível sincronizar jogos futuros"));
                 }
 
-                if (date < DateTime.Today.AddYears(-2))
-                {
-                    return BadRequest(ApiResponse<object>.ErrorResult("Data muito antiga para sincronização"));
-                }
+                Logger.LogInformation("Enfileirando sincronização dos jogos para a data: {Date}", date.ToShortDateString());
+                var jobId = _backgroundJobClient.Enqueue<SyncJobs>(job => job.SyncManualGamesByDateJobAsync(date));
 
-                Logger.LogInformation("Sincronizando jogos para a data: {Date}", date.ToShortDateString());
-
-                var syncCount = await _gameSyncService.SyncGamesByDateAsync(date);
-
-                _cache.Remove(ApiConstants.CacheKeys.TODAY_GAMES);
-                _cache.Remove(string.Format(ApiConstants.CacheKeys.GAMES_BY_DATE, date.ToString("yyyy-MM-dd")));
-
-                var savedGames = await _gameService.GetGamesByDateAsync(date);
-
-                var result = new
-                {
-                    message = $"Jogos sincronizados com sucesso para {date:yyyy-MM-dd}",
-                    syncedCount = syncCount,
-                    totalGamesInDb = savedGames.Count,
-                    date = date.ToString("yyyy-MM-dd"),
-                    timestamp = DateTime.UtcNow
-                };
-
-                Logger.LogInformation("Sincronização concluída para {Date} - {GameCount} jogos", date.ToShortDateString(), syncCount);
-                return Ok((object)result, "Jogos sincronizados com sucesso");
+                return Accepted(ApiResponse<object>.SuccessResult(new 
+                { 
+                    jobId, 
+                    status = "Accepted"
+                }, $"Sincronização para {date:yyyy-MM-dd} iniciada em segundo plano."));
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Erro ao sincronizar jogos para a data: {Date}", date);
+                Logger.LogError(ex, "Erro ao enfileirar sincronização para a data: {Date}", date);
                 throw;
             }
         }

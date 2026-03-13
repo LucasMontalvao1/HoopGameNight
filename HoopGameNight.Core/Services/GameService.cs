@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using HoopGameNight.Core.Configuration;
 using HoopGameNight.Core.Constants;
 using HoopGameNight.Core.DTOs.Request;
@@ -108,7 +108,11 @@ namespace HoopGameNight.Core.Services
                 _logger.LogInformation("BANCO: Encontrou {Count} jogos para {Date}",
                     response.Count, date.ToString("yyyy-MM-dd"));
 
-                await _cacheService.SetAsync(cacheKey, response, CacheDurations.GetGameCacheDuration(date));
+                var duration = response.Any(g => g.Status == GameStatus.Live.ToString()) 
+                    ? CacheDurations.LiveGames 
+                    : CacheDurations.GetGameCacheDuration(date);
+                    
+                await _cacheService.SetAsync(cacheKey, response, duration);
             }
             else if (date > DateTime.Today)
             {

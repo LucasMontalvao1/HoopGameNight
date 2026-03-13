@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
@@ -122,6 +122,9 @@ namespace HoopGameNight.Api.Extensions
             {
                 options.SuppressModelStateInvalidFilter = false;
             });
+
+            // SignalR (WebSockets para Real-time)
+            services.AddSignalR();
 
             // Configuração JSON
             services.ConfigureHttpJsonOptions(options =>
@@ -292,6 +295,9 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<IBackgroundSyncService, BackgroundSyncService>();
             services.AddScoped<IBackgroundSyncQueue, BackgroundSyncQueue>();
             
+            // Real-time Notifier
+            services.AddScoped<IGameUpdateNotifier, HoopGameNight.Api.Services.SignalRGameUpdateNotifier>();
+            
             // Health Services Locais (Admin)
             services.AddScoped<HoopGameNight.Api.Controllers.V1.Admin.ISyncHealthService, HoopGameNight.Api.Controllers.V1.Admin.SyncHealthService>();
 
@@ -322,15 +328,14 @@ namespace HoopGameNight.Api.Extensions
 
         private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy(IConfigurationSection? config = null)
         {
-            var retryCount = config?.GetValue<int>("RetryPolicy:RetryCount") ?? 3;
-
+            // Reduzido para 2 retries com backoff fixo menor para evitar ThreadPool Starvation
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .OrResult(msg => !msg.IsSuccessStatusCode)
-                .Or<TaskCanceledException>() // Capturar timeouts
+                .Or<TaskCanceledException>() 
                 .WaitAndRetryAsync(
-                    retryCount,
-                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                    2,
+                    retryAttempt => TimeSpan.FromSeconds(Math.Pow(1.5, retryAttempt)),
                     onRetry: (outcome, timespan, retryCount, context) =>
                     {
                         Console.WriteLine($"Polly Retry {retryCount} after {timespan.TotalMilliseconds}ms due to {outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()}");
@@ -339,12 +344,13 @@ namespace HoopGameNight.Api.Extensions
 
         private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
         {
+            // Mais sensível: Abre após 5 falhas (antes era 10) para proteger o servidor mais rápido em caso de queda da ESPN
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .Or<TaskCanceledException>()
                 .CircuitBreakerAsync(
-                    handledEventsAllowedBeforeBreaking: 10,
-                    durationOfBreak: TimeSpan.FromSeconds(20));
+                    handledEventsAllowedBeforeBreaking: 5,
+                    durationOfBreak: TimeSpan.FromSeconds(30));
         }
 
         private static IAsyncPolicy<HttpResponseMessage> GetOllamaRetryPolicy()
@@ -458,9 +464,11 @@ namespace HoopGameNight.Api.Extensions
 
                 options.AddPolicy("DevelopmentPolicy", policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.WithOrigins("http://localhost:4200", "http://localhost:3000")
                           .AllowAnyMethod()
-                          .AllowAnyHeader();
+                          .AllowAnyHeader()
+                          .AllowCredentials()
+                          .WithExposedHeaders("X-Total-Count", "X-Page", "X-Page-Size", "X-API-Version", "X-Rate-Limit-Remaining");
                 });
             });
 

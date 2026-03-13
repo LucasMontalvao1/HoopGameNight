@@ -25,11 +25,11 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             var prompt = _builder.BuildPrompt(question, games);
 
             // Assert
-            prompt.Should().Contain("regras_de_ouro", "Deve conter a seção de regras obrigatórias");
-            prompt.Should().Contain("NÃO é fonte de verdade", "Deve negar que a IA é fonte de verdade");
-            prompt.Should().Contain("VALIDAÇÃO DE ESCOPO", "Deve exigir validação de escopo");
-            prompt.Should().Contain("VALIDAÇÃO DE DADOS", "Deve exigir validação de dados");
-            prompt.Should().Contain("Gere a resposta em MARKDOWN", "Deve exigir formato Markdown");
+            prompt.Should().Contain("REGRAS CRÍTICAS DE RESPOSTA:", "Deve conter a seção de regras obrigatórias");
+            prompt.Should().Contain("Nunca invente estatísticas", "Deve negar que a IA é fonte de verdade");
+            prompt.Should().Contain("BASE DE DADOS", "Deve focar estritamente nos dados");
+            prompt.Should().Contain("VERACIDADE", "Deve exigir informações verídicas");
+            prompt.Should().Contain("Use Markdown", "Deve exigir formato Markdown");
         }
 
         [Fact(DisplayName = "Deve rotular datas corretamente como HOJE e AMANHÃ")]
@@ -76,7 +76,6 @@ namespace HoopGameNight.Tests.Unit.Core.AI
 
             // Assert
             prompt.Should().Contain("Nenhum jogo encontrado no banco de dados para este período");
-            prompt.Should().Contain("Você DEVE responder: \"Não encontrei jogos no banco de dados para este período.\"");
         }
 
         [Fact(DisplayName = "Deve formatar jogo finalizado com status FINALIZADO e placar")]
@@ -100,7 +99,7 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             var prompt = _builder.BuildPrompt("Resultado de hoje?", games);
 
             // Assert
-            prompt.Should().Contain("[FINALIZADO]");
+            prompt.Should().Contain("(Finalizado)");
             prompt.Should().Contain("LAL");
             prompt.Should().Contain("GSW");
         }
@@ -127,8 +126,7 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             var prompt = _builder.BuildPrompt("Jogo ao vivo?", games);
 
             // Assert
-            prompt.Should().Contain("[AO VIVO]");
-            prompt.Should().Contain("Período 3");
+            prompt.Should().Contain("(AO VIVO - P3)");
         }
 
         [Fact(DisplayName = "Deve incluir a pergunta do usuário no prompt gerado")]
@@ -152,7 +150,7 @@ namespace HoopGameNight.Tests.Unit.Core.AI
 
             // Assert
             prompt.Should().Contain(DateTime.Now.ToString("dd/MM/yyyy"), "Deve conter a data atual");
-            prompt.Should().Contain("Horário de Brasília", "Deve referenciar o fuso horário");
+            prompt.Should().Contain("(Brasília)", "Deve referenciar o fuso horário");
         }
 
         [Fact(DisplayName = "Deve exibir total de jogos disponíveis no prompt")]
@@ -181,7 +179,7 @@ namespace HoopGameNight.Tests.Unit.Core.AI
             var prompt = _builder.BuildPrompt("Jogos?", games);
 
             // Assert
-            prompt.Should().Contain("TOTAL: 2 jogos disponíveis");
+            prompt.Should().Contain("TOTAL: 2 jogo(s) disponível(is)");
         }
 
         [Fact(DisplayName = "Deve rotular jogos passados como ONTEM e futuros como FUTURO")]
