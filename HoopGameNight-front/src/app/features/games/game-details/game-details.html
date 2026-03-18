@@ -1,378 +1,412 @@
 <div class="game-details">
-    @if (gamesService.isLoading() || statsService.isLoading()) {
-    <div class="loading-state">
-        <app-skeleton-loader width="100%" height="250px" borderRadius="16px" className="mb-4"></app-skeleton-loader>
-        <app-skeleton-loader width="200px" height="40px" borderRadius="8px" className="mb-4"></app-skeleton-loader>
-        <app-skeleton-loader width="100%" height="400px" borderRadius="16px"></app-skeleton-loader>
-    </div>
-    } @else if (statsService.error()) {
-    <app-error-view [message]="statsService.error() || ''" (retry)="ngOnInit()"></app-error-view>
+    @if (statsService.error()) {
+        <app-error-view [message]="statsService.error() || ''" (retry)="ngOnInit()"></app-error-view>
     } @else {
-    @if (gamesService.selectedGame(); as game) {
+        @if (gamesService.selectedGame(); as game) {
+            <!-- Scoreboard Section (Hero) -->
+            <section class="scoreboard-premium animate-fade-in">
+                <div class="scoreboard-overlay"></div>
+                
+                <button class="btn-back" (click)="goBack()" title="Voltar">
+                    <span class="material-icons">arrow_back</span>
+                </button>
 
-    <!-- Scoreboard Section (Hero) -->
-    <section class="scoreboard glass-panel animate-fade-in">
-        <div class="scoreboard__bg-gradient"></div>
-
-        <button class="hero-back-btn" (click)="goBack()" title="Voltar para Agenda">
-            <span class="material-icons">arrow_back</span>
-        </button>
-
-        <div class="team visitor">
-            <div class="team-logo-container">
-                <img [src]="getTeamLogo(game.visitorTeam.abbreviation)" class="team-logo">
-            </div>
-            <div class="team-info-box">
-                <h2 class="team-name">{{ game.visitorTeam.displayName }}</h2>
-                <span class="team-abbr">{{ game.visitorTeam.abbreviation }}</span>
-            </div>
-        </div>
-
-        <div class="game-center">
-            <div class="scores-row">
-                <span class="score" [class.winner]="game.visitorTeamScore! > game.homeTeamScore!">
-                    {{ game.visitorTeamScore }}
-                </span>
-                <span class="score-divider"></span>
-                <span class="score" [class.winner]="game.homeTeamScore! > game.visitorTeamScore!">
-                    {{ game.homeTeamScore }}
-                </span>
-            </div>
-
-            <div class="game-meta">
-                <div class="status-pill" [class.live]="game.isLive">
-                    @if (game.isLive) {
-                    <span class="live-pulse"></span>
-                    <span class="status-text">LIVE • {{ game.timeRemaining }}</span>
-                    } @else if (game.isCompleted) {
-                    <span class="status-text">FINAL</span>
-                    } @else {
-                    <span class="status-text">{{ game.statusDisplay || (game.date | date:'shortTime') }}</span>
-                    }
-                </div>
-                <div class="game-date-display">{{ game.date | date:'EEEE, dd MMMM' }}</div>
-            </div>
-        </div>
-
-        <div class="team home">
-            <div class="team-info-box">
-                <h2 class="team-name">{{ game.homeTeam.displayName }}</h2>
-                <span class="team-abbr">{{ game.homeTeam.abbreviation }}</span>
-            </div>
-            <div class="team-logo-container">
-                <img [src]="getTeamLogo(game.homeTeam.abbreviation)" class="team-logo">
-            </div>
-        </div>
-    </section>
-
-    <!-- Segmented Tabs -->
-    <div class="tabs-container">
-        <nav class="segmented-tabs glass-panel animate-fade-in" style="animation-delay: 0.1s">
-            <button class="tab-btn" [class.active]="activeTab() === 'boxscore'" (click)="setTab('boxscore')">
-                <span class="material-icons">leaderboard</span> Boxscore
-            </button>
-            <button class="tab-btn" [class.active]="activeTab() === 'summary'" (click)="setTab('summary')">
-                <span class="material-icons">auto_awesome</span> Resumo IA
-            </button>
-        </nav>
-    </div>
-
-    @if (activeTab() === 'boxscore') {
-    @if (statsService.currentGameBoxscore(); as boxscore) {
-    <div class="boxscore-container">
-
-        <!-- ===== TEAM COMPARISON CARD ===== -->
-        @if (visitorTotals(); as vTotals) {
-        @if (homeTotals(); as hTotals) {
-        <div class="team-comparison-card glass-panel animate-fade-in" style="animation-delay: 0.15s">
-            <div class="comp-rows">
-                <div class="comp-row comp-header">
-                    <span class="comp-val vis" [routerLink]="['/teams', game.visitorTeam.id]">{{ game.visitorTeam.abbreviation }}</span>
-                    <span class="comp-label">—</span>
-                    <span class="comp-val home" [routerLink]="['/teams', game.homeTeam.id]">{{ game.homeTeam.abbreviation }}</span>
-                </div>
-                <div class="comp-row">
-                    <span class="comp-val vis" [class.winner]="vTotals.totalRebounds > hTotals.totalRebounds">
-                        {{ vTotals.totalRebounds }}
-                    </span>
-                    <span class="comp-label">REB</span>
-                    <span class="comp-val home" [class.winner]="hTotals.totalRebounds > vTotals.totalRebounds">
-                        {{ hTotals.totalRebounds }}
-                    </span>
-                </div>
-                <div class="comp-row">
-                    <span class="comp-val vis" [class.winner]="vTotals.assists > hTotals.assists">
-                        {{ vTotals.assists }}
-                    </span>
-                    <span class="comp-label">AST</span>
-                    <span class="comp-val home" [class.winner]="hTotals.assists > vTotals.assists">
-                        {{ hTotals.assists }}
-                    </span>
-                </div>
-                <div class="comp-row">
-                    <span class="comp-val vis" [class.winner]="vTotals.steals > hTotals.steals">
-                        {{ vTotals.steals }}
-                    </span>
-                    <span class="comp-label">STL</span>
-                    <span class="comp-val home" [class.winner]="hTotals.steals > vTotals.steals">
-                        {{ hTotals.steals }}
-                    </span>
-                </div>
-                <div class="comp-row">
-                    <span class="comp-val vis" [class.winner]="vTotals.blocks > hTotals.blocks">
-                        {{ vTotals.blocks }}
-                    </span>
-                    <span class="comp-label">BLK</span>
-                    <span class="comp-val home" [class.winner]="hTotals.blocks > vTotals.blocks">
-                        {{ hTotals.blocks }}
-                    </span>
-                </div>
-                <div class="comp-row">
-                    <span class="comp-val vis" [class.winner]="getFgPct(vTotals) > getFgPct(hTotals)">
-                        {{ getFgPct(vTotals) }}%
-                    </span>
-                    <span class="comp-label">FG%</span>
-                    <span class="comp-val home" [class.winner]="getFgPct(hTotals) > getFgPct(vTotals)">
-                        {{ getFgPct(hTotals) }}%
-                    </span>
-                </div>
-                <div class="comp-row">
-                    <span class="comp-val vis" [class.winner]="vTotals.turnovers < hTotals.turnovers">
-                        {{ vTotals.turnovers }}
-                    </span>
-                    <span class="comp-label">TOV</span>
-                    <span class="comp-val home" [class.winner]="hTotals.turnovers < vTotals.turnovers">
-                        {{ hTotals.turnovers }}
-                    </span>
-                </div>
-            </div>
-        </div>
-        }
-        }
-
-        <!-- ===== BOXSCORE TABLES GRID ===== -->
-        <div class="boxscore-grid">
-
-            <!-- Visitante -->
-            <div class="team-boxscore glass-panel animate-fade-in" style="animation-delay: 0.2s">
-                <div class="team-box-header">
-                    <div class="team-brand" [routerLink]="['/teams', game.visitorTeam.id]" style="cursor: pointer">
-                        <img [src]="getTeamLogo(game.visitorTeam.abbreviation)" class="mini-logo">
-                        <h3>{{ game.visitorTeam.displayName }}</h3>
-                    </div>
-                </div>
-                <div class="table-modern-wrapper">
-                    <table class="boxscore-table-premium">
-                        <thead>
-                            <tr>
-                                <th class="sticky-col">ATLETA</th>
-                                <th title="Minutos em Quadra">MIN</th>
-                                <th title="Pontos" (click)="toggleSort('points')" class="sortable">
-                                    PTS @if(sortField() === 'points') { <span class="material-icons sort-icon">{{
-                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
-                                </th>
-                                <th title="Rebotes" (click)="toggleSort('totalRebounds')" class="sortable">
-                                    REB @if(sortField() === 'totalRebounds') { <span class="material-icons sort-icon">{{
-                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
-                                </th>
-                                <th title="Assistências" (click)="toggleSort('assists')" class="sortable">
-                                    AST @if(sortField() === 'assists') { <span class="material-icons sort-icon">{{
-                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
-                                </th>
-                                <th title="Roubos de Bola">STL</th>
-                                <th title="Tocos">BLK</th>
-                                <th title="Arremessos de Quadra">FG</th>
-                                <th title="3 Pontos">3P</th>
-                                <th title="Lances Livres">FT</th>
-                                <th title="+/-">+/-</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (stat of sortedVisitorStats(); track stat.playerId) {
-                            <tr class="player-row" [class.is-starter]="stat.isStarter">
-                                <td class="player-identity sticky-col">
-                                    <div class="player-name-box">
-                                        @if (stat.didNotPlay) { <span class="dnp-badge">DNP</span> }
-                                        <a [routerLink]="['/players', stat.playerId]" class="player-link">{{
-                                            stat.playerFullName }}</a>
-                                        <span class="player-pos-tab">{{ stat.position }}</span>
-                                    </div>
-                                </td>
-                                <td>{{ stat.minutesFormatted }}</td>
-                                <td class="stat-highlight">{{ stat.points }}</td>
-                                <td>{{ stat.totalRebounds }}</td>
-                                <td>{{ stat.assists }}</td>
-                                <td>{{ stat.steals }}</td>
-                                <td>{{ stat.blocks }}</td>
-                                <td class="shooting-stat">{{ stat.fieldGoalsFormatted }}</td>
-                                <td class="shooting-stat">{{ stat.threePointersFormatted }}</td>
-                                <td class="shooting-stat">{{ stat.freeThrowsFormatted }}</td>
-                                <td [class.pos]="stat.plusMinus > 0" [class.neg]="stat.plusMinus < 0">
-                                    {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
-                                </td>
-                            </tr>
-                            }
-                        </tbody>
-                        @if (statsService.visitorTeamTotals(); as totals) {
-                        <tfoot>
-                            <tr class="team-totals-row">
-                                <td class="sticky-col totals-label">TOTAL</td>
-                                <td>—</td>
-                                <td class="stat-highlight">{{ totals.points }}</td>
-                                <td>{{ totals.totalRebounds }}</td>
-                                <td>{{ totals.assists }}</td>
-                                <td>{{ totals.steals }}</td>
-                                <td>{{ totals.blocks }}</td>
-                                <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
-                                <td class="shooting-stat">—</td>
-                                <td class="shooting-stat">—</td>
-                                <td>—</td>
-                            </tr>
-                        </tfoot>
-                        }
-                    </table>
-                </div>
-            </div>
-
-            <!-- Mandante -->
-            <div class="team-boxscore glass-panel animate-fade-in" style="animation-delay: 0.3s">
-                <div class="team-box-header">
-                    <div class="team-brand" [routerLink]="['/teams', game.homeTeam.id]" style="cursor: pointer">
-                        <img [src]="getTeamLogo(game.homeTeam.abbreviation)" class="mini-logo">
-                        <h3>{{ game.homeTeam.displayName }}</h3>
-                    </div>
-                </div>
-                <div class="table-modern-wrapper">
-                    <table class="boxscore-table-premium">
-                        <thead>
-                            <tr>
-                                <th class="sticky-col">ATLETA</th>
-                                <th title="Minutos em Quadra">MIN</th>
-                                <th title="Pontos" (click)="toggleSort('points')" class="sortable">
-                                    PTS @if(sortField() === 'points') { <span class="material-icons sort-icon">{{
-                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
-                                </th>
-                                <th title="Rebotes" (click)="toggleSort('totalRebounds')" class="sortable">
-                                    REB @if(sortField() === 'totalRebounds') { <span class="material-icons sort-icon">{{
-                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
-                                </th>
-                                <th title="Assistências" (click)="toggleSort('assists')" class="sortable">
-                                    AST @if(sortField() === 'assists') { <span class="material-icons sort-icon">{{
-                                        sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span> }
-                                </th>
-                                <th title="Roubos de Bola">STL</th>
-                                <th title="Tocos">BLK</th>
-                                <th title="Arremessos de Quadra">FG</th>
-                                <th title="3 Pontos">3P</th>
-                                <th title="Lances Livres">FT</th>
-                                <th title="+/-">+/-</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @for (stat of sortedHomeStats(); track stat.playerId) {
-                            <tr class="player-row" [class.is-starter]="stat.isStarter">
-                                <td class="player-identity sticky-col">
-                                    <div class="player-name-box">
-                                        @if (stat.didNotPlay) { <span class="dnp-badge">DNP</span> }
-                                        <a [routerLink]="['/players', stat.playerId]" class="player-link">{{
-                                            stat.playerFullName }}</a>
-                                        <span class="player-pos-tab">{{ stat.position }}</span>
-                                    </div>
-                                </td>
-                                <td>{{ stat.minutesFormatted }}</td>
-                                <td class="stat-highlight">{{ stat.points }}</td>
-                                <td>{{ stat.totalRebounds }}</td>
-                                <td>{{ stat.assists }}</td>
-                                <td>{{ stat.steals }}</td>
-                                <td>{{ stat.blocks }}</td>
-                                <td class="shooting-stat">{{ stat.fieldGoalsFormatted }}</td>
-                                <td class="shooting-stat">{{ stat.threePointersFormatted }}</td>
-                                <td class="shooting-stat">{{ stat.freeThrowsFormatted }}</td>
-                                <td [class.pos]="stat.plusMinus > 0" [class.neg]="stat.plusMinus < 0">
-                                    {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
-                                </td>
-                            </tr>
-                            }
-                        </tbody>
-                        @if (statsService.homeTeamTotals(); as totals) {
-                        <tfoot>
-                            <tr class="team-totals-row">
-                                <td class="sticky-col totals-label">TOTAL</td>
-                                <td>—</td>
-                                <td class="stat-highlight">{{ totals.points }}</td>
-                                <td>{{ totals.totalRebounds }}</td>
-                                <td>{{ totals.assists }}</td>
-                                <td>{{ totals.steals }}</td>
-                                <td>{{ totals.blocks }}</td>
-                                <td class="shooting-stat">{{ totals.fieldGoalsMade }}/{{ totals.fieldGoalsAttempted }}</td>
-                                <td class="shooting-stat">—</td>
-                                <td class="shooting-stat">—</td>
-                                <td>—</td>
-                            </tr>
-                        </tfoot>
-                        }
-                    </table>
-                </div>
-            </div>
-
-        </div><!-- /boxscore-grid -->
-    </div><!-- /boxscore-container -->
-    }
-
-    } @else {
-
-    <!-- Summary Content -->
-    <div class="summary-container shadow-sm animate-fade-in">
-        @if (isLoadingSummary()) {
-        <div class="ai-loading-state">
-            <div class="ai-pulse-icon">
-                <span class="material-icons">auto_awesome</span>
-            </div>
-            <p>O Coach Assistant está analisando o boxscore...</p>
-            <app-skeleton-loader width="100%" height="20px" className="mb-2"></app-skeleton-loader>
-            <app-skeleton-loader width="90%" height="20px" className="mb-2"></app-skeleton-loader>
-            <app-skeleton-loader width="70%" height="20px"></app-skeleton-loader>
-        </div>
-        } @else if (gameSummaryMarkdown()) {
-        <div class="ai-response-premium">
-            <div class="ai-response-header">
-                <span class="material-icons">auto_awesome</span>
-                <span>Análise do Coach Assistant</span>
-            </div>
-
-            <div class="ai-content-body" [innerHTML]="gameSummaryHtml() | safeHtml">
-            </div>
-
-            <!-- Highlights Section -->
-            @if (gameSummaryHighlights().length > 0) {
-            <div class="ai-highlights">
-                <div class="highlights-grid">
-                    @for (highlight of gameSummaryHighlights(); track highlight.title || highlight.Title) {
-                    <div class="highlight-card" [class]="(highlight.type || highlight.Type || '').toLowerCase()">
-                        <div class="h-header">
-                            <span class="material-icons">{{ (highlight.type || highlight.Type || '').toLowerCase() === 'performance' ? 'trending_up' : 
-                                                          (highlight.type || highlight.Type || '').toLowerCase() === 'stat' ? 'numbers' : 'star' }}</span>
-                            <span class="h-title">{{ highlight.title || highlight.Title }}</span>
+                <div class="sb-content">
+                    <div class="sb-team visitor">
+                        <div class="sb-logo-wrapper">
+                            <img [src]="getTeamLogo(game.visitorTeam.abbreviation)" class="sb-logo">
                         </div>
-                        <p class="h-desc">{{ highlight.description || highlight.Description }}</p>
+                        <div class="sb-team-detail">
+                            <h2 class="sb-name">{{ game.visitorTeam.displayName }}</h2>
+                            <div class="sb-record-row">
+                                <span class="sb-abbr">{{ game.visitorTeam.abbreviation }}</span>
+                                @if (game.visitorTeam.wins !== undefined) {
+                                    <span class="sb-record">{{ game.visitorTeam.wins }}-{{ game.visitorTeam.losses }}</span>
+                                }
+                            </div>
+                        </div>
                     </div>
-                    }
-                </div>
-            </div>
-            }
 
-            <div class="ai-footer">
-                *Análise baseada em dados oficiais da ESPN.
+                    <div class="sb-center">
+                        <div class="sb-score-group">
+                            <span class="sb-score">{{ game.visitorTeamScore }}</span>
+                            <div class="sb-status-box">
+                                <div class="sb-status-pill" [class.live]="game.isLive">
+                                    @if (game.isLive) {
+                                        <span>LIVE</span>
+                                    } @else if (game.isCompleted) {
+                                        <span>FINAL</span>
+                                    } @else {
+                                        <span>{{ game.status }}</span>
+                                    }
+                                </div>
+                                <span class="sb-clock">{{ game.timeRemaining || 'Q4' }}</span>
+                            </div>
+                            <span class="sb-score">{{ game.homeTeamScore }}</span>
+                        </div>
+                        <div class="sb-meta-info">
+                            <span>{{ game.date | date:'dd MMM yyyy' }}</span>
+                            <span class="dot">•</span>
+                            <span>22:30</span>
+                            <span class="dot">•</span>
+                            <span>TD Garden, Boston</span>
+                        </div>
+                    </div>
+
+                    <div class="sb-team home">
+                        <div class="sb-team-detail text-right">
+                            <h2 class="sb-name">{{ game.homeTeam.displayName }}</h2>
+                            <div class="sb-record-row justify-end">
+                                @if (game.homeTeam.wins !== undefined) {
+                                    <span class="sb-record">{{ game.homeTeam.wins }}-{{ game.homeTeam.losses }}</span>
+                                }
+                                <span class="sb-abbr">{{ game.homeTeam.abbreviation }}</span>
+                            </div>
+                        </div>
+                        <div class="sb-logo-wrapper">
+                            <img [src]="getTeamLogo(game.homeTeam.abbreviation)" class="sb-logo">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Simple Tabs -->
+            <nav class="premium-tabs-nav animate-fade-in">
+                <button type="button" class="nav-tab-btn" [class.active]="activeTab() === 'summary'" (click)="setTab('summary')">Resumo</button>
+                <button type="button" class="nav-tab-btn" [class.active]="activeTab() === 'boxscore'" (click)="setTab('boxscore')">Box Score</button>
+                <button type="button" class="nav-tab-btn" [class.active]="activeTab() === 'playbyplay'" (click)="setTab('playbyplay')">Jogadas</button>
+                <button type="button" class="nav-tab-btn" [class.active]="activeTab() === 'h2h'" (click)="setTab('h2h')">H2H</button>
+            </nav>
+
+            <div class="game-details-grid animate-fade-in" style="animation-delay: 0.2s">
+                <!-- ===== MAIN CONTENT AREA ===== -->
+                <main class="main-column">
+                    @if (statsService.isLoading() && activeTab() !== 'summary') {
+                        <div class="premium-card loading-card">
+                            <app-skeleton-loader width="100%" height="400px" borderRadius="16px"></app-skeleton-loader>
+                        </div>
+                    } @else {
+                        @if (activeTab() === 'boxscore') {
+                            <div class="premium-card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Box Score</h3>
+                                    @if (statsService.currentGameBoxscore(); as boxscore) {
+                                        <div class="team-tabs-mini">
+                                            <button class="mini-team-btn" [class.active]="boxscoreTeamView() === 'visitor'" (click)="setBoxscoreTeam('visitor')">
+                                                {{ game.visitorTeam.displayName }}
+                                            </button>
+                                            <button class="mini-team-btn" [class.active]="boxscoreTeamView() === 'home'" (click)="setBoxscoreTeam('home')">
+                                                {{ game.homeTeam.displayName }}
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="table-container">
+                                    <table class="premium-table sortable-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="text-left" (click)="toggleSort('playerFullName')" title="Jogador">
+                                                    Jogador <span class="sort-icon material-icons" *ngIf="sortField() === 'playerFullName'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('minutesPlayed')" title="Minutos Jogados" class="sortable">
+                                                    MIN <span class="sort-icon material-icons" *ngIf="sortField() === 'minutesPlayed'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('points')" class="sortable" title="Pontos">
+                                                    PTS <span class="sort-icon material-icons" *ngIf="sortField() === 'points'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('fieldGoalsMade')" class="sortable" title="Arremessos de Quadra (Convertidos/Tentados)">
+                                                    FG <span class="sort-icon material-icons" *ngIf="sortField() === 'fieldGoalsMade'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('totalRebounds')" class="sortable" title="Rebotes Totais">
+                                                    REB <span class="sort-icon material-icons" *ngIf="sortField() === 'totalRebounds'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('assists')" class="sortable" title="Assistências">
+                                                    AST <span class="sort-icon material-icons" *ngIf="sortField() === 'assists'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('threePointersMade')" class="sortable" title="Bolas de 3 (Convertidas/Tentadas)">
+                                                    3P <span class="sort-icon material-icons" *ngIf="sortField() === 'threePointersMade'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('freeThrowsMade')" class="sortable" title="Lances Livres (Convertidos/Tentados)">
+                                                    FT <span class="sort-icon material-icons" *ngIf="sortField() === 'freeThrowsMade'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('steals')" class="sortable" title="Roubadas de Bola">
+                                                    STL <span class="sort-icon material-icons" *ngIf="sortField() === 'steals'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('blocks')" class="sortable" title="Tocos">
+                                                    BLK <span class="sort-icon material-icons" *ngIf="sortField() === 'blocks'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('turnovers')" class="sortable" title="Turnovers (Erros)">
+                                                    TO <span class="sort-icon material-icons" *ngIf="sortField() === 'turnovers'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th (click)="toggleSort('personalFouls')" class="sortable" title="Faltas Pessoais">
+                                                    PF <span class="sort-icon material-icons" *ngIf="sortField() === 'personalFouls'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                                <th class="text-right sortable" (click)="toggleSort('plusMinus')" title="Eficiência (+/-)">
+                                                    ± <span class="sort-icon material-icons" *ngIf="sortField() === 'plusMinus'">{{ sortDirection() === 'asc' ? 'arrow_drop_up' : 'arrow_drop_down' }}</span>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (stat of activeBoxscoreStats(); track stat.playerId) {
+                                                <tr class="player-row" [class.is-starter]="stat.isStarter">
+                                                    <td>
+                                                        <div class="player-cell" [routerLink]="['/players', stat.playerId]">
+                                                            <div class="player-avatar-wrapper">
+                                                                 <img [src]="getPlayerAvatar(stat.playerEspnId)" (error)="onImageError($event)" class="player-avatar" [alt]="stat.playerFullName">
+                                                            </div>
+                                                            <div class="player-info-mini">
+                                                                <span class="p-name">{{ stat.playerFullName }}</span>
+                                                                <span class="p-pos">{{ stat.position }}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td>{{ stat.minutesPlayed }}</td>
+                                                    <td class="bold-stat">{{ stat.points }}</td>
+                                                    <td>{{ stat.fieldGoalsMade }}/{{ stat.fieldGoalsAttempted }}</td>
+                                                    <td>{{ stat.totalRebounds }}</td>
+                                                    <td>{{ stat.assists }}</td>
+                                                    <td>{{ stat.threePointersMade }}/{{ stat.threePointersAttempted }}</td>
+                                                    <td>{{ stat.freeThrowsMade }}/{{ stat.freeThrowsAttempted }}</td>
+                                                    <td>{{ stat.steals }}</td>
+                                                    <td>{{ stat.blocks }}</td>
+                                                    <td>{{ stat.turnovers }}</td>
+                                                    <td>{{ stat.personalFouls }}</td>
+                                                    <td class="text-right" [class.plus]="stat.plusMinus > 0" [class.minus]="stat.plusMinus < 0">
+                                                        {{ stat.plusMinus > 0 ? '+' : '' }}{{ stat.plusMinus }}
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                        @if (activeBoxscoreStats().length > 0) {
+                                            <tfoot class="table-totals">
+                                                <tr>
+                                                    <td class="text-left">TOTAL</td>
+                                                    <td>—</td>
+                                                    <td class="bold-stat">{{ boxscoreTeamView() === 'visitor' ? visitorTotals().points : homeTotals().points }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().fieldGoalsMade : homeTotals().fieldGoalsMade }}/{{ boxscoreTeamView() === 'visitor' ? visitorTotals().fieldGoalsAttempted : homeTotals().fieldGoalsAttempted }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().totalRebounds : homeTotals().totalRebounds }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().assists : homeTotals().assists }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().threePointersMade : homeTotals().threePointersMade }}/{{ boxscoreTeamView() === 'visitor' ? visitorTotals().threePointersAttempted : homeTotals().threePointersAttempted }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().freeThrowsMade : homeTotals().freeThrowsMade }}/{{ boxscoreTeamView() === 'visitor' ? visitorTotals().freeThrowsAttempted : homeTotals().freeThrowsAttempted }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().steals : homeTotals().steals }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().blocks : homeTotals().blocks }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().turnovers : homeTotals().turnovers }}</td>
+                                                    <td>{{ boxscoreTeamView() === 'visitor' ? visitorTotals().personalFouls : homeTotals().personalFouls }}</td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        }
+                                    </table>
+                                </div>
+
+                                <div class="card-footer-teams">
+                                    <button class="footer-team-btn" [class.active]="boxscoreTeamView() === 'visitor'" (click)="setBoxscoreTeam('visitor')">
+                                        {{ game.visitorTeam.name }}
+                                    </button>
+                                    <button class="footer-team-btn" [class.active]="boxscoreTeamView() === 'home'" (click)="setBoxscoreTeam('home')">
+                                        {{ game.homeTeam.name }}
+                                    </button>
+                                </div>
+                            </div>
+                        } @else if (activeTab() === 'summary') {
+                            <div class="premium-card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Análise do Jogo</h3>
+                                    <span class="material-icons info-icon">auto_awesome</span>
+                                </div>
+                                <div class="summary-body">
+                                    @if (isLoadingSummary()) {
+                                        <div class="ai-loading">
+                                            <span class="material-icons rotate">sync</span>
+                                            <p>Gerando análise inteligente...</p>
+                                        </div>
+                                    } @else {
+                                        <div class="summary-wrapper">
+                                            @if (gameSummaryHighlights().length > 0) {
+                                                <div class="highlights-grid">
+                                                    @for (item of gameSummaryHighlights(); track $index) {
+                                                        <div class="highlight-card" [class]="item.type">
+                                                            <div class="h-icon-box">
+                                                                <span class="material-icons">{{ getHighlightIcon(item.type) }}</span>
+                                                            </div>
+                                                            <div class="h-content">
+                                                                <span class="h-title">{{ item.title }}</span>
+                                                                <p class="h-desc">{{ item.description }}</p>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                            <div class="markdown-content" [innerHTML]="gameSummaryHtml()"></div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        } @else if (activeTab() === 'playbyplay') {
+                            <div class="premium-card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Linha do Tempo</h3>
+                                    <span class="material-icons info-icon">history</span>
+                                </div>
+                                <div class="pbp-timeline">
+                                    @for (play of gamesService.gamePlays(); track play.id) {
+                                        <div class="pbp-item" [class.scoring]="play.scoreValue > 0">
+                                            <div class="pbp-time">{{ play.clock }}</div>
+                                            <div class="pbp-dot"></div>
+                                            <div class="pbp-main">
+                                                <p class="pbp-desc">{{ play.text }}</p>
+                                                @if (play.scoreValue > 0) {
+                                                    <div class="pbp-score-now">
+                                                        {{ play.awayScore }} - {{ play.homeScore }}
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (gamesService.gamePlays().length === 0) {
+                                        <div class="empty-state">Nenhuma jogada disponível.</div>
+                                    }
+                                </div>
+                            </div>
+                        } @else if (activeTab() === 'h2h') {
+                            <div class="premium-card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Confrontos Diretos</h3>
+                                    <span class="material-icons info-icon">compare_arrows</span>
+                                </div>
+                                <div class="h2h-list">
+                                    @for (hGame of gamesService.gameH2H(); track hGame.id) {
+                                        <div class="h2h-item-card" (click)="router.navigate(['/games', hGame.id])">
+                                            <div class="h2h-date">{{ hGame.date | date:'dd MMM yyyy' }}</div>
+                                            <div class="h2h-matchup">
+                                                <div class="h2h-t">
+                                                    <img [src]="getTeamLogo(hGame.visitorTeam.abbreviation)" class="t-logo">
+                                                    <div class="t-info">
+                                                        <span class="t-abbr">{{ hGame.visitorTeam.abbreviation }}</span>
+                                                        <span class="t-score" [class.win]="hGame.visitorTeamScore! > hGame.homeTeamScore!">{{ hGame.visitorTeamScore }}</span>
+                                                    </div>
+                                                </div>
+                                                <span class="vs-text">vs</span>
+                                                <div class="h2h-t home">
+                                                    <div class="t-info text-right">
+                                                        <span class="t-abbr">{{ hGame.homeTeam.abbreviation }}</span>
+                                                        <span class="t-score" [class.win]="hGame.homeTeamScore! > hGame.visitorTeamScore!">{{ hGame.homeTeamScore }}</span>
+                                                    </div>
+                                                    <img [src]="getTeamLogo(hGame.homeTeam.abbreviation)" class="t-logo">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    @if (gamesService.gameH2H().length === 0) {
+                                        <div class="empty-state">Sem histórico de confrontos.</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </main>
+
+                <!-- ===== SIDEBAR AREA ===== -->
+                <aside class="sidebar-column">
+                    @if (gamesService.isLoading()) {
+                        <div class="premium-side-card">
+                            <app-skeleton-loader width="100%" height="200px" borderRadius="16px"></app-skeleton-loader>
+                        </div>
+                    } @else {
+                        <!-- Leaders Panel -->
+                        <div class="premium-side-card">
+                            <h3 class="side-card-title">Líderes do Jogo</h3>
+                            @if (topLeaders() !== null && (topLeaders()?.pts || topLeaders()?.reb || topLeaders()?.ast)) {
+                                <div class="side-leaders-list">
+                                    <!-- PTS Leader -->
+                                    <div class="side-leader-item">
+                                        <div class="leader-icon pts">
+                                            <span class="material-icons">emoji_events</span>
+                                        </div>
+                                        <div class="leader-info">
+                                            <div class="leader-stat-row">
+                                                <span class="stat-label">PTS:</span>
+                                                <span class="stat-player" [title]="topLeaders()!.pts?.playerName">{{ topLeaders()!.pts?.playerName || 'N/A' }} • {{ topLeaders()!.pts?.team || '' }}</span>
+                                                <span class="stat-value">{{ topLeaders()!.pts?.value || 0 }}pts</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- REB Leader -->
+                                    <div class="side-leader-item">
+                                        <div class="leader-icon reb">
+                                            <span class="material-icons">sports_basketball</span>
+                                        </div>
+                                        <div class="leader-info">
+                                            <div class="leader-stat-row">
+                                                <span class="stat-label">REB:</span>
+                                                <span class="stat-player" [title]="topLeaders()!.reb?.playerName">{{ topLeaders()!.reb?.playerName || 'N/A' }} • {{ topLeaders()!.reb?.team || '' }}</span>
+                                                <span class="stat-value">{{ topLeaders()!.reb?.value || 0 }}reb</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- AST Leader -->
+                                    <div class="side-leader-item">
+                                        <div class="leader-icon ast">
+                                            <span class="material-icons">person</span>
+                                        </div>
+                                        <div class="leader-info">
+                                            <div class="leader-stat-row">
+                                                <span class="stat-label">AST:</span>
+                                                <span class="stat-player" [title]="topLeaders()!.ast?.playerName">{{ topLeaders()!.ast?.playerName || 'N/A' }} • {{ topLeaders()!.ast?.team || '' }}</span>
+                                                <span class="stat-value">{{ topLeaders()!.ast?.value || 0 }}ast</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            } @else {
+                                <div class="side-empty">Líderes não disponíveis</div>
+                            }
+                        </div>
+
+                        <!-- Parciais Panel -->
+                        <div class="premium-side-card">
+                            <h3 class="side-card-title">Parciais</h3>
+                            <div class="side-linescore">
+                                @if (game.lineScore && game.lineScore.length > 0) {
+                                    <div class="ls-row ls-header">
+                                        <span class="ls-team"></span>
+                                        @for (ls of game.lineScore; track ls.period) {
+                                            <span class="ls-val">{{ ls.period }}</span>
+                                        }
+                                        <span class="ls-val total">TOT</span>
+                                    </div>
+                                    <div class="ls-row">
+                                        <span class="ls-team">{{ game.visitorTeam.abbreviation }}</span>
+                                        @for (ls of game.lineScore; track ls.period) {
+                                            <span class="ls-val">{{ ls.visitorScore }}</span>
+                                        }
+                                        <span class="ls-val total">{{ game.visitorTeamScore }}</span>
+                                    </div>
+                                    <div class="ls-row">
+                                        <span class="ls-team">{{ game.homeTeam.abbreviation }}</span>
+                                        @for (ls of game.lineScore; track ls.period) {
+                                            <span class="ls-val">{{ ls.homeScore }}</span>
+                                        }
+                                        <span class="ls-val total">{{ game.homeTeamScore }}</span>
+                                    </div>
+                                } @else {
+                                    <div class="side-empty">Parciais não disponíveis</div>
+                                }
+                            </div>
+                            <div class="ls-final-total">
+                                <span>TOTAL</span>
+                                <span class="ls-total-score">{{ game.visitorTeamScore }} – {{ game.homeTeamScore }}</span>
+                            </div>
+                        </div>
+                    }
+                </aside>
             </div>
-        </div>
-        } @else {
-        <div class="placeholder-content">
-            <span class="material-icons">description</span>
-            <p>Resumo detalhado gerado por IA em breve...</p>
-        </div>
+        } @else if (gamesService.isLoading()) {
+            <div class="loading-state">
+                <app-skeleton-loader width="100%" height="250px" borderRadius="16px" className="mb-4"></app-skeleton-loader>
+                <app-skeleton-loader width="100%" height="500px" borderRadius="16px"></app-skeleton-loader>
+            </div>
         }
-    </div>
-    }
-    }
     }
 </div>

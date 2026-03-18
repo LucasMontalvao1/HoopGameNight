@@ -470,6 +470,9 @@ namespace HoopGameNight.Core.Services
                     var competition = competitions.EnumerateArray().FirstOrDefault();
                     if (competition.ValueKind != JsonValueKind.Undefined && competition.TryGetProperty("competitors", out var competitors))
                     {
+                        var homeLines = new List<int>();
+                        var visitorLines = new List<int>();
+
                         foreach (var competitor in competitors.EnumerateArray())
                         {
                             var isHome = GetPropertySafe(competitor, "homeAway") == "home";
@@ -486,7 +489,69 @@ namespace HoopGameNight.Core.Services
                                 if (isHome) game.HomeTeamScore = scoreValue;
                                 else game.AwayTeamScore = scoreValue;
                             }
+
+                            // Extract Team Record
+                            if (competitor.TryGetProperty("records", out var records))
+                            {
+                                var overallRecord = records.EnumerateArray().FirstOrDefault(r => 
+                                    GetPropertySafe(r, "name").ToLower().Contains("overall") || 
+                                    GetPropertySafe(r, "type").ToLower().Contains("total") ||
+                                    GetPropertySafe(r, "name") == "" || GetPropertySafe(r, "type") == "");
+                                
+                                if (overallRecord.ValueKind != JsonValueKind.Undefined)
+                                {
+                                    var recordStr = GetPropertySafe(overallRecord, "summary");
+                                    if (isHome) game.HomeTeamRecord = recordStr;
+                                    else game.AwayTeamRecord = recordStr;
+                                }
+                            }
+
+                            // Extract LineScores
+                            if (competitor.TryGetProperty("linescores", out var linescores))
+                            {
+                                foreach (var line in linescores.EnumerateArray())
+                                {
+                                    if (line.TryGetProperty("value", out var val))
+                                    {
+                                        int score = 0;
+                                        if (val.ValueKind == JsonValueKind.Number) score = (int)val.GetDouble();
+                                        else if (val.ValueKind == JsonValueKind.String) int.TryParse(val.GetString(), out score);
+
+                                        if (isHome) homeLines.Add(score);
+                                        else visitorLines.Add(score);
+                                    }
+                                }
+                            }
                         }
+
+                        // Format LineScoreJson
+                        if (homeLines.Any() || visitorLines.Any())
+                        {
+                            var lineObj = new List<object>();
+                            int maxPeriods = Math.Max(homeLines.Count, visitorLines.Count);
+                            for (int i = 0; i < maxPeriods; i++)
+                            {
+                                string periodName = (i < 4) ? $"Q{i + 1}" : $"OT{i - 3}";
+                                lineObj.Add(new
+                                {
+                                    Period = periodName,
+                                    HomeScore = i < homeLines.Count ? homeLines[i] : 0,
+                                    VisitorScore = i < visitorLines.Count ? visitorLines[i] : 0
+                                });
+                            }
+                            game.LineScoreJson = JsonSerializer.Serialize(lineObj);
+                        }
+                    }
+
+                    // Extract Leaders
+                    if (competition.ValueKind != JsonValueKind.Undefined && competition.TryGetProperty("leaders", out var leadersArray))
+                    {
+                        var leadersObj = new
+                        {
+                            HomeTeamLeaders = ExtractTeamLeaders(leadersArray, true, game.HomeTeamAbbreviation ?? ""),
+                            VisitorTeamLeaders = ExtractTeamLeaders(leadersArray, false, game.AwayTeamAbbreviation ?? "")
+                        };
+                        game.GameLeadersJson = JsonSerializer.Serialize(leadersObj);
                     }
                 }
 
@@ -621,11 +686,175 @@ namespace HoopGameNight.Core.Services
             };
         }
 
-        private string GetPropertySafe(JsonElement element, string propertyName)
+        private object ExtractTeamLeaders(JsonElement leadersArray, bool isHome, string teamAbbreviation)
         {
-            return element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
-                ? property.GetString() ?? ""
-                : "";
+            object? pointsLeader = null;
+            object? reboundsLeader = null;
+            object? assistsLeader = null;
+
+            var side = isHome ? "home" : "away";
+
+            foreach (var category in leadersArray.EnumerateArray())
+            {
+                var name = GetPropertySafe(category, "name")?.ToLowerInvariant() ?? "";
+                if (category.TryGetProperty("leaders", out var teamLeaders))
+                {
+                    var sideLeaders = teamLeaders.EnumerateArray().FirstOrDefault(l => GetPropertySafe(l, "address") == side || GetPropertySafe(l, "homeAway") == side);
+                    if (sideLeaders.ValueKind == JsonValueKind.Undefined)
+                        sideLeaders = teamLeaders.EnumerateArray().FirstOrDefault();
+
+                    if (sideLeaders.ValueKind != JsonValueKind.Undefined && sideLeaders.TryGetProperty("athlete", out var athlete))
+                    {
+                        var leader = new {
+                            PlayerId = SafeParseInt(GetPropertyStringSafe(athlete, "id")),
+                            PlayerName = GetPropertyStringSafe(athlete, "displayName"),
+                            TeamAbbreviation = teamAbbreviation,
+                            Value = sideLeaders.TryGetProperty("value", out var val) ? (val.ValueKind == JsonValueKind.Number ? val.GetDouble() : (double)SafeParseDecimal(val.GetString())) : 0,
+                            Jersey = GetPropertyStringSafe(athlete, "jersey"),
+                            Position = athlete.TryGetProperty("position", out var pos) ? GetPropertyStringSafe(pos, "abbreviation") : ""
+                        };
+
+                        if (name == "points") pointsLeader = leader;
+                        else if (name == "rebounds") reboundsLeader = leader;
+                        else if (name == "assists") assistsLeader = leader;
+                    }
+                }
+            }
+
+            return new {
+                PointsLeader = pointsLeader,
+                ReboundsLeader = reboundsLeader,
+                AssistsLeader = assistsLeader
+            };
         }
+
+        public List<GamePlay> ParsePlaysResponse(string json, int gameId)
+        {
+            var plays = new List<GamePlay>();
+            try
+            {
+                using var document = JsonDocument.Parse(json);
+                var root = document.RootElement;
+
+                // ESPN usually provides plays under 'plays' or 'items' depending on the endpoint
+                JsonElement playsArray;
+                if (!root.TryGetProperty("plays", out playsArray))
+                {
+                    if (!root.TryGetProperty("items", out playsArray))
+                        return plays;
+                }
+
+                foreach (var item in playsArray.EnumerateArray())
+                {
+                    var play = new GamePlay
+                    {
+                        GameId = gameId,
+                        ExternalId = GetPropertySafe(item, "id"),
+                        Sequence = item.TryGetProperty("sequence", out var seq) ? seq.GetInt32() : 0,
+                        Text = GetPropertySafe(item, "text"),
+                        Type = item.TryGetProperty("type", out var type) ? GetPropertySafe(type, "text") : "",
+                        ScoreValue = item.TryGetProperty("scoreValue", out var sv) ? sv.GetInt32() : 0,
+                        HomeScore = item.TryGetProperty("homeScore", out var hs) ? hs.GetInt32() : 0,
+                        AwayScore = item.TryGetProperty("awayScore", out var its) ? its.GetInt32() : 0,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    if (item.TryGetProperty("period", out var period))
+                        play.Period = period.TryGetProperty("number", out var pNum) ? pNum.GetInt32() : 0;
+
+                    if (item.TryGetProperty("clock", out var clock))
+                        play.Clock = GetPropertySafe(clock, "displayValue");
+
+                    if (item.TryGetProperty("team", out var team))
+                        play.TeamId = SafeParseInt(GetPropertySafe(team, "id"));
+
+                    if (item.TryGetProperty("participants", out var participants) && participants.EnumerateArray().Any())
+                        play.PlayerId = SafeParseInt(GetPropertySafe(participants.EnumerateArray().First(), "id"));
+
+                    plays.Add(play);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error parsing ESPN plays response for game {GameId}", gameId);
+            }
+            return plays;
+        }
+
+        public Dictionary<string, (int Wins, int Losses)> ParseStandings(EspnStandingsDto standings)
+        {
+            var results = new Dictionary<string, (int Wins, int Losses)>();
+            
+            if (standings == null) return results;
+
+            ProcessStandingEntries(standings.Entries, results);
+            if (standings.Standings != null)
+            {
+                ProcessStandingEntries(standings.Standings.Entries, results);
+            }
+            ProcessStandingChildren(standings.Children, results);
+
+            return results;
+        }
+
+        private void ProcessStandingChildren(List<EspnStandingsDto>? children, Dictionary<string, (int Wins, int Losses)> results)
+        {
+            if (children == null) return;
+
+            foreach (var child in children)
+            {
+                ProcessStandingEntries(child.Entries, results);
+                if (child.Standings != null)
+                {
+                    ProcessStandingEntries(child.Standings.Entries, results);
+                }
+                ProcessStandingChildren(child.Children, results);
+            }
+        }
+
+        private void ProcessStandingEntries(List<EspnStandingEntryDto>? entries, Dictionary<string, (int Wins, int Losses)> results)
+        {
+            if (entries == null) return;
+
+            foreach (var entry in entries)
+            {
+                if (entry.Team == null || string.IsNullOrEmpty(entry.Team.Id) || entry.Stats == null) continue;
+
+                int wins = 0;
+                int losses = 0;
+
+                foreach (var stat in entry.Stats)
+                {
+                    var name = stat.Name?.ToLowerInvariant();
+                    if (name == "wins" || name == "w")
+                    {
+                        wins = (int)SafeParseDecimal(stat.Value);
+                    }
+                    else if (name == "losses" || name == "l")
+                    {
+                        losses = (int)SafeParseDecimal(stat.Value);
+                    }
+                }
+
+                results[entry.Team.Id] = (wins, losses);
+            }
+        }
+
+        private string GetPropertyStringSafe(JsonElement element, string propertyName)
+        {
+            if (element.ValueKind == JsonValueKind.Null || element.ValueKind == JsonValueKind.Undefined) return "";
+            if (!element.TryGetProperty(propertyName, out var property)) return "";
+            
+            return property.ValueKind switch
+            {
+                JsonValueKind.String => property.GetString() ?? "",
+                JsonValueKind.Number => property.ToString(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => ""
+            };
+        }
+
+        private string GetPropertySafe(JsonElement element, string propertyName) => GetPropertyStringSafe(element, propertyName);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace HoopGameNight.Core.DTOs.Response
 {
@@ -26,6 +26,10 @@ namespace HoopGameNight.Core.DTOs.Response
         public bool IsFutureGame { get; set; }
         public string DataSource { get; set; } = "ESPN"; 
         public FutureGameInfo? FutureGameInfo { get; set; }
+        public List<LineScoreDTO>? LineScore { get; set; }
+        public GameLeadersDTO? Leaders { get; set; }
+        public string? AiSummary { get; set; }
+        public string? AiHighlights { get; set; }
     }
 
     /// <summary>
@@ -48,5 +52,35 @@ namespace HoopGameNight.Core.DTOs.Response
         public string Score { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public bool IsLive { get; set; }
+    }
+
+    public class LineScoreDTO
+    {
+        public string Period { get; set; } = string.Empty;
+        public int HomeScore { get; set; }
+        public int VisitorScore { get; set; }
+    }
+
+    public class GameLeadersDTO
+    {
+        public TeamLeaderDTO HomeTeamLeaders { get; set; } = new();
+        public TeamLeaderDTO VisitorTeamLeaders { get; set; } = new();
+    }
+
+    public class TeamLeaderDTO
+    {
+        public LeaderPlayerDTO? PointsLeader { get; set; }
+        public LeaderPlayerDTO? ReboundsLeader { get; set; }
+        public LeaderPlayerDTO? AssistsLeader { get; set; }
+    }
+
+    public class LeaderPlayerDTO
+    {
+        public int PlayerId { get; set; }
+        public string PlayerName { get; set; } = string.Empty;
+        public string TeamAbbreviation { get; set; } = string.Empty;
+        public double Value { get; set; }
+        public string? Position { get; set; }
+        public string? Jersey { get; set; }
     }
 }

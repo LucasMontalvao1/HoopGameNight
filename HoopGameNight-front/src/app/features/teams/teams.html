@@ -15,7 +15,8 @@
         <!-- Search -->
         <div class="search-input-group">
           <span class="material-icons">search</span>
-          <input type="text" placeholder="Buscar franquia..." [value]="searchQuery()" (input)="onSearchInput($event)">
+          <input type="text" placeholder="Buscar franquia..." [value]="searchQuery()" (input)="onSearchInput($event)"
+            aria-label="Buscar franquia por nome ou cidade">
         </div>
 
         <!-- Conference Pills -->
@@ -45,25 +46,26 @@
         <!-- View Toggle -->
         <div class="view-toggle">
           <button class="view-btn" [class.active]="viewMode() === 'grid'" (click)="onViewModeChange('grid')"
-            title="Grade">
+            title="Grade" aria-label="Mudar para visualização em grade">
             <span class="material-icons">grid_view</span>
           </button>
           <button class="view-btn" [class.active]="viewMode() === 'list'" (click)="onViewModeChange('list')"
-            title="Lista">
+            title="Lista" aria-label="Mudar para visualização em lista">
             <span class="material-icons">view_list</span>
           </button>
           <button class="view-btn" [class.active]="viewMode() === 'divisions'" (click)="onViewModeChange('divisions')"
-            title="Divisões">
+            title="Divisões" aria-label="Mudar para visualização por divisões">
             <span class="material-icons">category</span>
           </button>
         </div>
 
         <div class="action-buttons">
           <button class="btn btn--secondary btn--icon-only" (click)="refreshTeams()"
-            [disabled]="teamsService.isLoading()" title="Atualizar Tela">
+            [disabled]="teamsService.isLoading()" title="Atualizar Tela" aria-label="Recarregar lista de times">
             <span class="material-icons" [class.rotating]="teamsService.isLoading()">refresh</span>
           </button>
-          <button class="btn btn--primary btn--compact" (click)="syncTeams()" [disabled]="teamsService.isLoading()">
+          <button class="btn btn--primary btn--compact" (click)="syncTeams()" [disabled]="teamsService.isLoading()"
+            aria-label="Sincronizar franquias com o servidor">
             <span class="material-icons">sync</span>
             <span class="btn-text">Sincronizar</span>
           </button>
@@ -137,7 +139,7 @@
           </div>
           <button class="favorite-btn" [class.favorite-btn--active]="preferencesStore.isFavoriteTeam(team.id)"
             (click)="$event.stopPropagation(); preferencesStore.toggleFavoriteTeam(team.id)"
-            [title]="preferencesStore.isFavoriteTeam(team.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'">
+            [attr.aria-label]="preferencesStore.isFavoriteTeam(team.id) ? 'Remover ' + team.name + ' dos favoritos' : 'Adicionar ' + team.name + ' aos favoritos'">
             <span class="material-icons">
               {{ preferencesStore.isFavoriteTeam(team.id) ? 'favorite' : 'favorite_border' }}
             </span>
@@ -150,6 +152,9 @@
           <div class="team-details">
             <span class="team-abbreviation">{{ team.abbreviation }}</span>
             <span class="team-city">{{ team.city }}</span>
+                <span class="team-record-badge">
+                  {{ team.wins || 0 }} - {{ team.losses || 0 }}
+                </span>
           </div>
         </div>
       </div>
@@ -169,7 +174,7 @@
 
         <div class="team-info-group">
           <h3 class="team-name">{{ getTeamDisplayName(team) }}</h3>
-          <p class="team-details">{{ team.division }} Division • {{ team.conference }} Conference</p>
+          <p class="team-details">{{ team.division }} Division • {{ team.conference }} Conference • {{ team.wins }}-{{ team.losses }}</p>
         </div>
 
         <div class="team-meta-group">

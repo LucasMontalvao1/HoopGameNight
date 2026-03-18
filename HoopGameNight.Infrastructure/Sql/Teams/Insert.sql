@@ -1,4 +1,4 @@
-﻿INSERT INTO teams (
+INSERT INTO teams (
     external_id,
     external_espn_id,
     name,
@@ -6,7 +6,9 @@
     abbreviation,
     city,
     conference,
-    division
+    division,
+    wins,
+    losses
 ) VALUES (
     @ExternalId,
     @EspnId,
@@ -15,7 +17,9 @@
     @Abbreviation,
     @City,
     @Conference,
-    @Division
+    @Division,
+    @Wins,
+    @Losses
 );
 
 SELECT LAST_INSERT_ID();

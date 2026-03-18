@@ -12,6 +12,10 @@ SELECT
     g.time_remaining,
     g.postseason,
     g.season,
+    g.ai_summary,
+    g.ai_highlights,
+    g.line_score_json,
+    g.game_leaders_json,
     g.created_at,
     g.updated_at,
     -- Home Team
@@ -23,6 +27,8 @@ SELECT
     ht.city,
     ht.conference,
     ht.division,
+    ht.wins,
+    ht.losses,
     ht.created_at,
     ht.updated_at,
     -- Visitor Team
@@ -34,6 +40,8 @@ SELECT
     vt.city,
     vt.conference,
     vt.division,
+    vt.wins,
+    vt.losses,
     vt.created_at,
     vt.updated_at
 FROM games g

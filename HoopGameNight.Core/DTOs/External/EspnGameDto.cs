@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace HoopGameNight.Core.DTOs.External
 {
@@ -19,5 +19,9 @@ namespace HoopGameNight.Core.DTOs.External
         public string? TimeRemaining { get; set; } 
         public bool? IsPostseason { get; set; } 
         public int? Season { get; set; } 
+        public string? LineScoreJson { get; set; }
+        public string? GameLeadersJson { get; set; }
+        public string? HomeTeamRecord { get; set; }
+        public string? AwayTeamRecord { get; set; }
     }
 }

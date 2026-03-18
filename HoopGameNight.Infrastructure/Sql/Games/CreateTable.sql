@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS games (
     date DATE NOT NULL COMMENT 'Data do jogo (local time)',
     datetime DATETIME NOT NULL COMMENT 'Data e hora completa',
 
-    -- Times e placares
+    -- IDs de times
     home_team_id INT NOT NULL,
     visitor_team_id INT NOT NULL,
     home_team_score INT DEFAULT NULL,
@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS games (
     -- IA Insight
     ai_summary TEXT DEFAULT NULL COMMENT 'Resumo gerado por IA',
     ai_highlights JSON DEFAULT NULL COMMENT 'Destaques e insights da IA',
+
+    -- Lideres do jogo
+    line_score_json JSON DEFAULT NULL COMMENT 'Parciais por período',
+    game_leaders_json JSON DEFAULT NULL COMMENT 'Líderes de estatísticas do jogo',
 
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -50,3 +54,28 @@ CREATE TABLE IF NOT EXISTS games (
 
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Jogos da NBA - ESPN API';
+
+-- ============================================
+-- TABELA DE HISTÓRICO DE JOGADAS (PLAY-BY-PLAY)
+-- ============================================
+CREATE TABLE IF NOT EXISTS game_plays (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    game_id INT NOT NULL,
+    external_id VARCHAR(100) DEFAULT NULL,
+    sequence INT NOT NULL,
+    period INT NOT NULL,
+    clock VARCHAR(10) DEFAULT NULL,
+    text TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT NULL,
+    team_id INT DEFAULT NULL,
+    player_id INT DEFAULT NULL,
+    score_value INT DEFAULT 0,
+    home_score INT DEFAULT 0,
+    away_score INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE,
+    INDEX idx_plays_game (game_id),
+    INDEX idx_plays_game_period (game_id, period)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Histórico de jogadas (Play-by-play) da partida';

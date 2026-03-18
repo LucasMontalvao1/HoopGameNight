@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, effect } from '@angular/core';
-import { GameResponse, GetGamesRequest, SyncStatusResponse } from '../interfaces/api.interface';
+import { GameResponse, GetGamesRequest, SyncStatusResponse, GamePlayResponse, GameLeadersResponse } from '../interfaces/api.interface';
 import { GamesApiService } from './games-api.service';
 import { APP_CONSTANTS } from '../constants/app.constants';
 import { SignalrService } from './signalr.service';
@@ -16,6 +16,9 @@ export class GamesService {
   private readonly _syncStatus = signal<SyncStatusResponse | null>(null);
   private readonly _lastUpdate = signal<Date | null>(null);
   private readonly _selectedGame = signal<GameResponse | null>(null);
+  private readonly _gamePlays = signal<GamePlayResponse[]>([]);
+  private readonly _gameH2H = signal<GameResponse[]>([]);
+  private readonly _gameLeaders = signal<GameLeadersResponse | null>(null);
 
 
   readonly todayGames = this._todayGames.asReadonly();
@@ -26,6 +29,9 @@ export class GamesService {
   readonly syncStatus = this._syncStatus.asReadonly();
   readonly lastUpdate = this._lastUpdate.asReadonly();
   readonly selectedGame = this._selectedGame.asReadonly();
+  readonly gamePlays = this._gamePlays.asReadonly();
+  readonly gameH2H = this._gameH2H.asReadonly();
+  readonly gameLeaders = this._gameLeaders.asReadonly();
 
   readonly liveGames = computed(() =>
     this._todayGames().filter(game => game.isLive)
@@ -380,6 +386,27 @@ export class GamesService {
       console.error('Erro ao buscar próximos jogos do time:', error);
       return [];
     }
+  }
+
+  async loadGamePlays(id: number): Promise<void> {
+    await this.executeWithLoading(async () => {
+      const plays = await this.gamesApi.getGamePlays(id);
+      this._gamePlays.set(plays);
+    });
+  }
+
+  async loadHeadToHead(id: number): Promise<void> {
+    await this.executeWithLoading(async () => {
+      const h2h = await this.gamesApi.getHeadToHead(id);
+      this._gameH2H.set(h2h);
+    });
+  }
+
+  async loadGameLeaders(id: number): Promise<void> {
+    await this.executeWithLoading(async () => {
+      const leaders = await this.gamesApi.getGameLeaders(id);
+      this._gameLeaders.set(leaders);
+    });
   }
 
   clearCache(): void {

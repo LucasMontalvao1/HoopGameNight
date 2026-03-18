@@ -1,4 +1,4 @@
-﻿namespace HoopGameNight.Api.Constants
+namespace HoopGameNight.Api.Constants
 {
     public static class RouteConstants
     {
@@ -8,6 +8,9 @@
             public const string GET_BY_DATE = "date/{date:datetime}";
             public const string GET_BY_TEAM = "team/{teamId:int}";
             public const string GET_BY_ID = "{id:int}";
+            public const string GET_PBP = "{id:int}/pbp";
+            public const string GET_H2H = "{id:int}/h2h";
+            public const string GET_LEADERS = "{id:int}/leaders";
 
             public const string SYNC_TODAY = "sync/today";
             public const string SYNC_BY_DATE = "sync/date/{date:datetime}";

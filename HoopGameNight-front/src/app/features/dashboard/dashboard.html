@@ -97,6 +97,7 @@
                   <img [src]="getTeamLogoUrl(game.visitorTeam.abbreviation)" class="team-logo-lg"
                     (error)="handleLogoError($event, game.visitorTeam.abbreviation)">
                   <span class="team-abbr-lg">{{ game.visitorTeam.abbreviation }}</span>
+                  <span class="team-record-mini">{{ game.visitorTeam.wins }}-{{ game.visitorTeam.losses }}</span>
                   @if (game.isCompleted || game.isLive) {
                   <span class="team-score-lg" [class.is-winner]="game.winningTeam?.id === game.visitorTeam.id">
                     {{ game.visitorTeamScore }}
@@ -111,6 +112,7 @@
                   <img [src]="getTeamLogoUrl(game.homeTeam.abbreviation)" class="team-logo-lg"
                     (error)="handleLogoError($event, game.homeTeam.abbreviation)">
                   <span class="team-abbr-lg">{{ game.homeTeam.abbreviation }}</span>
+                  <span class="team-record-mini">{{ game.homeTeam.wins }}-{{ game.homeTeam.losses }}</span>
                   @if (game.isCompleted || game.isLive) {
                   <span class="team-score-lg" [class.is-winner]="game.winningTeam?.id === game.homeTeam.id">
                     {{ game.homeTeamScore }}

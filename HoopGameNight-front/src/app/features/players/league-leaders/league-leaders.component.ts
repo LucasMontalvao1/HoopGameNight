@@ -16,7 +16,7 @@ export class LeagueLeadersComponent implements OnInit {
 
     readonly leaders = this.playersService.leagueLeaders;
     readonly isLoading = this.playersService.isLoading;
-    readonly activeTab = signal<'pts' | 'reb' | 'ast'>('pts');
+    readonly activeTab = signal<'pts' | 'reb' | 'ast' | 'stl' | 'blk' | '3p'>('pts');
 
     ngOnInit(): void {
         if (!this.leaders()) {
@@ -24,7 +24,7 @@ export class LeagueLeadersComponent implements OnInit {
         }
     }
 
-    setTab(tab: 'pts' | 'reb' | 'ast'): void {
+    setTab(tab: 'pts' | 'reb' | 'ast' | 'stl' | 'blk' | '3p'): void {
         this.activeTab.set(tab);
     }
 
@@ -36,6 +36,9 @@ export class LeagueLeadersComponent implements OnInit {
             case 'pts': return data.scoringLeaders;
             case 'reb': return data.reboundLeaders;
             case 'ast': return data.assistLeaders;
+            case 'stl': return data.stealsLeaders;
+            case 'blk': return data.blocksLeaders;
+            case '3p': return data.threePointLeaders;
             default: return [];
         }
     }
@@ -45,6 +48,9 @@ export class LeagueLeadersComponent implements OnInit {
             case 'pts': return 'Pontos';
             case 'reb': return 'Rebotes';
             case 'ast': return 'Assistências';
+            case 'stl': return 'Roubos';
+            case 'blk': return 'Tocos';
+            case '3p': return '3 Pontos';
             default: return '';
         }
     }

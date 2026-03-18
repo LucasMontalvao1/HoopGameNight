@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using HoopGameNight.Core.DTOs.Request;
@@ -57,5 +57,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         Task<EspnBoxscoreDto?> GetGameBoxscoreAsync(int gameId);
         Task<GameLeadersResponse?> GetGameLeadersAsync(int gameId);
         Task<TeamSeasonLeadersResponse?> GetTeamLeadersAsync(int teamId);
+        Task<List<GamePlayResponse>> GetGamePlaysAsync(int gameId);
+        Task<List<GameResponse>> GetHeadToHeadAsync(int gameId);
     }
 }

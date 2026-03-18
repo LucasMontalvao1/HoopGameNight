@@ -2,6 +2,7 @@ using HoopGameNight.Core.DTOs.External;
 using HoopGameNight.Core.DTOs.External.ESPN;
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HoopGameNight.Core.Interfaces.Services
@@ -52,6 +53,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         /// Busca boxscore completo de um jogo
         /// </summary>
         Task<EspnBoxscoreDto?> GetGameBoxscoreAsync(string gameId);
+        Task<string> GetGamePlaysRawAsync(string gameId);
 
         #endregion
 
@@ -143,6 +145,11 @@ namespace HoopGameNight.Core.Interfaces.Services
         /// Busca líderes da liga na temporada
         /// </summary>
         Task<EspnLeadersDto?> GetLeagueLeadersAsync();
+
+        /// <summary>
+        /// Busca estatísticas por atleta com suporte a ordenação customizada
+        /// </summary>
+        Task<JsonElement> GetStatsByAthleteAsync(string category, int limit = 10, string sort = "");
 
         #endregion
 

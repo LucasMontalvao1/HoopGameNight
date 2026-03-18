@@ -23,6 +23,10 @@ namespace HoopGameNight.Core.Services.AI
    - Se perguntarem ""quais jogos"", liste apenas os confrontos, horários e placares.
    - Se perguntarem sobre um jogo específico, use: Placar -> Destaque -> Breve Comentário.
 4. **VERACIDADE:** Se um dado (como rebotes de um jogador específico) não estiver nos DADOS DISPONÍVEIS, apenas não mencione ou diga que o registro local não possui detalhes deste scout.
+5. **INSIGHTS NBA:** 
+   - Identifique e destaque Double-Doubles (10+ em 2 categorias) e Triple-Doubles (10+ em 3 categorias).
+   - Analise a eficiência: destaque jogadores que pontuaram muito em poucos minutos.
+   - Analise o aproveitamento: mencione o FG% e SEMPRE inclua a relação de acertos/tentativas (ex: ""75% com 6/8 FGs"").
 
 ### 📋 DADOS DISPONÍVEIS ({DateTime.Now:dd/MM/yyyy HH:mm}):
 
@@ -56,12 +60,13 @@ O JSON DEVE seguir este formato exato:
   ]
 }}
 
-### REGRAS DO CONTEÚDO:
-- Use APENAS os dados presentes no boxscore.
-- O campo 'summary' deve conter o resumo tradicional em MarkDown (Análise da Partida, Líderes e Insights).
-- O campo 'highlights' deve conter de 3 a 5 destaques curtos e impactantes.
-- Tipos válidos para highlights: 'performance', 'stat', 'moment', 'bench'.
-- Responda APENAS o JSON, sem textos explicativos antes ou depois.
+### REGRAS DO CONTEÚDO (MUITO IMPORTANTE PARA FORMATAÇÃO JSON):
+- O campo 'summary' deve conter o resumo tradicional em MarkDown com as SEÇÕES EXATAS: ""**Análise da Partida**"" e ""**Líderes e Insights**"". Detalhe bem quem foram os destaques.
+- **Destaque Estatístico:** No resumo, identifique explicitamente **Double-Doubles** e **Triple-Doubles**.
+- **Análise de Eficiência:** Identifique jogadores com alta produção em poucos minutos jogados e comente sobre o aproveitamento de arremessos, incluindo sempre o formato ""Percentual% (Acertos/Tentativas)"".
+- **ATENÇÃO JSON:** NÃO insira quebras de linha reais (Enters/0x0A) dentro das strings JSON. Para quebrar linha no MarkDown, escreva literalmente `\n` ou `\n\n`.
+- O campo 'highlights' deve conter de 3 a 5 destaques curtos e impactantes. Tipos válidos: 'performance', 'stat', 'moment', 'bench'.
+- Responda APENAS o JSON válido, iniciando com {{ e terminando com }}, sem textos explicativos antes ou depois e sem bloco de código markdown (```json).
 
 ### DADOS PARA O RESUMO:
 - Placar Final: {awayTeam.DisplayName} {game.VisitorTeamScore} x {game.HomeTeamScore} {homeTeam.DisplayName}
@@ -82,7 +87,6 @@ Gere o JSON agora:";
             void FormatTeamStats(string teamName, List<PlayerGameStatsDetailedResponse> players)
             {
                 lines.Add($"\n--- {teamName} ---");
-                // Totais do Time
                 var teamPts = players.Sum(p => p.Points);
                 var teamReb = players.Sum(p => p.TotalRebounds);
                 var teamAst = players.Sum(p => p.Assists);
@@ -92,10 +96,9 @@ Gere o JSON agora:";
                 
                 lines.Add($"TOTAIS: {teamPts} PTS, {teamReb} REB, {teamAst} AST, {teamStl} STL, {teamBlk} BLK, {teamTov} TOV");
 
-                // Principais performances (filtrando DNP e limitando para não estourar contexto)
                 foreach (var p in players.Where(p => !p.DidNotPlay).OrderByDescending(p => p.Points).Take(8))
                 {
-                    lines.Add($"{p.PlayerFullName}: {p.Points} PTS, {p.TotalRebounds} REB, {p.Assists} AST, {p.FieldGoalsFormatted} FG ({p.FieldGoalPercentage}%), {p.ThreePointersFormatted} 3PT ({p.ThreePointPercentage}%), +/-: {p.PlusMinus}, {p.MinutesPlayed} MIN");
+                    lines.Add($"{p.PlayerFullName}: {p.Points} PTS, {p.TotalRebounds} REB, {p.Assists} AST, {p.FieldGoalsFormatted} FG ({p.FieldGoalPercentage}%), {p.ThreePointersFormatted} 3PT ({p.ThreePointPercentage}%), {p.FreeThrowsFormatted} FT ({p.FreeThrowPercentage}%), {p.Steals} STL, {p.Blocks} BLK, {p.Turnovers} TOV, +/-: {p.PlusMinus}, {p.MinutesPlayed} MIN");
                 }
             }
 
@@ -113,13 +116,13 @@ Gere o JSON agora:";
             
             void AddTeamLeaders(TeamGameLeaders teamLeaders)
             {
-                lines.Add($"\n🏀 **{teamLeaders.TeamName}**:");
+                lines.Add($"\n**{teamLeaders.TeamName}**:");
                 if (teamLeaders.PointsLeader != null)
-                    lines.Add($"   - 🔥 Pontos: **{teamLeaders.PointsLeader.PlayerName}** ({teamLeaders.PointsLeader.Value} pts)");
+                    lines.Add($"   - Pontos: **{teamLeaders.PointsLeader.PlayerName}** ({teamLeaders.PointsLeader.Value} pts)");
                 if (teamLeaders.ReboundsLeader != null)
-                    lines.Add($"   - 🛡️ Rebotes: **{teamLeaders.ReboundsLeader.PlayerName}** ({teamLeaders.ReboundsLeader.Value} reb)");
+                    lines.Add($"   - Rebotes: **{teamLeaders.ReboundsLeader.PlayerName}** ({teamLeaders.ReboundsLeader.Value} reb)");
                 if (teamLeaders.AssistsLeader != null)
-                    lines.Add($"   - 🪄 Assistências: **{teamLeaders.AssistsLeader.PlayerName}** ({teamLeaders.AssistsLeader.Value} ast)");
+                    lines.Add($"   - Assistências: **{teamLeaders.AssistsLeader.PlayerName}** ({teamLeaders.AssistsLeader.Value} ast)");
             }
 
             AddTeamLeaders(leaders.VisitorTeamLeaders);
@@ -179,7 +182,7 @@ Gere o JSON agora:";
 
                             if (bestLeader != null)
                             {
-                                lines.Add($"      🔥 Destaque: **{bestLeader.PlayerName}** ({bestLeader.Value} pts)");
+                                lines.Add($"Destaque: **{bestLeader.PlayerName}** ({bestLeader.Value} pts)");
                             }
                         }
                     }

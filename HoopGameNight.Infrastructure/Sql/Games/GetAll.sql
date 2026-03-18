@@ -1,4 +1,4 @@
-﻿SELECT 
+SELECT 
     g.id,
     g.external_id,
     g.date,
@@ -24,6 +24,8 @@
     ht.city,
     ht.conference,
     ht.division,
+    ht.wins,
+    ht.losses,
     ht.created_at,
     ht.updated_at,
     -- Visitor Team
@@ -36,6 +38,8 @@
     vt.city,
     vt.conference,
     vt.division,
+    vt.wins,
+    vt.losses,
     vt.created_at,
     vt.updated_at
 FROM games g

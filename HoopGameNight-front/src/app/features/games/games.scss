@@ -657,6 +657,13 @@
     }
   }
 
+  &__record {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: var(--accent-primary);
+    opacity: 0.8;
+  }
+
   &__name {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);

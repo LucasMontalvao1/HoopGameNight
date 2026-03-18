@@ -6,5 +6,7 @@ UPDATE games SET
     time_remaining = @TimeRemaining,
     ai_summary = @AiSummary,
     ai_highlights = @AiHighlights,
+    line_score_json = @LineScoreJson,
+    game_leaders_json = @GameLeadersJson,
     updated_at = @UpdatedAt
 WHERE id = @Id;

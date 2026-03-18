@@ -19,6 +19,7 @@ namespace HoopGameNight.Core.DTOs.Response
         public string PlayerFullName { get; set; } = string.Empty;
         public int? JerseyNumber { get; set; }
         public string? Position { get; set; }
+        public string? PlayerEspnId { get; set; }
 
         // Informações do Jogo
         public DateTime GameDate { get; set; }

@@ -98,6 +98,22 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         public async Task<EspnGameStatusDto?> GetGameStatusAsync(string gameId) =>
             await GetAsync<EspnGameStatusDto>($"{CORE_API_BASE_URL}/events/{gameId}/competitions/{gameId}/status", $"game status {gameId}");
 
+        public async Task<string> GetGamePlaysRawAsync(string gameId)
+        {
+            try
+            {
+                var url = $"{BASE_URL}/summary?event={gameId}";
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return string.Empty;
+                return await response.Content.ReadAsStringAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching raw plays for game {GameId}", gameId);
+                return string.Empty;
+            }
+        }
+
         #endregion
 
         #region Teams
@@ -171,10 +187,10 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         #region Standings
 
         public async Task<EspnStandingsDto?> GetConferenceStandingsAsync() =>
-            await GetAsync<EspnStandingsDto>($"{BASE_URL}/standings?type=conference", "conference standings");
+            await GetAsync<EspnStandingsDto>($"{BASE_URL.Replace("/site", "")}/standings?type=conference", "conference standings");
 
         public async Task<EspnStandingsDto?> GetDivisionStandingsAsync() =>
-            await GetAsync<EspnStandingsDto>($"{BASE_URL}/standings?type=division", "division standings");
+            await GetAsync<EspnStandingsDto>($"{BASE_URL.Replace("/site", "")}/standings?type=division", "division standings");
 
         #endregion
 
@@ -345,6 +361,27 @@ namespace HoopGameNight.Infrastructure.ExternalServices
 
         public async Task<EspnLeadersDto?> GetLeagueLeadersAsync() =>
             await GetWithCacheAsync<EspnLeadersDto>($"{BASE_URL}/leaders", "league_leaders", TimeSpan.FromHours(6));
+
+        public async Task<JsonElement> GetStatsByAthleteAsync(string category, int limit = 10, string sort = "")
+        {
+            try
+            {
+                var sortParam = string.IsNullOrEmpty(sort) ? "" : $"&sort={sort}";
+                var url = $"https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?isqualified=true&limit={limit}{sortParam}";
+                
+                var response = await _httpClient.GetAsync(url);
+                if (!response.IsSuccessStatusCode) return default;
+
+                var json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                return doc.RootElement.Clone();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching stats by athlete for category {Category}", category);
+                return default;
+            }
+        }
 
         #endregion
 

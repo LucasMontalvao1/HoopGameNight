@@ -1,4 +1,4 @@
-﻿SELECT
+SELECT
     g.id,
     g.external_id,
     g.date,
@@ -12,6 +12,10 @@
     g.time_remaining,
     g.postseason,
     g.season,
+    g.ai_summary,
+    g.ai_highlights,
+    g.line_score_json,
+    g.game_leaders_json,
     g.created_at,
     g.updated_at,
     -- Home Team
@@ -23,6 +27,8 @@
     ht.city,
     ht.conference,
     ht.division,
+    ht.wins,
+    ht.losses,
     ht.created_at,
     ht.updated_at,
     -- Visitor Team
@@ -34,9 +40,11 @@
     vt.city,
     vt.conference,
     vt.division,
+    vt.wins,
+    vt.losses,
     vt.created_at,
     vt.updated_at
 FROM games g
 LEFT JOIN teams ht ON g.home_team_id = ht.id
 LEFT JOIN teams vt ON g.visitor_team_id = vt.id
-WHERE g.id = @Id;
+WHERE g.id = @Id OR g.external_id = @Id;

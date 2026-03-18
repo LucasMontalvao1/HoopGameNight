@@ -139,13 +139,11 @@ namespace HoopGameNight.Core.Services.AI
 
             _logger.LogInformation("Processando consulta: {Question}", request.Question);
 
-            // Busca inteligente
             var (games, period, detectedTeams) = await GetRelevantGamesWithContextAsync(normalizedQuestion);
 
             _logger.LogInformation("Métricas da busca: {Count} jogos localizados | Período: {Period} | Times: {Teams}",
                 games.Count, period, string.Join(", ", detectedTeams));
 
-            // Validação: se não encontrou jogos E não encontrou jogadores
             var (playerStatsText, detectedPlayers) = await GetRelevantPlayerStatsAsync(normalizedQuestion);
 
             if (!games.Any() && string.IsNullOrEmpty(playerStatsText))
@@ -163,17 +161,15 @@ namespace HoopGameNight.Core.Services.AI
                 };
             }
 
-            // 2. Buscar líderes para até 3 jogos finalizados/em andamento (local ou cache)
             var gamesWithPerformance = games
                 .Where(g => g.IsCompleted || g.IsLive)
                 .OrderByDescending(g => g.Date)
-                .Take(3) // Reduzido para performance no chat
+                .Take(3) 
                 .ToList();
 
             var gameLeaders = new Dictionary<int, GameLeadersResponse>();
             foreach (var g in gamesWithPerformance)
             {
-                // Tenta buscar líderes calculados localmente primeiro (muito mais rápido)
                 var leaders = await CalculateLeadersFromBoxscoreAsync(g.Id);
                 
                 if (leaders != null)
@@ -182,7 +178,6 @@ namespace HoopGameNight.Core.Services.AI
                 }
             }
 
-            // 3. Enriquecer com Boxscore se houver apenas um jogo foco (especificidade)
             var statsText = playerStatsText;
             if (gamesWithPerformance.Count == 1)
             {
@@ -195,10 +190,8 @@ namespace HoopGameNight.Core.Services.AI
                 }
             }
 
-            // Montar prompt
             var prompt = _promptBuilder.BuildPrompt(request.Question, games, statsText, gameLeaders);
 
-            // Enviar ao Groq
             var answer = await _groqClient.GenerateAsync(prompt);
 
             var response = new AskResponse
@@ -238,19 +231,26 @@ namespace HoopGameNight.Core.Services.AI
             var gameEntity = await _gameRepository.GetByIdAsync(gameId);
             if (gameEntity == null) return new AskResponse { Answer = "Jogo não encontrado." };
 
-            if (gameEntity.IsCompleted && !string.IsNullOrEmpty(gameEntity.AiSummary) && !string.IsNullOrEmpty(gameEntity.AiHighlights))
+            if (!string.IsNullOrEmpty(gameEntity.AiSummary) && !string.IsNullOrEmpty(gameEntity.AiHighlights))
             {
                 var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-                var combined = JsonSerializer.Serialize(new { summary = gameEntity.AiSummary, highlights = JsonSerializer.Deserialize<JsonElement>(gameEntity.AiHighlights) }, options);
-                await _cacheService.SetAsync(cacheKey, combined, expiration: null);
-                
-                return new AskResponse
+                try
                 {
-                    Question = $"Resumo do jogo {gameEntity.GameTitle}",
-                    Answer = combined,
-                    GamesAnalyzed = 1,
-                    DataSource = "Database (Persisted)"
-                };
+                    var combined = JsonSerializer.Serialize(new { summary = gameEntity.AiSummary, highlights = JsonSerializer.Deserialize<JsonElement>(gameEntity.AiHighlights) }, options);
+                    await _cacheService.SetAsync(cacheKey, combined, expiration: null);
+                    
+                    return new AskResponse
+                    {
+                        Question = $"Resumo do jogo {gameEntity.GameTitle}",
+                        Answer = combined,
+                        GamesAnalyzed = 1,
+                        DataSource = "Database (Persisted)"
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Erro ao desserializar highlights persistidos para o jogo {GameId}. Gerando novo resumo.", gameId);
+                }
             }
 
             var game = await _gameService.GetGameByIdAsync(gameId);
@@ -266,25 +266,26 @@ namespace HoopGameNight.Core.Services.AI
             {
                 var cleanerResponse = rawResponse.Trim();
                 if (cleanerResponse.StartsWith("```json")) cleanerResponse = cleanerResponse.Substring(7);
+                if (cleanerResponse.StartsWith("```")) cleanerResponse = cleanerResponse.Substring(3);
                 if (cleanerResponse.EndsWith("```")) cleanerResponse = cleanerResponse.Substring(0, cleanerResponse.Length - 3);
                 cleanerResponse = cleanerResponse.Trim();
+
+                cleanerResponse = SanitizeJsonString(cleanerResponse);
 
                 var aiData = JsonSerializer.Deserialize<AiGameStory>(cleanerResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 
                 if (aiData != null && !string.IsNullOrEmpty(aiData.Summary))
                 {
                     var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-                    if (gameEntity.IsCompleted)
-                    {
-                        gameEntity.AiSummary = aiData.Summary;
-                        gameEntity.AiHighlights = JsonSerializer.Serialize(aiData.Highlights, options);
-                        await _gameRepository.UpdateAsync(gameEntity);
-                        
-                        var cacheData = JsonSerializer.Serialize(new { summary = aiData.Summary, highlights = aiData.Highlights }, options);
-                        await _cacheService.SetAsync(cacheKey, cacheData, expiration: null);
-                        
-                        _logger.LogInformation("Resumo e Highlights salvos para o jogo {GameId}", gameId);
-                    }
+                    
+                    gameEntity.AiSummary = aiData.Summary;
+                    gameEntity.AiHighlights = JsonSerializer.Serialize(aiData.Highlights, options);
+                    await _gameRepository.UpdateAsync(gameEntity);
+                    
+                    var cacheData = JsonSerializer.Serialize(new { summary = aiData.Summary, highlights = aiData.Highlights }, options);
+                    await _cacheService.SetAsync(cacheKey, cacheData, expiration: null);
+                    
+                    _logger.LogInformation("Resumo e Highlights salvos para o jogo {GameId} (Status: {Status})", gameId, gameEntity.Status);
 
                     return new AskResponse
                     {
@@ -321,6 +322,36 @@ namespace HoopGameNight.Core.Services.AI
             public string Title { get; set; } = string.Empty;
             public string Description { get; set; } = string.Empty;
             public string Type { get; set; } = string.Empty;
+        }
+
+        private string SanitizeJsonString(string json)
+        {
+            var sb = new System.Text.StringBuilder(json.Length);
+            bool inString = false;
+            for (int i = 0; i < json.Length; i++)
+            {
+                char c = json[i];
+                if (c == '"' && (i == 0 || json[i - 1] != '\\'))
+                {
+                    inString = !inString;
+                    sb.Append(c);
+                }
+                else if (inString)
+                {
+                    switch (c)
+                    {
+                        case '\n': sb.Append("\\n"); break;
+                        case '\r': sb.Append("\\r"); break;
+                        case '\t': sb.Append("\\t"); break;
+                        default: sb.Append(c); break;
+                    }
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
         }
 
         private async Task<GameLeadersResponse?> CalculateLeadersFromBoxscoreAsync(int gameId)
@@ -561,7 +592,7 @@ namespace HoopGameNight.Core.Services.AI
                     statsLines.Add($"--- Estatísticas Recentes: {player.FullName} ---");
                     foreach (var game in gamelog.Games.Take(5))
                     {
-                        statsLines.Add($"{game.GameDate} vs {game.Opponent}: {game.Points} PTS, {game.Rebounds} REB, {game.Assists} AST, Minutos {game.Minutes}");
+                        statsLines.Add($"{game.GameDate} vs {game.Opponent}: {game.Points} PTS, {game.Rebounds} REB, {game.Assists} AST, Minutos {game.Minutes}, FG: {game.FieldGoalsMade}/{game.FieldGoalsAttempted}, 3PT: {game.ThreePointersMade}/{game.ThreePointersAttempted}, FT: {game.FreeThrowsMade}/{game.FreeThrowsAttempted}");
                     }
                 }
             }

@@ -72,6 +72,10 @@ export interface GameResponse {
   isLive: boolean;
   isCompleted: boolean;
   winningTeam?: TeamSummaryResponse;
+  lineScore?: LineScoreDTO[];
+  leaders?: GameLeadersResponse;
+  aiSummary?: string;
+  aiHighlights?: string;
 }
 
 export interface TeamSummaryResponse {
@@ -81,6 +85,8 @@ export interface TeamSummaryResponse {
   city: string;
   displayName: string;
   logoUrl?: string;
+  wins?: number;
+  losses?: number;
 }
 
 export interface GetGamesRequest {
@@ -120,6 +126,8 @@ export interface TeamResponse {
   fullName: string;
   name: string;
   displayName?: string;
+  wins?: number;
+  losses?: number;
 }
 
 export interface GetTeamsRequest {
@@ -287,5 +295,46 @@ export interface StatLeadersResponse {
   scoringLeaders: StatLeader[];
   reboundLeaders: StatLeader[];
   assistLeaders: StatLeader[];
+  stealsLeaders: StatLeader[];
+  blocksLeaders: StatLeader[];
+  threePointLeaders: StatLeader[];
   lastUpdated: string;
+}
+
+export interface GamePlayResponse {
+  id: number;
+  gameId: number;
+  externalId?: string;
+  sequence: number;
+  period: number;
+  clock?: string;
+  text: string;
+  type?: string;
+  teamId?: number;
+  playerId?: number;
+  scoreValue: number;
+  homeScore: number;
+  awayScore: number;
+}
+
+export interface GameLeadersResponse {
+  gameId: number;
+  gameDate: string;
+  homeTeam: string;
+  visitorTeam: string;
+  homeTeamLeaders: TeamGameLeaders;
+  visitorTeamLeaders: TeamGameLeaders;
+}
+
+export interface TeamGameLeaders {
+  teamName: string;
+  pointsLeader?: StatLeader;
+  reboundsLeader?: StatLeader;
+  assistsLeader?: StatLeader;
+}
+
+export interface LineScoreDTO {
+  period: string;
+  homeScore: number;
+  visitorScore: number;
 }

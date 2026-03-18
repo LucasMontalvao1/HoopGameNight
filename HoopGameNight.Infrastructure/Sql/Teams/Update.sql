@@ -1,4 +1,4 @@
-﻿UPDATE teams SET
+UPDATE teams SET
     external_espn_id = @EspnId,
     name = @Name,
     full_name = @FullName,
@@ -6,5 +6,7 @@
     city = @City,
     conference = @Conference,
     division = @Division,
+    wins = @Wins,
+    losses = @Losses,
     updated_at = @UpdatedAt
 WHERE id = @Id;

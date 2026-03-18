@@ -11,6 +11,7 @@ SELECT
     CONCAT(p.first_name, ' ', p.last_name) AS player_full_name,
     p.jersey_number,
     p.position,
+    p.espn_id AS player_espn_id,
     
     g.date AS game_date,
     g.home_team_id,

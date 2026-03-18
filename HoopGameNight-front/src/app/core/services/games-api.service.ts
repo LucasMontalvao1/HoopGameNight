@@ -9,7 +9,9 @@ import {
   PaginatedResponse,
   GameResponse,
   GetGamesRequest,
-  SyncStatusResponse
+  SyncStatusResponse,
+  GamePlayResponse,
+  GameLeadersResponse
 } from '../interfaces/api.interface';
 import { APP_CONSTANTS } from '../constants/app.constants';
 
@@ -180,6 +182,41 @@ export class GamesApiService {
         .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
     );
 
+    return response.data;
+  }
+
+  // GET /api/v1/games/{id}/pbp
+  async getGamePlays(id: number): Promise<GamePlayResponse[]> {
+    const url = `${this.baseUrl}/${id}/pbp`;
+    try {
+      const response = await firstValueFrom(
+        this.http.get<ApiResponse<GamePlayResponse[]>>(url)
+          .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+      );
+      return response.data ?? [];
+    } catch (error: any) {
+      if (error.status === 404) return [];
+      throw error;
+    }
+  }
+
+  // GET /api/v1/games/{id}/h2h
+  async getHeadToHead(id: number): Promise<GameResponse[]> {
+    const url = `${this.baseUrl}/${id}/h2h`;
+    const response = await firstValueFrom(
+      this.http.get<ApiResponse<GameResponse[]>>(url)
+        .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+    );
+    return response.data;
+  }
+
+  // GET /api/v1/games/{id}/leaders
+  async getGameLeaders(id: number): Promise<GameLeadersResponse> {
+    const url = `${this.baseUrl}/${id}/leaders`;
+    const response = await firstValueFrom(
+      this.http.get<ApiResponse<GameLeadersResponse>>(url)
+        .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
+    );
     return response.data;
   }
 }

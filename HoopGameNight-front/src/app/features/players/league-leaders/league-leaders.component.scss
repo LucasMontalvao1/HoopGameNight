@@ -34,6 +34,9 @@
             padding: 4px;
             border-radius: var(--border-radius-md);
             gap: 2px;
+            overflow-x: auto;
+            scrollbar-width: none; // Firefox
+            &::-webkit-scrollbar { display: none; } // Chrome/Safari
 
             button {
                 border: none;
@@ -45,6 +48,8 @@
                 border-radius: var(--border-radius-sm);
                 cursor: pointer;
                 transition: all var(--transition-fast);
+                white-space: nowrap;
+                flex-shrink: 0;
 
                 &.active {
                     background: var(--surface-primary);

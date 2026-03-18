@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using AutoMapper;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Enums;
@@ -23,11 +24,15 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.Conference, opt => opt.MapFrom(src => src.Conference.ToString()))
                 .ForMember(dest => dest.ConferenceDisplay, opt => opt.MapFrom(src => src.Conference.GetDescription()))
                 .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName))
-                .ForMember(dest => dest.LogoUrl, opt => opt.MapFrom(src => TeamExtensions.GetTeamLogoUrl(src.Abbreviation)));
+                .ForMember(dest => dest.LogoUrl, opt => opt.MapFrom(src => TeamExtensions.GetTeamLogoUrl(src.Abbreviation)))
+                .ForMember(dest => dest.Wins, opt => opt.MapFrom(src => src.Wins))
+                .ForMember(dest => dest.Losses, opt => opt.MapFrom(src => src.Losses));
 
             CreateMap<Team, TeamSummaryResponse>()
                 .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.DisplayName))
-                .ForMember(dest => dest.LogoUrl, opt => opt.MapFrom(src => TeamExtensions.GetTeamLogoUrl(src.Abbreviation)));
+                .ForMember(dest => dest.LogoUrl, opt => opt.MapFrom(src => TeamExtensions.GetTeamLogoUrl(src.Abbreviation)))
+                .ForMember(dest => dest.Wins, opt => opt.MapFrom(src => src.Wins))
+                .ForMember(dest => dest.Losses, opt => opt.MapFrom(src => src.Losses));
 
             // Player Mappings
             CreateMap<Player, PlayerResponse>()
@@ -53,12 +58,19 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.GameTitle, opt => opt.MapFrom(src => src.GameTitle))
                 .ForMember(dest => dest.IsLive, opt => opt.MapFrom(src => src.IsLive))
                 .ForMember(dest => dest.IsCompleted, opt => opt.MapFrom(src => src.IsCompleted))
-                .ForMember(dest => dest.IsFutureGame, opt => opt.MapFrom(src => src.IsFutureGame));
+                .ForMember(dest => dest.IsFutureGame, opt => opt.MapFrom(src => src.IsFutureGame))
+                .ForMember(dest => dest.AiSummary, opt => opt.MapFrom(src => src.AiSummary))
+                .ForMember(dest => dest.AiHighlights, opt => opt.MapFrom(src => src.AiHighlights))
+                .ForMember(dest => dest.LineScore, opt => opt.MapFrom(src => !string.IsNullOrEmpty(src.LineScoreJson) ? JsonSerializer.Deserialize<List<LineScoreDTO>>(src.LineScoreJson, (JsonSerializerOptions?)null) : null))
+                .ForMember(dest => dest.Leaders, opt => opt.MapFrom(src => !string.IsNullOrEmpty(src.GameLeadersJson) ? JsonSerializer.Deserialize<GameLeadersDTO>(src.GameLeadersJson, (JsonSerializerOptions?)null) : null));
 
             CreateMap<Game, GameSummaryResponse>()
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
                 .ForMember(dest => dest.HomeTeam, opt => opt.MapFrom(src => src.HomeTeam != null ? src.HomeTeam.DisplayName : $"Team {src.HomeTeamId}"))
                 .ForMember(dest => dest.VisitorTeam, opt => opt.MapFrom(src => src.VisitorTeam != null ? src.VisitorTeam.DisplayName : $"Team {src.VisitorTeamId}"));
+
+            // GamePlay Mapping
+            CreateMap<GamePlay, GamePlayResponse>();
         }
 
         private void CreatePlayerStatsMaps()
@@ -153,7 +165,8 @@ namespace HoopGameNight.Api.Mappings
                 .ForMember(dest => dest.FreeThrowPercentage, opt => opt.MapFrom(src => src.FreeThrowPercentage))
                 .ForMember(dest => dest.OffensiveRebounds, opt => opt.MapFrom(src => src.OffensiveRebounds))
                 .ForMember(dest => dest.DefensiveRebounds, opt => opt.MapFrom(src => src.DefensiveRebounds))
-                .ForMember(dest => dest.Opponent, opt => opt.MapFrom(src => src.OpponentAbbreviation));
+                .ForMember(dest => dest.Opponent, opt => opt.MapFrom(src => src.OpponentAbbreviation))
+                .ForMember(dest => dest.PlayerEspnId, opt => opt.MapFrom(src => src.PlayerEspnId));
         }
 
         private static TeamSummaryResponse? GetWinningTeamSummary(Game game)

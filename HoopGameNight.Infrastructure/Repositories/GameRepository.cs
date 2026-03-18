@@ -245,7 +245,9 @@ namespace HoopGameNight.Infrastructure.Repositories
                 game.PostSeason,
                 game.Season,
                 game.AiSummary,
-                game.AiHighlights
+                game.AiHighlights,
+                game.LineScoreJson,
+                game.GameLeadersJson
             });
 
             game.Id = id;
@@ -270,6 +272,8 @@ namespace HoopGameNight.Infrastructure.Repositories
                 game.TimeRemaining,
                 game.AiSummary,
                 game.AiHighlights,
+                game.LineScoreJson,
+                game.GameLeadersJson,
                 game.UpdatedAt
             });
 
@@ -335,7 +339,6 @@ namespace HoopGameNight.Infrastructure.Repositories
                 var results = await connection.QueryAsync(sql, parameters);
                 var games = new List<Game>();
                 
-                // Cache local para evitar N+1 conexões durante o loop
                 var teamCache = new Dictionary<int, Team>();
 
                 foreach (IDictionary<string, object> row in results)
@@ -344,8 +347,8 @@ namespace HoopGameNight.Infrastructure.Repositories
                     {
                         Id = (int)row["id"],
                         ExternalId = row["external_id"]?.ToString() ?? string.Empty,
-                        Date = row["date"] is DateOnly dateOnly ? dateOnly.ToDateTime(TimeOnly.MinValue) : (DateTime)row["date"],
-                        DateTime = row.ContainsKey("datetime") && row["datetime"] != null ? (DateTime)row["datetime"] : System.DateTime.UtcNow,
+                        Date = row["date"] is DateTime dt ? dt : (row["date"] is DateOnly dOnly ? dOnly.ToDateTime(TimeOnly.MinValue) : DateTime.MinValue),
+                        DateTime = row.ContainsKey("datetime") && row["datetime"] is DateTime dttm ? dttm : (row.ContainsKey("datetime") && row["datetime"] != null ? Convert.ToDateTime(row["datetime"]) : DateTime.MinValue),
                         HomeTeamId = (int)row["home_team_id"],
                         VisitorTeamId = (int)row["visitor_team_id"],
                         HomeTeamScore = row.ContainsKey("home_team_score") ? row["home_team_score"] as int? : null,
@@ -355,25 +358,32 @@ namespace HoopGameNight.Infrastructure.Repositories
                         TimeRemaining = row.ContainsKey("time_remaining") ? row["time_remaining"]?.ToString() : null,
                         PostSeason = row.ContainsKey("postseason") && row["postseason"] != null && (bool)row["postseason"],
                         Season = (int)row["season"],
+                        AiSummary = row.ContainsKey("ai_summary") ? row["ai_summary"]?.ToString() : null,
+                        AiHighlights = row.ContainsKey("ai_highlights") ? row["ai_highlights"]?.ToString() : null,
+                        LineScoreJson = row.ContainsKey("line_score_json") ? row["line_score_json"]?.ToString() : null,
+                        GameLeadersJson = row.ContainsKey("game_leaders_json") ? row["game_leaders_json"]?.ToString() : null,
                         CreatedAt = (DateTime)row["created_at"],
                         UpdatedAt = row.ContainsKey("updated_at") && row["updated_at"] != null ? (DateTime)row["updated_at"] : System.DateTime.UtcNow
                     };
 
                     // Home Team Mapping
-                    if (row.ContainsKey("HomeTeam_Id") && row["HomeTeam_Id"] != null && (int)row["HomeTeam_Id"] > 0)
+                    if (row.ContainsKey("HomeTeam_Id") || row.ContainsKey("id1"))
                     {
+                        var homePrefix = row.ContainsKey("HomeTeam_Id") ? "HomeTeam_" : "";
+                        var idKey = homePrefix == "" ? "id1" : "HomeTeam_Id";
+                        
                         game.HomeTeam = new Team
                         {
-                            Id = (int)row["HomeTeam_Id"],
-                            ExternalId = row["HomeTeam_ExternalId"] as int? ?? 0,
-                            Name = row["HomeTeam_Name"]?.ToString() ?? "",
-                            FullName = row["HomeTeam_FullName"]?.ToString() ?? "",
-                            Abbreviation = row["HomeTeam_Abbreviation"]?.ToString() ?? "",
-                            City = row["HomeTeam_City"]?.ToString() ?? "",
-                            Conference = Enum.TryParse<Conference>(row["HomeTeam_Conference"]?.ToString(), out Conference homeConf) ? homeConf : Conference.East,
-                            Division = row["HomeTeam_Division"]?.ToString() ?? "",
-                            CreatedAt = row.ContainsKey("HomeTeam_CreatedAt") && row["HomeTeam_CreatedAt"] != null ? (DateTime)row["HomeTeam_CreatedAt"] : System.DateTime.UtcNow,
-                            UpdatedAt = row.ContainsKey("HomeTeam_UpdatedAt") && row["HomeTeam_UpdatedAt"] != null ? (DateTime)row["HomeTeam_UpdatedAt"] : System.DateTime.UtcNow
+                            Id = Convert.ToInt32(row[idKey]),
+                            ExternalId = GetValueSafe<int?>(row, homePrefix + "ExternalId", homePrefix + "external_id") ?? 0,
+                            Name = GetValueSafe<string>(row, homePrefix + "Name", homePrefix + "name") ?? "",
+                            FullName = GetValueSafe<string>(row, homePrefix + "FullName", homePrefix + "full_name") ?? "",
+                            Abbreviation = GetValueSafe<string>(row, homePrefix + "Abbreviation", homePrefix + "abbreviation") ?? "",
+                            City = GetValueSafe<string>(row, homePrefix + "City", homePrefix + "city") ?? "",
+                            Conference = Enum.TryParse<Conference>(GetValueSafe<string>(row, homePrefix + "Conference", homePrefix + "conference"), out Conference homeConf) ? homeConf : Conference.East,
+                            Division = GetValueSafe<string>(row, homePrefix + "Division", homePrefix + "division") ?? "",
+                            Wins = GetValueSafe<int?>(row, homePrefix + "Wins", homePrefix + "wins", "wins1"),
+                            Losses = GetValueSafe<int?>(row, homePrefix + "Losses", homePrefix + "losses", "losses1")
                         };
                     }
                     else
@@ -387,20 +397,23 @@ namespace HoopGameNight.Infrastructure.Repositories
                     }
 
                     // Visitor Team Mapping
-                    if (row.ContainsKey("VisitorTeam_Id") && row["VisitorTeam_Id"] != null && (int)row["VisitorTeam_Id"] > 0)
+                    if (row.ContainsKey("VisitorTeam_Id") || row.ContainsKey("id2"))
                     {
+                        var visitorPrefix = row.ContainsKey("VisitorTeam_Id") ? "VisitorTeam_" : "";
+                        var idKey = visitorPrefix == "" ? "id2" : "VisitorTeam_Id";
+
                         game.VisitorTeam = new Team
                         {
-                            Id = (int)row["VisitorTeam_Id"],
-                            ExternalId = row["VisitorTeam_ExternalId"] as int? ?? 0,
-                            Name = row["VisitorTeam_Name"]?.ToString() ?? "",
-                            FullName = row["VisitorTeam_FullName"]?.ToString() ?? "",
-                            Abbreviation = row["VisitorTeam_Abbreviation"]?.ToString() ?? "",
-                            City = row["VisitorTeam_City"]?.ToString() ?? "",
-                            Conference = Enum.TryParse<Conference>(row["VisitorTeam_Conference"]?.ToString(), out Conference visitorConf) ? visitorConf : Conference.East,
-                            Division = row["VisitorTeam_Division"]?.ToString() ?? "",
-                            CreatedAt = row.ContainsKey("VisitorTeam_CreatedAt") && row["VisitorTeam_CreatedAt"] != null ? (DateTime)row["VisitorTeam_CreatedAt"] : System.DateTime.UtcNow,
-                            UpdatedAt = row.ContainsKey("VisitorTeam_UpdatedAt") && row["VisitorTeam_UpdatedAt"] != null ? (DateTime)row["VisitorTeam_UpdatedAt"] : System.DateTime.UtcNow
+                            Id = Convert.ToInt32(row[idKey]),
+                            ExternalId = GetValueSafe<int?>(row, visitorPrefix + "ExternalId", visitorPrefix + "external_id") ?? 0,
+                            Name = GetValueSafe<string>(row, visitorPrefix + "Name", visitorPrefix + "name") ?? "",
+                            FullName = GetValueSafe<string>(row, visitorPrefix + "FullName", visitorPrefix + "full_name") ?? "",
+                            Abbreviation = GetValueSafe<string>(row, visitorPrefix + "Abbreviation", visitorPrefix + "abbreviation") ?? "",
+                            City = GetValueSafe<string>(row, visitorPrefix + "City", visitorPrefix + "city") ?? "",
+                            Conference = Enum.TryParse<Conference>(GetValueSafe<string>(row, visitorPrefix + "Conference", visitorPrefix + "conference"), out Conference visitorConf) ? visitorConf : Conference.East,
+                            Division = GetValueSafe<string>(row, visitorPrefix + "Division", visitorPrefix + "division") ?? "",
+                            Wins = GetValueSafe<int?>(row, visitorPrefix + "Wins", visitorPrefix + "wins", "wins1", "wins2"),
+                            Losses = GetValueSafe<int?>(row, visitorPrefix + "Losses", visitorPrefix + "losses", "losses1", "losses2")
                         };
                     }
                     else
@@ -424,6 +437,35 @@ namespace HoopGameNight.Infrastructure.Repositories
                 Logger.LogError(ex, "CRITICAL ERROR in manual mapping fallback");
                 throw;
             }
+        }
+
+        private T? GetValueSafe<T>(IDictionary<string, object> row, params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (row.ContainsKey(key) && row[key] != null && row[key] != DBNull.Value)
+                {
+                    try
+                    {
+                        var value = row[key];
+                        var targetType = typeof(T);
+
+                        if (targetType.IsGenericType && targetType.GetGenericTypeDefinition() == typeof(Nullable<>))
+                        {
+                            targetType = Nullable.GetUnderlyingType(targetType);
+                        }
+
+                        if (targetType == null) return default;
+
+                        return (T)Convert.ChangeType(value, targetType);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+                }
+            }
+            return default;
         }
 
         public async Task<IEnumerable<Game>> GetGamesMissingStatsAsync()

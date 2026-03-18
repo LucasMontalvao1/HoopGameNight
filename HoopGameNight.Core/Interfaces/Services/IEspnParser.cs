@@ -27,5 +27,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         EspnPlayerDetailsDto? ParsePlayerFromRoster(JsonElement item);
         EspnPlayerStatsDto? ParsePlayerGameStatsFromBoxscore(EspnBoxscoreDto boxscore, string playerId, string gameId);
         PlayerSeasonStats ParseSeasonStats(EspnPlayerStatsDto espnStats, int playerId);
+        List<GamePlay> ParsePlaysResponse(string json, int gameId);
+        Dictionary<string, (int Wins, int Losses)> ParseStandings(EspnStandingsDto standings);
     }
 }

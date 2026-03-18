@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -143,13 +143,23 @@ namespace HoopGameNight.Core.Services
                 if (cached != null) return cached;
 
                 var espnLeaders = await _espnService.GetGameLeadersAsync(game.ExternalId);
-                if (espnLeaders == null)
+                var response = espnLeaders != null ? await MapEspnGameLeadersToResponse(espnLeaders, game) : null;
+
+                bool hasAnyLeader = response != null && (
+                    response.HomeTeamLeaders?.PointsLeader != null ||
+                    response.VisitorTeamLeaders?.PointsLeader != null ||
+                    response.HomeTeamLeaders?.ReboundsLeader != null ||
+                    response.VisitorTeamLeaders?.ReboundsLeader != null ||
+                    response.HomeTeamLeaders?.AssistsLeader != null ||
+                    response.VisitorTeamLeaders?.AssistsLeader != null
+                );
+
+                if (!hasAnyLeader)
                 {
-                    _logger.LogWarning("ESPN leaders not found for game {GameId}", gameId);
-                    return null;
+                    _logger.LogInformation("Líderes não encontrados via API ESPN ou dados vazios para o jogo {GameId}. Calculando manualmente a partir do Boxscore...", gameId);
+                    response = await CalculateLeadersFromBoxscoreAsync(gameId, game);
                 }
 
-                var response = await MapEspnGameLeadersToResponse(espnLeaders, game);
                 if (response != null)
                 {
                     var cacheTime = game.IsCompleted ? CacheDurations.NoExpiration : TimeSpan.FromSeconds(30);
@@ -428,6 +438,86 @@ namespace HoopGameNight.Core.Services
                 _logger.LogError(ex, "Error mapping game leaders for game {GameId}", game.Id);
                 return null;
             }
+        }
+
+        private async Task<GameLeadersResponse?> CalculateLeadersFromBoxscoreAsync(int gameId, Game game)
+        {
+            var boxscore = await GetGameBoxscoreAsync(gameId);
+            if (boxscore?.Players == null) return null;
+
+            var response = new GameLeadersResponse
+            {
+                GameId = gameId,
+                GameDate = game.Date,
+                HomeTeam = game.HomeTeam?.Name ?? "",
+                VisitorTeam = game.VisitorTeam?.Name ?? "",
+                HomeTeamLeaders = new TeamGameLeaders { TeamName = game.HomeTeam?.Name ?? "" },
+                VisitorTeamLeaders = new TeamGameLeaders { TeamName = game.VisitorTeam?.Name ?? "" }
+            };
+
+            foreach (var teamStats in boxscore.Players)
+            {
+                var espnTeamId = teamStats.Team?.Id;
+                if (string.IsNullOrEmpty(espnTeamId)) continue;
+
+                int systemTeamId = await _teamService.MapEspnTeamToSystemIdAsync(espnTeamId, teamStats.Team?.Abbreviation ?? "");
+                var isHome = systemTeamId == game.HomeTeamId;
+                var teamLeaders = isHome ? response.HomeTeamLeaders : response.VisitorTeamLeaders;
+
+                var allAthletes = teamStats.Statistics?
+                    .SelectMany(s => s.Athletes ?? new List<EspnAthleteEntryDto>())
+                    .GroupBy(a => a.Athlete?.Id)
+                    .Select(g => g.First())
+                    .ToList();
+
+                if (allAthletes == null || !allAthletes.Any()) continue;
+
+                var statCategory = teamStats.Statistics?.FirstOrDefault();
+                if (statCategory == null) continue;
+
+                var labels = statCategory.Names ?? statCategory.Keys;
+                if (labels == null) continue;
+
+                var lowerLabels = labels.Select(l => l.ToLowerInvariant()).ToList();
+                var ptsIdx = lowerLabels.IndexOf("points");
+                if (ptsIdx < 0) ptsIdx = lowerLabels.IndexOf("pts");
+
+                var rebIdx = lowerLabels.IndexOf("rebounds");
+                if (rebIdx < 0) rebIdx = lowerLabels.IndexOf("reb");
+
+                var astIdx = lowerLabels.IndexOf("assists");
+                if (astIdx < 0) astIdx = lowerLabels.IndexOf("ast");
+
+                foreach (var entry in allAthletes)
+                {
+                    var espnPlayerId = entry.Athlete?.Id ?? _espnParser.ExtractIdFromRef(entry.Athlete?.Ref);
+                    if (string.IsNullOrEmpty(espnPlayerId)) continue;
+
+                    var stats = entry.Stats;
+                    if (stats == null || !stats.Any()) continue;
+                    
+                    var pName = entry.Athlete?.DisplayName ?? "Player";
+                    var pTeam = teamStats.Team?.Abbreviation ?? "";
+
+                    if (ptsIdx >= 0 && ptsIdx < stats.Count) {
+                        var val = _espnParser.SafeParseDecimal(stats[ptsIdx]);
+                        if (teamLeaders.PointsLeader == null || val > teamLeaders.PointsLeader.Value)
+                            teamLeaders.PointsLeader = new StatLeader { PlayerName = pName, Team = pTeam, Value = val, GamesPlayed = 1 };
+                    }
+                    if (rebIdx >= 0 && rebIdx < stats.Count) {
+                        var val = _espnParser.SafeParseDecimal(stats[rebIdx]);
+                        if (teamLeaders.ReboundsLeader == null || val > teamLeaders.ReboundsLeader.Value)
+                            teamLeaders.ReboundsLeader = new StatLeader { PlayerName = pName, Team = pTeam, Value = val, GamesPlayed = 1 };
+                    }
+                    if (astIdx >= 0 && astIdx < stats.Count) {
+                        var val = _espnParser.SafeParseDecimal(stats[astIdx]);
+                        if (teamLeaders.AssistsLeader == null || val > teamLeaders.AssistsLeader.Value)
+                            teamLeaders.AssistsLeader = new StatLeader { PlayerName = pName, Team = pTeam, Value = val, GamesPlayed = 1 };
+                    }
+                }
+            }
+
+            return response;
         }
 
         #endregion

@@ -29,6 +29,8 @@ namespace HoopGameNight.Core.Services
         private readonly ICacheService _cacheService;
         private readonly IGameStatsService _gameStatsService;
         private readonly ITeamService _teamService;
+        private readonly IGamePlayRepository _gamePlayRepository;
+        private readonly IEspnParser _espnParser;
         private readonly ILogger<GameService> _logger;
 
         public GameService(
@@ -39,6 +41,8 @@ namespace HoopGameNight.Core.Services
             ICacheService cacheService,
             IGameStatsService gameStatsService,
             ITeamService teamService,
+            IGamePlayRepository gamePlayRepository,
+            IEspnParser espnParser,
             ILogger<GameService> logger)
         {
             _gameRepository = gameRepository;
@@ -48,6 +52,8 @@ namespace HoopGameNight.Core.Services
             _cacheService = cacheService;
             _gameStatsService = gameStatsService;
             _teamService = teamService;
+            _gamePlayRepository = gamePlayRepository;
+            _espnParser = espnParser;
             _logger = logger;
         }
 
@@ -539,14 +545,18 @@ namespace HoopGameNight.Core.Services
                         Id = homeTeam.Id,
                         Name = homeTeam.Name,
                         Abbreviation = homeTeam.Abbreviation,
-                        LogoUrl = TeamExtensions.GetTeamLogoUrl(homeTeam.Abbreviation)
+                        LogoUrl = TeamExtensions.GetTeamLogoUrl(homeTeam.Abbreviation),
+                        Wins = homeTeam.Wins,
+                        Losses = homeTeam.Losses
                     },
                     VisitorTeam = new TeamSummaryResponse
                     {
                         Id = awayTeam.Id,
                         Name = awayTeam.Name,
                         Abbreviation = awayTeam.Abbreviation,
-                        LogoUrl = TeamExtensions.GetTeamLogoUrl(awayTeam.Abbreviation)
+                        LogoUrl = TeamExtensions.GetTeamLogoUrl(awayTeam.Abbreviation),
+                        Wins = awayTeam.Wins,
+                        Losses = awayTeam.Losses
                     },
                     HomeTeamScore = eg.HomeTeamScore,
                     VisitorTeamScore = eg.AwayTeamScore,
@@ -687,6 +697,98 @@ namespace HoopGameNight.Core.Services
             {
                 _logger.LogError(ex, "Error mapping team leaders for team {TeamId}", teamId);
                 return null;
+            }
+        }
+
+        public async Task<List<GamePlayResponse>> GetGamePlaysAsync(int gameId)
+        {
+            try
+            {
+                var cacheKey = $"game_plays_{gameId}";
+                var cached = await _cacheService.GetAsync<List<GamePlayResponse>>(cacheKey);
+                if (cached != null) return cached;
+
+                var game = await _gameRepository.GetByIdAsync(gameId);
+                if (game == null) return new List<GamePlayResponse>();
+
+                var plays = await _gamePlayRepository.GetByGameIdAsync(gameId);
+
+                if (!plays.Any() && !string.IsNullOrEmpty(game.ExternalId))
+                {
+                    _logger.LogInformation("No plays found in DB for game {GameId}, fetching from ESPN", gameId);
+                    var rawPlays = await _espnService.GetGamePlaysRawAsync(game.ExternalId);
+                    if (!string.IsNullOrEmpty(rawPlays))
+                    {
+                        var parsedPlays = _espnParser.ParsePlaysResponse(rawPlays, gameId);
+                        if (parsedPlays.Any())
+                        {
+                            await _gamePlayRepository.SavePlaysAsync(gameId, parsedPlays);
+                            plays = parsedPlays;
+                            _logger.LogInformation("Successfully parsed {Count} plays from ESPN for game {GameId}", plays.Count(), gameId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("ESPN play-by-play JSON was retrieved but parser found 0 valid plays for game {GameId}", gameId);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("ESPN returned empty plays data for game {GameId}", gameId);
+                    }
+                }
+
+                var response = _mapper.Map<List<GamePlayResponse>>(plays.ToList());
+
+                // Cache for 30s for live games, 24h for completed ones
+                var duration = (game.Status == GameStatus.Live) ? TimeSpan.FromSeconds(30) : TimeSpan.FromHours(24);
+                await _cacheService.SetAsync(cacheKey, response, duration);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting game plays for game {GameId}", gameId);
+                return new List<GamePlayResponse>();
+            }
+        }
+
+        public async Task<List<GameResponse>> GetHeadToHeadAsync(int gameId)
+        {
+            try
+            {
+                var cacheKey = $"game_h2h_{gameId}";
+                var cached = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
+                if (cached != null) return cached;
+
+                var game = await _gameRepository.GetByIdAsync(gameId);
+                if (game == null) return new List<GameResponse>();
+
+                _logger.LogInformation("Fetching H2H for game {GameId} (Teams: {HomeId} vs {VisitorId})",
+                    gameId, game.HomeTeamId, game.VisitorTeamId);
+
+                var teamGames = await _gameRepository.GetByTeamAsync(game.HomeTeamId);
+                var h2hGames = teamGames.Where(g =>
+                    (g.HomeTeamId == game.HomeTeamId && g.VisitorTeamId == game.VisitorTeamId) ||
+                    (g.HomeTeamId == game.VisitorTeamId && g.VisitorTeamId == game.HomeTeamId))
+                    .OrderByDescending(g => g.Date)
+                    .Take(10)
+                    .ToList();
+
+                if (h2hGames.Count < 4)
+                {
+                    _logger.LogWarning("Poucos jogos H2H no DB ({Count}) para {HomeId} vs {VisitorId}. ESPN API fallback (arquivos antigos) recomendado futuramente.", 
+                        h2hGames.Count, game.HomeTeamId, game.VisitorTeamId);
+                }
+
+                var response = _mapper.Map<List<GameResponse>>(h2hGames);
+                await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromHours(12));
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting H2H for game {GameId}", gameId);
+                return new List<GameResponse>();
             }
         }
 

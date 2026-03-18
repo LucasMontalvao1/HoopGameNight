@@ -240,6 +240,16 @@
       text-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
     }
   }
+  .team-record-mini {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    background: var(--accent-primary-alpha);
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+    opacity: 0.9;
+  }
 }
 
 .vs-divider {

@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { TeamsService } from '../../../core/services/teams.service';
 import { GamesService } from '../../../core/services/games.service';
 import { PlayersService } from '../../../core/services/players.service';
+import { SEOService } from '../../../core/services/seo.service';
 import { TeamResponse, GameResponse, TeamSummaryResponse, PlayerResponse } from '../../../core/interfaces/api.interface';
 
 @Component({
@@ -38,27 +39,13 @@ export class TeamDetails implements OnInit {
   });
 
   readonly wins = computed(() => {
-    const games = this._recentGames();
     const team = this._team();
-    if (!team) return 0;
-
-    return games.filter(game => {
-      const isHomeTeam = game.homeTeam.id === team.id;
-      const isVisitorTeam = game.visitorTeam.id === team.id;
-
-      if (isHomeTeam) {
-        return (game.homeTeamScore ?? 0) > (game.visitorTeamScore ?? 0);
-      }
-      if (isVisitorTeam) {
-        return (game.visitorTeamScore ?? 0) > (game.homeTeamScore ?? 0);
-      }
-      return false;
-    }).length;
+    return team?.wins ?? 0;
   });
 
   readonly losses = computed(() => {
-    const games = this._recentGames();
-    return games.length - this.wins();
+    const team = this._team();
+    return team?.losses ?? 0;
   });
 
   constructor(
@@ -66,7 +53,8 @@ export class TeamDetails implements OnInit {
     private readonly router: Router,
     protected readonly teamsService: TeamsService,
     protected readonly gamesService: GamesService,
-    protected readonly playersService: PlayersService
+    protected readonly playersService: PlayersService,
+    private readonly seoService: SEOService
   ) { }
 
   async ngOnInit(): Promise<void> {
@@ -89,7 +77,6 @@ export class TeamDetails implements OnInit {
 
       console.log(`Carregando dados do time: ${abbreviation}`);
 
-      // Carregar todos os times se ainda não foram carregados
       if (this.teamsService.allTeams().length === 0) {
         console.log('Carregando lista de times...');
         await this.teamsService.loadAllTeams();
@@ -123,6 +110,7 @@ export class TeamDetails implements OnInit {
       }
 
       this._team.set(team);
+      this.updateSEO(team);
       console.log(`Time carregado com sucesso: ${team.displayName || team.name} (ID: ${team.id})`);
 
       // Buscar jogos do time
@@ -286,5 +274,14 @@ export class TeamDetails implements OnInit {
     } else {
       this.router.navigate(['/players']);
     }
+  }
+
+  private updateSEO(team: TeamResponse): void {
+    const title = team.displayName || `${team.city} ${team.name}`;
+    const description = `Acompanhe o desempenho, jogos recentes e elenco completo do ${title} (${team.conference} Conference). Estatísticas atualizadas da NBA.`;
+    const image = this.getTeamLogoUrl(team.abbreviation);
+
+    this.seoService.updateTitle(title);
+    this.seoService.updateMeta(description, undefined, image);
   }
 }

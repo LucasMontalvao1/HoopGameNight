@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Core.Interfaces.Repositories;
 using HoopGameNight.Core.Interfaces.Services;
@@ -20,6 +20,8 @@ namespace HoopGameNight.Tests.Helpers
         public Mock<ICacheService> MockCacheService { get; }
         public Mock<IGameStatsService> MockGameStatsService { get; }
         public Mock<ITeamService> MockTeamService { get; }
+        public Mock<IGamePlayRepository> MockGamePlayRepository { get; }
+        public Mock<IEspnParser> MockEspnParser { get; }
 
         public GameService GameService { get; }
 
@@ -33,7 +35,8 @@ namespace HoopGameNight.Tests.Helpers
             MockCacheService = MockSetupHelper.CreateCacheServiceMock();
             MockGameStatsService = new Mock<IGameStatsService>();
             MockTeamService = new Mock<ITeamService>();
-
+            MockGamePlayRepository = new Mock<IGamePlayRepository>();
+            MockEspnParser = new Mock<IEspnParser>();
 
             GameService = new GameService(
                 MockGameRepository.Object,
@@ -43,6 +46,8 @@ namespace HoopGameNight.Tests.Helpers
                 MockCacheService.Object,
                 MockGameStatsService.Object,
                 MockTeamService.Object,
+                MockGamePlayRepository.Object,
+                MockEspnParser.Object,
                 MockLogger.Object
             );
 

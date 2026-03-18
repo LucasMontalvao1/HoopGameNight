@@ -1458,51 +1458,114 @@ namespace HoopGameNight.Core.Services
         }
         public async Task<StatLeadersResponse> GetLeagueLeadersAsync(int season)
         {
-            var cacheKey = $"league_leaders_{season}";
+            var cacheKey = $"league_leaders_v3_{season}";
             if (_cache.TryGetValue(cacheKey, out StatLeadersResponse? cached)) return cached!;
 
             var response = new StatLeadersResponse { LastUpdated = DateTime.UtcNow };
 
             try {
-                var scoringData = await _statsRepository.GetScoringLeadersAsync(season, 10, 5);
-                response.ScoringLeaders = scoringData.Select((d, index) => new StatLeader {
-                    PlayerId = d.PlayerId != null ? (int)d.PlayerId : 0,
-                    ExternalId = d.ExternalId != null ? (int)d.ExternalId : (int?)null,
-                    PlayerName = d.PlayerName?.ToString() ?? "Unknown",
-                    Team = d.TeamAbbreviation?.ToString() ?? "-",
-                    Value = d.AverageValue != null ? (decimal)d.AverageValue : 0m,
-                    GamesPlayed = d.GamesPlayed != null ? (int)d.GamesPlayed : 0,
-                    Rank = index + 1
-                }).ToList();
+                // Pontos - Offensive Index 0
+                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0);
+                
+                // Assistências - Offensive Index 10
+                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10);
+                
+                // 3 Pontos - Offensive Index 4
+                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4);
+                
+                // Rebotes - General Index 11
+                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11);
+                
+                // Roubos - Defensive Index 0
+                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0);
+                
+                // Tocos - Defensive Index 1
+                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1);
 
-                var reboundData = await _statsRepository.GetReboundLeadersAsync(season, 10, 5);
-                response.ReboundLeaders = reboundData.Select((d, index) => new StatLeader {
-                    PlayerId = d.PlayerId != null ? (int)d.PlayerId : 0,
-                    ExternalId = d.ExternalId != null ? (int)d.ExternalId : (int?)null,
-                    PlayerName = d.PlayerName?.ToString() ?? "Unknown",
-                    Team = d.TeamAbbreviation?.ToString() ?? "-",
-                    Value = d.AverageValue != null ? (decimal)d.AverageValue : 0m,
-                    GamesPlayed = d.GamesPlayed != null ? (int)d.GamesPlayed : 0,
-                    Rank = index + 1
-                }).ToList();
+                // Fallback para banco local se ESPN falhar totalmente (apenas se Scoring estiver vazio)
+                if (response.ScoringLeaders.Count == 0)
+                {
+                    var scoringData = await _statsRepository.GetScoringLeadersAsync(season, 10, 5);
+                    response.ScoringLeaders = scoringData.Select((d, index) => new StatLeader {
+                        PlayerId = d.PlayerId ?? 0,
+                        ExternalId = d.ExternalId,
+                        PlayerName = d.PlayerName?.ToString() ?? "Unknown",
+                        Team = d.TeamAbbreviation?.ToString() ?? "-",
+                        Value = d.AverageValue ?? 0m,
+                        Rank = index + 1
+                    }).ToList();
+                }
 
-                var assistData = await _statsRepository.GetAssistLeadersAsync(season, 10, 5);
-                response.AssistLeaders = assistData.Select((d, index) => new StatLeader {
-                    PlayerId = d.PlayerId != null ? (int)d.PlayerId : 0,
-                    ExternalId = d.ExternalId != null ? (int)d.ExternalId : (int?)null,
-                    PlayerName = d.PlayerName?.ToString() ?? "Unknown",
-                    Team = d.TeamAbbreviation?.ToString() ?? "-",
-                    Value = d.AverageValue != null ? (decimal)d.AverageValue : 0m,
-                    GamesPlayed = d.GamesPlayed != null ? (int)d.GamesPlayed : 0,
-                    Rank = index + 1
-                }).ToList();
-
-                _cache.Set(cacheKey, response, TimeSpan.FromHours(1));
+                _cache.Set(cacheKey, response, TimeSpan.FromHours(2));
             } catch (Exception ex) {
                 _logger.LogError(ex, "Error fetching league leaders for season {Season}", season);
             }
 
             return response;
+        }
+
+        private async Task<List<StatLeader>> MapEspnByAthleteStats(string categoryName, string sort, string targetCategory, int statIndex)
+        {
+            var list = new List<StatLeader>();
+            try
+            {
+                var json = await _espnApiService.GetStatsByAthleteAsync(categoryName, 10, sort);
+                if (json.ValueKind == JsonValueKind.Undefined || !json.TryGetProperty("athletes", out var athletes)) return list;
+
+                int rank = 1;
+                foreach (var entry in athletes.EnumerateArray())
+                {
+                    var athleteObj = GetPropertySafe(entry, "athlete");
+                    var name = GetPropertySafe(athleteObj, "displayName").GetString() ?? "Unknown";
+                    var extIdStr = GetPropertySafe(athleteObj, "id").GetString();
+                    int? extId = int.TryParse(extIdStr, out var id) ? id : (int?)null;
+                    
+                    var teams = GetPropertySafe(athleteObj, "teams");
+                    var teamAbbr = "-";
+                    if (teams.ValueKind == JsonValueKind.Array && teams.GetArrayLength() > 0)
+                    {
+                        teamAbbr = GetPropertySafe(teams[0], "abbreviation").GetString() ?? "-";
+                    }
+
+                    decimal val = 0;
+                    if (entry.TryGetProperty("categories", out var categories))
+                    {
+                        foreach (var cat in categories.EnumerateArray())
+                        {
+                            if (GetPropertySafe(cat, "name").GetString() == targetCategory && cat.TryGetProperty("values", out var values))
+                            {
+                                var statsArray = values.EnumerateArray().ToList();
+                                if (statsArray.Count > statIndex)
+                                {
+                                    val = (decimal)statsArray[statIndex].GetDouble();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    var playerId = 0;
+                    if (!string.IsNullOrEmpty(extIdStr))
+                    {
+                        var player = await _playerRepository.GetByEspnIdAsync(extIdStr);
+                        if (player != null) playerId = player.Id;
+                    }
+
+                    list.Add(new StatLeader {
+                        Rank = rank++,
+                        ExternalId = extId,
+                        PlayerName = name,
+                        Team = teamAbbr,
+                        Value = Math.Round(val, 1),
+                        PlayerId = playerId
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error mapping stats for {Category}", categoryName);
+            }
+            return list;
         }
 
         private System.Text.Json.JsonElement GetProperty(System.Text.Json.JsonElement? element, string name)

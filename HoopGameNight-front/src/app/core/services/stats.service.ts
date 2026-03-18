@@ -30,11 +30,15 @@ export class StatsService {
 
     private readonly _currentGameBoxscore = signal<GamePlayerStatsResponse | null>(null);
     private readonly _currentPlayerGamelog = signal<PlayerGamelogResponse | null>(null);
+    private readonly _currentGameSummary = signal<string | null>(null);
+    private readonly _currentGameHighlights = signal<any[]>([]);
     private readonly _isLoading = signal<boolean>(false);
     private readonly _error = signal<string | null>(null);
 
     readonly currentGameBoxscore = this._currentGameBoxscore.asReadonly();
     readonly currentPlayerGamelog = this._currentPlayerGamelog.asReadonly();
+    readonly currentGameSummary = this._currentGameSummary.asReadonly();
+    readonly currentGameHighlights = this._currentGameHighlights.asReadonly();
     readonly isLoading = this._isLoading.asReadonly();
     readonly error = this._error.asReadonly();
 
@@ -87,6 +91,13 @@ export class StatsService {
     async loadGameBoxscore(gameId: number): Promise<void> {
         this._isLoading.set(true);
         this._error.set(null);
+        
+        // Se mudar o jogo, limpa o resumo anterior para não mostrar dado trocado
+        if (this._currentGameBoxscore()?.gameId !== gameId) {
+            this._currentGameSummary.set(null);
+            this._currentGameHighlights.set([]);
+        }
+
         try {
             const data = await this.apiService.getGameBoxscore(gameId);
             this._currentGameBoxscore.set(data);
@@ -132,6 +143,13 @@ export class StatsService {
     clearState(): void {
         this._currentGameBoxscore.set(null);
         this._currentPlayerGamelog.set(null);
+        this._currentGameSummary.set(null);
+        this._currentGameHighlights.set([]);
         this._error.set(null);
+    }
+
+    setGameSummary(markdown: string | null, highlights: any[] = []): void {
+        this._currentGameSummary.set(markdown);
+        this._currentGameHighlights.set(highlights);
     }
 }

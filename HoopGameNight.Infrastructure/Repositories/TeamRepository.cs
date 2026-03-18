@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -100,7 +100,9 @@ namespace HoopGameNight.Infrastructure.Repositories
                 team.Abbreviation,
                 team.City,
                 Conference = team.Conference.ToString(),
-                team.Division
+                team.Division,
+                team.Wins,
+                team.Losses
             });
 
             Logger.LogInformation("Team inserted with ID: {TeamId}", id);
@@ -123,6 +125,8 @@ namespace HoopGameNight.Infrastructure.Repositories
                 team.City,
                 Conference = team.Conference.ToString(),
                 team.Division,
+                team.Wins,
+                team.Losses,
                 team.UpdatedAt
             });
 

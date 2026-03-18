@@ -142,10 +142,12 @@
               </div>
             </div>
 
-            <!-- Evolução de Performance (Chart) -->
-            <app-player-performance-chart [games]="statsService.currentPlayerGamelog()?.games || []"
-              [teamColor]="getTeamColor(player.team?.abbreviation, 'primary')">
-            </app-player-performance-chart>
+            <!-- Evolução de Performance (Chart) - Only for current season -->
+            @if (selectedSeason() === 2025) {
+              <app-player-performance-chart [games]="statsService.currentPlayerGamelog()?.games || []"
+                [teamColor]="getTeamColor(player.team?.abbreviation, 'primary')">
+              </app-player-performance-chart>
+            }
 
             <!-- Porcentagens de Arremesso -->
             <div class="stats-category">

@@ -122,6 +122,8 @@ namespace HoopGameNight.Core.Services
                                 TimeRemaining = espnGame.TimeRemaining,
                                 PostSeason = DeterminePostseason(espnGame),
                                 Season = espnGame.Season ?? GetSeasonYear(espnGame.Date),
+                                LineScoreJson = espnGame.LineScoreJson,
+                                GameLeadersJson = espnGame.GameLeadersJson,
                                 CreatedAt = DateTime.UtcNow,
                                 UpdatedAt = DateTime.UtcNow
                             };
@@ -163,6 +165,9 @@ namespace HoopGameNight.Core.Services
                         _logger.LogError(ex, "Erro ao processar jogo ESPN ID {GameId}", espnGame.Id);
                     }
                 }
+
+                // Update Team Records
+                await UpdateTeamRecordsAsync(espnGames);
 
                 await InvalidateCacheForDate(date, affectedTeamIds);
 
@@ -405,6 +410,9 @@ namespace HoopGameNight.Core.Services
             var isPostseason = DeterminePostseason(espnGame);
             if (existingGame.PostSeason != isPostseason) { existingGame.PostSeason = isPostseason; hasChanges = true; }
 
+            if (existingGame.LineScoreJson != espnGame.LineScoreJson) { existingGame.LineScoreJson = espnGame.LineScoreJson; hasChanges = true; }
+            if (existingGame.GameLeadersJson != espnGame.GameLeadersJson) { existingGame.GameLeadersJson = espnGame.GameLeadersJson; hasChanges = true; }
+
             return hasChanges;
         }
 
@@ -457,6 +465,43 @@ namespace HoopGameNight.Core.Services
             {
                 // Invalida o padrão de times uma única vez para evitar múltiplos SCANs pesados no Redis
                 await _cacheService.RemoveByPatternAsync("games:team:*");
+            }
+        }
+
+        private async Task UpdateTeamRecordsAsync(List<EspnGameDto> espnGames)
+        {
+            foreach (var eg in espnGames)
+            {
+                if (!string.IsNullOrEmpty(eg.HomeTeamRecord)) await UpdateSingleTeamRecord(eg.HomeTeamId, eg.HomeTeamAbbreviation, eg.HomeTeamRecord);
+                if (!string.IsNullOrEmpty(eg.AwayTeamRecord)) await UpdateSingleTeamRecord(eg.AwayTeamId, eg.AwayTeamAbbreviation, eg.AwayTeamRecord);
+            }
+        }
+
+        private async Task UpdateSingleTeamRecord(string espnId, string abbr, string record)
+        {
+            try
+            {
+                var teamId = await _teamService.MapEspnTeamToSystemIdAsync(espnId, abbr);
+                if (teamId == 0) return;
+
+                var team = await _teamRepository.GetByIdAsync(teamId);
+                if (team == null) return;
+
+                var parts = record.Split('-');
+                if (parts.Length >= 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int l))
+                {
+                    if (team.Wins != w || team.Losses != l)
+                    {
+                        team.Wins = w;
+                        team.Losses = l;
+                        await _teamRepository.UpdateAsync(team);
+                        _logger.LogInformation("Record atualizado para {Team}: {W}-{L}", team.Abbreviation, w, l);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Erro ao atualizar record para time {Abbr}", abbr);
             }
         }
 

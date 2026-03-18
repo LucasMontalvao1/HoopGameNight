@@ -237,6 +237,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<ITeamRepository, TeamRepository>();
             services.AddScoped<IPlayerRepository, PlayerRepository>();
             services.AddScoped<IPlayerStatsRepository, PlayerStatsRepository>();
+            services.AddScoped<IGamePlayRepository, GamePlayRepository>();
 
             return services;
         }
@@ -328,7 +329,6 @@ namespace HoopGameNight.Api.Extensions
 
         private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy(IConfigurationSection? config = null)
         {
-            // Reduzido para 2 retries com backoff fixo menor para evitar ThreadPool Starvation
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .OrResult(msg => !msg.IsSuccessStatusCode)
@@ -344,7 +344,6 @@ namespace HoopGameNight.Api.Extensions
 
         private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
         {
-            // Mais sensível: Abre após 5 falhas (antes era 10) para proteger o servidor mais rápido em caso de queda da ESPN
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
                 .Or<TaskCanceledException>()
@@ -497,7 +496,7 @@ namespace HoopGameNight.Api.Extensions
                         factory: partition => new FixedWindowRateLimiterOptions
                         {
                             AutoReplenishment = true,
-                            PermitLimit = 5,    // 5 perguntas por minuto (exemplo estrito)
+                            PermitLimit = 3,    // 3 perguntas por minuto 
                             QueueLimit = 2,
                             Window = TimeSpan.FromMinutes(1)
                         }));

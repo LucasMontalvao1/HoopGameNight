@@ -16,14 +16,35 @@ export class SEOService {
         this.titleService.setTitle(fullTitle);
     }
 
-    updateMeta(description: string = this.defaultDesc, keywords: string = 'NBA, basquete, estatísticas, jogos ao vivo, análise de desempenho'): void {
+    updateMeta(description: string = this.defaultDesc, keywords: string = 'NBA, basquete, estatísticas, jogos ao vivo, análise de desempenho', image: string = 'assets/icons/icon-512x512.png'): void {
         this.metaService.updateTag({ name: 'description', content: description });
         this.metaService.updateTag({ name: 'keywords', content: keywords });
 
         // Open Graph
-        this.metaService.updateTag({ property: 'og:title', content: this.titleService.getTitle() });
+        const currentTitle = this.titleService.getTitle();
+        this.metaService.updateTag({ property: 'og:title', content: currentTitle });
         this.metaService.updateTag({ property: 'og:description', content: description });
         this.metaService.updateTag({ property: 'og:type', content: 'website' });
+        this.metaService.updateTag({ property: 'og:image', content: image });
+        this.metaService.updateTag({ property: 'og:url', content: window.location.href });
+
+        // Twitter Cards
+        this.metaService.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+        this.metaService.updateTag({ name: 'twitter:title', content: currentTitle });
+        this.metaService.updateTag({ name: 'twitter:description', content: description });
+        this.metaService.updateTag({ name: 'twitter:image', content: image });
+
+        this.updateCanonicalLink();
+    }
+
+    private updateCanonicalLink(): void {
+        let link: HTMLLinkElement | null = document.querySelector('link[rel="canonical"]');
+        if (!link) {
+            link = document.createElement('link');
+            link.setAttribute('rel', 'canonical');
+            document.head.appendChild(link);
+        }
+        link.setAttribute('href', window.location.href);
     }
 
     reset(): void {

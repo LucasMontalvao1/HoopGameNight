@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { PlayersService } from '../../../core/services/players.service';
 import { PlayerStatsApiService, PlayerSeasonStats } from '../../../core/services/player-stats-api.service';
 import { StatsService } from '../../../core/services/stats.service';
+import { SEOService } from '../../../core/services/seo.service';
 import { PlayerPerformanceChartComponent } from '../player-performance-chart/player-performance-chart.component';
 
 @Component({
@@ -35,6 +36,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     public readonly playersService: PlayersService,
     private readonly playerStatsService: PlayerStatsApiService,
     protected readonly statsService: StatsService,
+    private readonly seoService: SEOService,
     private readonly route: ActivatedRoute,
     public readonly router: Router
   ) { }
@@ -58,6 +60,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
         const player = this.playersService.selectedPlayer();
         if (player) {
           this._currentPlayerId.set(player.id);
+          this.updateSEO(player);
           await this.loadPlayerStats(player.id);
           await this.loadRecentGamelog(player.id);
         }
@@ -201,10 +204,10 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     try {
       this._loadingStats.set(true);
       const stats = await this.playerStatsService.getPlayerSeasonStats(playerId, season);
-      console.log(`✅ Stats carregadas via DB View para season ${season}:`, stats);
+      console.log(`Stats carregadas via DB View para season ${season}:`, stats);
       this._seasonStats.set(stats);
     } catch (error) {
-      console.error(`❌ Erro ao carregar stats da season ${season} via DB:`, error);
+      console.error(`Erro ao carregar stats da season ${season} via DB:`, error);
       this._seasonStats.set(null);
     } finally {
       this._loadingStats.set(false);
@@ -242,5 +245,14 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     if (player) {
       this.playersService.toggleFavorite(player.id);
     }
+  }
+
+  private updateSEO(player: any): void {
+    const title = `${player.firstName} ${player.lastName}`;
+    const description = `Estatísticas completas, histórico de jogos e desempenho de ${title} (${player.team?.abbreviation || 'NBA'}). Confira médias de pontos, rebotes e assistências.`;
+    const image = this.playersService.getPlayerPhotoUrl(player.espnId || player.externalId);
+
+    this.seoService.updateTitle(title);
+    this.seoService.updateMeta(description, undefined, image);
   }
 }

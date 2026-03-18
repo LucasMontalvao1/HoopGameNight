@@ -10,7 +10,7 @@
 
         <div class="games-navbar__date-controls">
           <button class="nav-arrow-btn" (click)="goToPreviousDay()" [disabled]="gamesService.isLoading()"
-            title="Dia Anterior">
+            title="Dia Anterior" aria-label="Ir para o dia anterior">
             <span class="material-icons">chevron_left</span>
           </button>
 
@@ -27,7 +27,7 @@
           </div>
 
           <button class="nav-arrow-btn" (click)="goToNextDay()" [disabled]="gamesService.isLoading()"
-            title="Próximo Dia">
+            title="Próximo Dia" aria-label="Ir para o próximo dia">
             <span class="material-icons">chevron_right</span>
           </button>
 
@@ -51,12 +51,13 @@
 
         <div class="action-buttons">
           <button class="btn btn--secondary btn--icon-only" (click)="refreshGames()"
-            [disabled]="gamesService.isLoading()" title="Atualizar Tela">
+            [disabled]="gamesService.isLoading()" title="Atualizar Tela" aria-label="Atualizar lista de jogos">
             <span class="material-icons" [class.rotating]="gamesService.isLoading()">refresh</span>
           </button>
 
           <button class="btn btn--primary btn--compact" (click)="syncCurrentDate()"
-            [disabled]="gamesService.isLoading() || isFutureDate()" [title]="getSyncButtonTooltip()">
+            [disabled]="gamesService.isLoading() || isFutureDate()" [title]="getSyncButtonTooltip()"
+            aria-label="Sincronizar dados com a API externa">
             <span class="material-icons">sync</span>
             <span class="btn-text">Sincronizar</span>
           </button>
@@ -168,6 +169,7 @@
                 </div>
                 <div class="team__info">
                   <span class="team__abbreviation">{{ game.visitorTeam.abbreviation }}</span>
+                  <span class="team__record">({{ game.visitorTeam.wins }}-{{ game.visitorTeam.losses }})</span>
                   <span class="team__name">{{ game.visitorTeam.displayName }}</span>
                 </div>
                 <div class="team__score">{{ game.visitorTeamScore ?? 0 }}</div>
@@ -188,6 +190,7 @@
                 </div>
                 <div class="team__info">
                   <span class="team__abbreviation">{{ game.homeTeam.abbreviation }}</span>
+                  <span class="team__record">({{ game.homeTeam.wins }}-{{ game.homeTeam.losses }})</span>
                   <span class="team__name">{{ game.homeTeam.displayName }}</span>
                 </div>
                 <div class="team__score">{{ game.homeTeamScore ?? 0 }}</div>

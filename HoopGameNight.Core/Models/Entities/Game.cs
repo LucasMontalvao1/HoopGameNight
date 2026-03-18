@@ -1,4 +1,4 @@
-﻿using HoopGameNight.Core.Enums;
+using HoopGameNight.Core.Enums;
 using System;
 
 namespace HoopGameNight.Core.Models.Entities
@@ -19,6 +19,8 @@ namespace HoopGameNight.Core.Models.Entities
         public int Season { get; set; }
         public string? AiSummary { get; set; }
         public string? AiHighlights { get; set; }
+        public string? LineScoreJson { get; set; }
+        public string? GameLeadersJson { get; set; }
 
         public Team? HomeTeam { get; set; }
         public Team? VisitorTeam { get; set; }

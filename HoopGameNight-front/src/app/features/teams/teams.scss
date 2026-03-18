@@ -688,6 +688,24 @@
   color: var(--text-tertiary);
 }
 
+.team-record-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+  background: var(--surface-tertiary);
+  padding: 4px 8px;
+  border-radius: var(--border-radius-full);
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: var(--shadow-sm);
+  letter-spacing: 0.05em;
+
+  :root.dark & {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--accent-primary);
+  }
+}
+
 // ===== TEAMS LIST =====
 .teams-list {
   display: flex;

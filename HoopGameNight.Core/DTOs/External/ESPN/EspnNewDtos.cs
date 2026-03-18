@@ -185,7 +185,13 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
     public class EspnStandingsDto
     {
         public string? Name { get; set; } 
-        public List<EspnStandingEntryDto>? Children { get; set; } 
+        public List<EspnStandingsDto>? Children { get; set; } 
+        public EspnStandingsContainerDto? Standings { get; set; }
+        public List<EspnStandingEntryDto>? Entries { get; set; }
+    }
+
+    public class EspnStandingsContainerDto
+    {
         public List<EspnStandingEntryDto>? Entries { get; set; }
     }
 

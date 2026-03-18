@@ -676,6 +676,58 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
+        [HttpGet(RouteConstants.Games.GET_PBP)]
+        [ProducesResponseType(typeof(ApiResponse<List<GamePlayResponse>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<List<GamePlayResponse>>>> GetGamePlays(int id)
+        {
+            try
+            {
+                Logger.LogInformation("Buscando jogadas (PBP) para o jogo {GameId}", id);
+                var plays = await _gameService.GetGamePlaysAsync(id);
+                return Ok(plays, "Jogadas recuperadas com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar jogadas para o jogo {GameId}", id);
+                throw;
+            }
+        }
+
+        [HttpGet(RouteConstants.Games.GET_H2H)]
+        [ProducesResponseType(typeof(ApiResponse<List<GameResponse>>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<List<GameResponse>>>> GetHeadToHead(int id)
+        {
+            try
+            {
+                Logger.LogInformation("Buscando retrospecto (H2H) para o jogo {GameId}", id);
+                var h2h = await _gameService.GetHeadToHeadAsync(id);
+                return Ok(h2h, "Confrontos diretos recuperados com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar H2H para o jogo {GameId}", id);
+                throw;
+            }
+        }
+
+        [HttpGet(RouteConstants.Games.GET_LEADERS)]
+        [ProducesResponseType(typeof(ApiResponse<GameLeadersResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<GameLeadersResponse>>> GetGameLeaders(int id)
+        {
+            try
+            {
+                Logger.LogInformation("Buscando líderes para o jogo {GameId}", id);
+                var leaders = await _gameService.GetGameLeadersAsync(id);
+                if (leaders == null) return NotFound(ApiResponse<GameLeadersResponse>.ErrorResult("Líderes não encontrados"));
+                return Ok(leaders, "Líderes do jogo recuperados com sucesso");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erro ao buscar líderes para o jogo {GameId}", id);
+                throw;
+            }
+        }
+
         [HttpGet("{id}/boxscore")]
         [ProducesResponseType(typeof(ApiResponse<EspnBoxscoreDto>), StatusCodes.Status200OK)]
         public async Task<ActionResult<ApiResponse<EspnBoxscoreDto>>> GetGameBoxscore(int id)

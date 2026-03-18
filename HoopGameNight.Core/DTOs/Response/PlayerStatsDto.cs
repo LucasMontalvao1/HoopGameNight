@@ -176,6 +176,7 @@ namespace HoopGameNight.Core.DTOs.Response
         public string OpponentLogo { get; set; } = string.Empty;
         public string Score { get; set; } = string.Empty;
         public int TeamId { get; set; }
+        public string? PlayerEspnId { get; set; }
 
         // Performance flags
         public bool DoubleDouble { get; set; }
@@ -202,6 +203,9 @@ namespace HoopGameNight.Core.DTOs.Response
         public List<StatLeader> ScoringLeaders { get; set; } = new();
         public List<StatLeader> ReboundLeaders { get; set; } = new();
         public List<StatLeader> AssistLeaders { get; set; } = new();
+        public List<StatLeader> StealsLeaders { get; set; } = new();
+        public List<StatLeader> BlocksLeaders { get; set; } = new();
+        public List<StatLeader> ThreePointLeaders { get; set; } = new();
         public DateTime LastUpdated { get; set; }
     }
 

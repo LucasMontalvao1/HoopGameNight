@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -20,6 +20,7 @@ namespace HoopGameNight.Core.Services
         private readonly IEspnApiService _espnService;
         private readonly IMapper _mapper;
         private readonly ICacheService _cacheService;
+        private readonly IEspnParser _espnParser;
         private readonly ILogger<TeamService> _logger;
 
         public TeamService(
@@ -27,12 +28,14 @@ namespace HoopGameNight.Core.Services
             IEspnApiService espnService,
             IMapper mapper,
             ICacheService cacheService,
+            IEspnParser espnParser,
             ILogger<TeamService> logger)
         {
             _teamRepository = teamRepository;
             _espnService = espnService;
             _mapper = mapper;
             _cacheService = cacheService;
+            _espnParser = espnParser;
             _logger = logger;
         }
 
@@ -126,13 +129,58 @@ namespace HoopGameNight.Core.Services
                 }
 
                 await _cacheService.RemoveAsync(CacheKeys.ALL_TEAMS);
-
-                _logger.LogInformation("Sincronização concluída: {New} novos, {Updated} atualizados", syncCount, updateCount);
+                
+                _logger.LogInformation("Sincronização concluída: {New} novos, {Updated} atualizados. Iniciando atualização de recordes (Standings)...", syncCount, updateCount);
+                
+                await SyncTeamStandingsAsync();
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erro ao sincronizar times da ESPN");
                 throw new ExternalApiException("ESPN API", "Falha ao sincronizar times da API externa", null);
+            }
+        }
+
+        private async Task SyncTeamStandingsAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Buscando classificação (standings) da ESPN...");
+                var standings = await _espnService.GetConferenceStandingsAsync();
+                if (standings == null)
+                {
+                    _logger.LogWarning("Não foi possível recuperar a classificação da ESPN.");
+                    return;
+                }
+
+                var teamRecords = _espnParser.ParseStandings(standings);
+                _logger.LogInformation("Encontrados recordes para {Count} times.", teamRecords.Count);
+
+                var updateCount = 0;
+                foreach (var record in teamRecords)
+                {
+                    var espnId = record.Key;
+                    int wins = record.Value.Wins;
+                    int losses = record.Value.Losses;
+
+                    if (int.TryParse(espnId, out var extId))
+                    {
+                        var team = await _teamRepository.GetByExternalIdAsync(extId);
+                        if (team != null)
+                        {
+                            team.Wins = wins;
+                            team.Losses = losses;
+                            await _teamRepository.UpdateAsync(team);
+                            updateCount++;
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Recordes atualizados para {Count} times.", updateCount);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erro ao atualizar classificação dos times");
             }
         }
 

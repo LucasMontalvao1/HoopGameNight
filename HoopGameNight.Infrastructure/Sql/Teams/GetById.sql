@@ -1,4 +1,4 @@
-﻿SELECT
+SELECT
     id,
     external_id,
     external_espn_id,
@@ -8,6 +8,8 @@
     city,
     conference,
     division,
+    wins,
+    losses,
     created_at,
     updated_at
 FROM teams
