@@ -35,6 +35,8 @@ export class StatsService {
     private readonly _isLoading = signal<boolean>(false);
     private readonly _error = signal<string | null>(null);
 
+    private readonly gamelogCache = new Map<string, PlayerGamelogResponse>();
+
     readonly currentGameBoxscore = this._currentGameBoxscore.asReadonly();
     readonly currentPlayerGamelog = this._currentPlayerGamelog.asReadonly();
     readonly currentGameSummary = this._currentGameSummary.asReadonly();
@@ -111,10 +113,24 @@ export class StatsService {
     }
 
     async loadPlayerGamelog(playerId: number, season?: number): Promise<void> {
+        const cacheKey = `${playerId}_${season || 'all'}`;
+        if (this.gamelogCache.has(cacheKey)) {
+            const cachedData = this.gamelogCache.get(cacheKey)!;
+            this._currentPlayerGamelog.set({
+                ...cachedData,
+                games: cachedData.games.slice(0, 30)
+            });
+            return;
+        }
+
         this._isLoading.set(true);
         this._error.set(null);
         try {
             const data = await this.apiService.getPlayerGamelog(playerId, season);
+            if (data && data.games) {
+                data.games = data.games.slice(0, 30);
+            }
+            this.gamelogCache.set(cacheKey, data);
             this._currentPlayerGamelog.set(data);
         } catch (err) {
             console.error('Error loading gamelog:', err);
@@ -146,6 +162,7 @@ export class StatsService {
         this._currentGameSummary.set(null);
         this._currentGameHighlights.set([]);
         this._error.set(null);
+        // We do not clear the cache here to keep the data across typical navigation
     }
 
     setGameSummary(markdown: string | null, highlights: any[] = []): void {

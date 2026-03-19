@@ -102,11 +102,20 @@ export class StatsApiService {
                 .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
         );
 
-        if (response.success && response.data && response.data.games) {
-            return {
-                ...response.data,
-                games: response.data.games.map(game => this.normalizeRecentGame(game))
-            };
+        if (response.success && response.data) {
+            if (Array.isArray(response.data)) {
+                return {
+                    playerId,
+                    playerName: 'Unknown',
+                    season: season || 2024,
+                    games: response.data.map(game => this.normalizeRecentGame(game))
+                } as PlayerGamelogResponse;
+            } else if (response.data.games) {
+                return {
+                    ...response.data,
+                    games: response.data.games.map(game => this.normalizeRecentGame(game))
+                };
+            }
         }
         return response.data;
     }
@@ -122,11 +131,20 @@ export class StatsApiService {
                 .pipe(timeout(APP_CONSTANTS.REQUEST_TIMEOUT))
         );
 
-        if (response.success && response.data && response.data.games) {
-            return {
-                ...response.data,
-                games: response.data.games.map(game => this.normalizeRecentGame(game))
-            };
+        if (response.success && response.data) {
+            if (Array.isArray(response.data)) {
+                return {
+                    playerId,
+                    playerName: 'Unknown',
+                    season: 2024,
+                    games: response.data.map(game => this.normalizeRecentGame(game))
+                } as PlayerGamelogResponse;
+            } else if (response.data.games) {
+                return {
+                    ...response.data,
+                    games: response.data.games.map(game => this.normalizeRecentGame(game))
+                };
+            }
         }
 
         return response.data;

@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect } from '@angular/core';
 import { PlayersApiService } from './players-api.service';
 import { StorageService } from './storage.service';
 import {
@@ -8,6 +8,7 @@ import {
   PaginatedResponse,
   PlayerPosition
 } from '../interfaces/api.interface';
+import { PreferencesStore } from './preferences.store';
 import { APP_CONSTANTS } from '../constants/app.constants';
 
 interface CacheEntry<T> {
@@ -27,7 +28,6 @@ export class PlayersService {
   private readonly _isLoading = signal<boolean>(false);
   private readonly _error = signal<string | null>(null);
   private readonly _leagueLeaders = signal<StatLeadersResponse | null>(null);
-  private readonly _favoritePlayerIds = signal<number[]>([]);
   private readonly _favoritePlayers = signal<PlayerResponse[]>([]);
   private readonly _searchQuery = signal<string>('');
   private readonly _selectedPosition = signal<string | null>(null);
@@ -55,7 +55,6 @@ export class PlayersService {
   readonly pagination = this._pagination.asReadonly();
   readonly lastUpdate = this._lastUpdate.asReadonly();
   readonly leagueLeaders = this._leagueLeaders.asReadonly();
-  readonly favoritePlayerIds = this._favoritePlayerIds.asReadonly();
   readonly favoritePlayers = this._favoritePlayers.asReadonly();
 
   readonly hasSearchResults = computed(() => this._searchResults().length > 0);
@@ -81,10 +80,15 @@ export class PlayersService {
 
   constructor(
     private readonly playersApiService: PlayersApiService,
-    private readonly storageService: StorageService
+    private readonly storageService: StorageService,
+    private readonly preferencesStore: PreferencesStore
   ) {
     this.loadFeaturedPlayersFromCache();
-    this.loadFavoritesFromStorage();
+
+    effect(() => {
+      const ids = this.preferencesStore.favoritePlayerIds();
+      this.loadFavoritePlayers(ids);
+    });
   }
 
   async searchPlayers(query: string, page: number = 1, pageSize: number = 20): Promise<void> {
@@ -347,28 +351,7 @@ export class PlayersService {
     }
   }
 
-  isFavorite(playerId: number): boolean {
-    return this._favoritePlayerIds().includes(playerId);
-  }
-
-  async toggleFavorite(playerId: number): Promise<void> {
-    const current = [...this._favoritePlayerIds()];
-    const index = current.indexOf(playerId);
-
-    if (index === -1) {
-      current.push(playerId);
-    } else {
-      current.splice(index, 1);
-    }
-
-    this._favoritePlayerIds.set(current);
-    await this.storageService.setAppData('players', 'favorites', current);
-
-    await this.loadFavoritePlayers();
-  }
-
-  async loadFavoritePlayers(): Promise<void> {
-    const ids = this._favoritePlayerIds();
+  async loadFavoritePlayers(ids: number[]): Promise<void> {
     if (ids.length === 0) {
       this._favoritePlayers.set([]);
       return;
@@ -379,14 +362,6 @@ export class PlayersService {
       this._favoritePlayers.set(players);
     } catch (err) {
       console.error('Error loading favorite players:', err);
-    }
-  }
-
-  private async loadFavoritesFromStorage(): Promise<void> {
-    const favorites = await this.storageService.getAppData<number[]>('players', 'favorites');
-    if (favorites) {
-      this._favoritePlayerIds.set(favorites);
-      await this.loadFavoritePlayers();
     }
   }
 

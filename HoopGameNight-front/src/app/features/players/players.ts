@@ -32,11 +32,15 @@ export class PlayersComponent implements OnInit {
   readonly positionNames = POSITION_NAMES;
 
   readonly displayPlayers = computed(() => {
-    let result = this.playersService.searchResults();
     if (this._favoritesOnly()) {
-      result = result.filter(p => this.preferencesStore.isFavoritePlayer(p.id));
+      let favs = this.playersService.favoritePlayers();
+      const query = this.searchInput().toLowerCase();
+      if (query.length >= 2) {
+        favs = favs.filter(p => p.fullName.toLowerCase().includes(query));
+      }
+      return favs;
     }
-    return result;
+    return this.playersService.searchResults();
   });
 
   readonly showingFeatured = computed(() => false); // Sempre mostra resultados paginados

@@ -758,12 +758,44 @@
     }
   }
 
-  &__meta {
+  .team-meta-group {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-md);
 
-    .material-icons {
+    .favorite-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      color: var(--text-tertiary);
+      transition: all var(--transition-fast);
+      border-radius: 50%;
+
+      &:hover {
+        transform: scale(1.1);
+        color: var(--accent-primary);
+        background: var(--surface-tertiary);
+      }
+
+      &--active {
+        color: #ef4444;
+
+        &:hover {
+          color: #dc2626;
+          background: rgba(239, 68, 68, 0.1);
+        }
+      }
+
+      .material-icons {
+        font-size: 1.25rem;
+      }
+    }
+
+    > .material-icons {
       color: var(--text-tertiary);
     }
   }

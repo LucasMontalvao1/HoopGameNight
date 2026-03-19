@@ -27,6 +27,8 @@
 // ===== ULTRA-COMPACT NAVIGATION BAR (GLASS) =====
 .games-navbar {
   @include glass;
+  position: relative;
+  z-index: 50;
   display: flex;
   justify-content: space-between;
   align-items: center;

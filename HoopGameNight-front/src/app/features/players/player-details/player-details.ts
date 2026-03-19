@@ -5,6 +5,7 @@ import { PlayersService } from '../../../core/services/players.service';
 import { PlayerStatsApiService, PlayerSeasonStats } from '../../../core/services/player-stats-api.service';
 import { StatsService } from '../../../core/services/stats.service';
 import { SEOService } from '../../../core/services/seo.service';
+import { PreferencesStore } from '../../../core/services/preferences.store';
 import { PlayerPerformanceChartComponent } from '../player-performance-chart/player-performance-chart.component';
 
 @Component({
@@ -38,7 +39,8 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     protected readonly statsService: StatsService,
     private readonly seoService: SEOService,
     private readonly route: ActivatedRoute,
-    public readonly router: Router
+    public readonly router: Router,
+    public readonly preferencesStore: PreferencesStore
   ) { }
 
   protected readonly activeTab = signal<'stats' | 'gamelog' | 'career'>('stats');
@@ -193,7 +195,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
   private async loadRecentGamelog(idOverride?: number): Promise<void> {
     const playerId = idOverride || this._currentPlayerId();
     if (playerId) {
-      await this.statsService.loadPlayerGamelog(playerId);
+      await this.statsService.loadRecentPlayerGames(playerId);
     }
   }
 
@@ -235,15 +237,39 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     return numValue.toFixed(1);
   }
 
+  formatHeight(heightStr: string | undefined): string {
+    if (!heightStr) return '-';
+    const match = heightStr.match(/(\d+)'(\d+(?:\.\d+)?)"?/);
+    if (match) {
+      const feet = parseInt(match[1], 10);
+      const inches = parseFloat(match[2]);
+      const totalInches = (feet * 12) + inches;
+      const meters = totalInches * 0.0254;
+      return `${meters.toFixed(2).replace('.', ',')}m (${heightStr})`;
+    }
+    return heightStr;
+  }
+
+  formatWeight(weightStr: string | undefined): string {
+    if (!weightStr) return '-';
+    const match = weightStr.match(/(\d+(?:\.\d+)?)/);
+    if (match) {
+      const lbs = parseFloat(match[1]);
+      const kg = lbs * 0.453592;
+      return `${Math.round(kg)}kg (${weightStr})`;
+    }
+    return weightStr;
+  }
+
   isFavorite(): boolean {
     const player = this.playersService.selectedPlayer();
-    return player ? this.playersService.isFavorite(player.id) : false;
+    return player ? this.preferencesStore.isFavoritePlayer(player.id) : false;
   }
 
   toggleFavorite(): void {
     const player = this.playersService.selectedPlayer();
     if (player) {
-      this.playersService.toggleFavorite(player.id);
+      this.preferencesStore.toggleFavoritePlayer(player.id);
     }
   }
 

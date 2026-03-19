@@ -67,7 +67,7 @@
     </div> <!-- /players-navbar -->
 
     <!-- Results Info -->
-    @if (playersService.hasSearchResults()) {
+    @if (!favoritesOnly() && playersService.hasSearchResults()) {
     <div class="results-info">
       <span class="results-count">{{ playersService.pagination().totalCount }} atletas encontrados</span>
       @if (playersService.searchQuery()) {
@@ -76,6 +76,12 @@
       @if (playersService.selectedPosition()) {
       <span class="position-term">• Posição: {{ getPositionName(playersService.selectedPosition()) }}</span>
       }
+    </div>
+    }
+    
+    @if (favoritesOnly()) {
+    <div class="results-info">
+      <span class="results-count">{{ displayPlayers().length }} favoritos salvos</span>
     </div>
     }
 
@@ -151,7 +157,7 @@
     </div>
 
     <!-- Pagination -->
-    @if (playersService.hasSearchResults() && playersService.pagination().totalPages > 1) {
+    @if (!favoritesOnly() && playersService.hasSearchResults() && playersService.pagination().totalPages > 1) {
     <div class="pagination-bar">
       <button class="btn btn--secondary" [disabled]="!playersService.hasPreviousPage()" (click)="previousPage()">
         <span class="material-icons">chevron_left</span> Anterior

@@ -103,6 +103,32 @@ namespace HoopGameNight.Core.Services
                     allStats = await _statsRepository.GetGamePlayerStatsDetailedAsync(gameId);
                 }
 
+                var homeStats = allStats.Where(s => s.TeamId == game.HomeTeamId).ToList();
+                var visitorStats = allStats.Where(s => s.TeamId == game.VisitorTeamId).ToList();
+
+                var orphans = allStats.Where(s => s.TeamId != game.HomeTeamId && s.TeamId != game.VisitorTeamId).ToList();
+                if (orphans.Any())
+                {
+                    foreach (var orphan in orphans)
+                    {
+                        var player = await _playerRepository.GetByIdAsync(orphan.PlayerId);
+                        if (player != null)
+                        {
+                            if (player.TeamId == game.HomeTeamId)
+                            {
+                                orphan.TeamId = game.HomeTeamId;
+                                homeStats.Add(orphan);
+                            }
+                            else if (player.TeamId == game.VisitorTeamId)
+                            {
+                                orphan.TeamId = game.VisitorTeamId;
+                                visitorStats.Add(orphan);
+                            }
+                            // Se for all-star game ou caso extremo, ele continuará órfão.
+                        }
+                    }
+                }
+
                 var response = new GamePlayerStatsResponse
                 {
                     GameId = gameId,
@@ -111,8 +137,8 @@ namespace HoopGameNight.Core.Services
                     VisitorTeam = game.VisitorTeam?.Name ?? "",
                     HomeScore = game.HomeTeamScore,
                     VisitorScore = game.VisitorTeamScore,
-                    HomeTeamStats = allStats.Where(s => s.TeamId == game.HomeTeamId).ToList(),
-                    VisitorTeamStats = allStats.Where(s => s.TeamId == game.VisitorTeamId).ToList()
+                    HomeTeamStats = homeStats,
+                    VisitorTeamStats = visitorStats
                 };
 
                 var cacheTime = isFinal ? CacheDurations.NoExpiration : TimeSpan.FromSeconds(30);

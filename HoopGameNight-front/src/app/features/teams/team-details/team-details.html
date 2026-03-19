@@ -33,8 +33,19 @@
                 class="team-logo-large" (error)="handleLogoError($event, team()!.abbreviation)" />
             </div>
             <div class="team-hero-info">
-              <h1 class="team-name">{{ teamDisplayName() }}</h1>
-              <div class="team-meta">
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <h1 class="team-name" style="margin: 0;">{{ teamDisplayName() }}</h1>
+                <button class="favorite-btn" 
+                  style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;"
+                  [style.color]="preferencesStore.isFavoriteTeam(team()!.id) ? '#ff4b4b' : 'white'"
+                  (click)="preferencesStore.toggleFavoriteTeam(team()!.id)"
+                  [title]="preferencesStore.isFavoriteTeam(team()!.id) ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'">
+                  <span class="material-icons">
+                    {{ preferencesStore.isFavoriteTeam(team()!.id) ? 'favorite' : 'favorite_border' }}
+                  </span>
+                </button>
+              </div>
+              <div class="team-meta" style="margin-top: 12px;">
                 <span class="meta-badge glow-badge">
                   <span class="material-icons">stars</span>
                   {{ team()!.conference === 'East' ? 'Leste' : 'Oeste' }}

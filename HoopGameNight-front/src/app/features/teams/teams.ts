@@ -24,12 +24,14 @@ export class Teams implements OnInit {
   private readonly _selectedDivision = signal<string>('All');
   private readonly _viewMode = signal<'grid' | 'list' | 'divisions'>('grid');
   private readonly _sortBy = signal<'name' | 'conference' | 'division'>('name');
+  private readonly _showFavoritesOnly = signal<boolean>(false);
 
   readonly searchQuery = this._searchQuery.asReadonly();
   readonly selectedConference = this._selectedConference.asReadonly();
   readonly selectedDivision = this._selectedDivision.asReadonly();
   readonly viewMode = this._viewMode.asReadonly();
   readonly sortBy = this._sortBy.asReadonly();
+  readonly showFavoritesOnly = this._showFavoritesOnly.asReadonly();
 
   constructor(
     protected readonly teamsService: TeamsService,
@@ -95,11 +97,16 @@ export class Teams implements OnInit {
     this._viewMode.set(mode);
   }
 
+  toggleFavoritesOnly(): void {
+    this._showFavoritesOnly.update(v => !v);
+  }
+
   clearFilters(): void {
     this._searchQuery.set('');
     this._selectedConference.set('All');
     this._selectedDivision.set('All');
     this._sortBy.set('name');
+    this._showFavoritesOnly.set(false);
   }
 
   getFilteredTeams(): TeamResponse[] {
@@ -115,6 +122,10 @@ export class Teams implements OnInit {
 
     if (this._selectedDivision() !== 'All') {
       teams = teams.filter(team => team.division === this._selectedDivision());
+    }
+
+    if (this._showFavoritesOnly()) {
+      teams = teams.filter(team => this.preferencesStore.isFavoriteTeam(team.id));
     }
 
     return this.sortTeams(teams);
@@ -266,7 +277,8 @@ export class Teams implements OnInit {
     return (
       this._searchQuery() !== '' ||
       this._selectedConference() !== 'All' ||
-      this._selectedDivision() !== 'All'
+      this._selectedDivision() !== 'All' ||
+      this._showFavoritesOnly()
     );
   }
 

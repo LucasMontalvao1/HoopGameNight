@@ -6,6 +6,7 @@ import { TeamsService } from '../../../core/services/teams.service';
 import { GamesService } from '../../../core/services/games.service';
 import { PlayersService } from '../../../core/services/players.service';
 import { SEOService } from '../../../core/services/seo.service';
+import { PreferencesStore } from '../../../core/services/preferences.store';
 import { TeamResponse, GameResponse, TeamSummaryResponse, PlayerResponse } from '../../../core/interfaces/api.interface';
 
 @Component({
@@ -54,7 +55,8 @@ export class TeamDetails implements OnInit {
     protected readonly teamsService: TeamsService,
     protected readonly gamesService: GamesService,
     protected readonly playersService: PlayersService,
-    private readonly seoService: SEOService
+    private readonly seoService: SEOService,
+    public readonly preferencesStore: PreferencesStore
   ) { }
 
   async ngOnInit(): Promise<void> {

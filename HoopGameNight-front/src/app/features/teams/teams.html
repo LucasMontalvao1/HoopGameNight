@@ -45,12 +45,17 @@
 
         <!-- View Toggle -->
         <div class="view-toggle">
+          <button class="view-btn" [class.active]="showFavoritesOnly()" (click)="toggleFavoritesOnly()"
+            title="Apenas Favoritos" aria-label="Mostrar apenas times favoritos">
+            <span class="material-icons" [style.color]="showFavoritesOnly() ? '#ff4b4b' : 'inherit'">favorite</span>
+          </button>
+          <div class="separator-line" style="width: 1px; height: 24px; background: var(--border-primary); margin: 0 4px;"></div>
           <button class="view-btn" [class.active]="viewMode() === 'grid'" (click)="onViewModeChange('grid')"
             title="Grade" aria-label="Mudar para visualização em grade">
             <span class="material-icons">grid_view</span>
           </button>
           <button class="view-btn" [class.active]="viewMode() === 'list'" (click)="onViewModeChange('list')"
-            title="Lista" aria-label="Mudar para visualização em lista">
+            title="Lista" aria-label="Mudar para visualização em Lista">
             <span class="material-icons">view_list</span>
           </button>
           <button class="view-btn" [class.active]="viewMode() === 'divisions'" (click)="onViewModeChange('divisions')"
@@ -64,11 +69,7 @@
             [disabled]="teamsService.isLoading()" title="Atualizar Tela" aria-label="Recarregar lista de times">
             <span class="material-icons" [class.rotating]="teamsService.isLoading()">refresh</span>
           </button>
-          <button class="btn btn--primary btn--compact" (click)="syncTeams()" [disabled]="teamsService.isLoading()"
-            aria-label="Sincronizar franquias com o servidor">
-            <span class="material-icons">sync</span>
-            <span class="btn-text">Sincronizar</span>
-          </button>
+
         </div>
       </div>
 

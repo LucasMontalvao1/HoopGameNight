@@ -57,9 +57,9 @@
             <span class="meta-item"><span class="material-icons meta-icon">sports_basketball</span>{{
               player.positionDisplay }}</span>
             <span class="meta-divider">•</span>
-            <span class="meta-item"><span class="material-icons meta-icon">height</span>{{ player.height }}</span>
+            <span class="meta-item"><span class="material-icons meta-icon">height</span>{{ formatHeight(player.height) }}</span>
             <span class="meta-divider">•</span>
-            <span class="meta-item"><span class="material-icons meta-icon">scale</span>{{ player.weight }}</span>
+            <span class="meta-item"><span class="material-icons meta-icon">scale</span>{{ formatWeight(player.weight) }}</span>
           </div>
         </div>
       </div>
@@ -264,7 +264,7 @@
         <div class="gamelog-section glass-panel animate-fade-in" style="animation-delay: 0.2s">
           <div class="section-header-compact">
             <h2><span class="material-icons">list_alt</span> Histórico Recente</h2>
-            <span class="badge badge--nba">Ultimos 20 Jogos</span>
+            <span class="badge badge--nba">Ultimos 30 Jogos</span>
           </div>
 
           @if (statsService.isLoading()) {
@@ -319,6 +319,11 @@
                 }
               </tbody>
             </table>
+          </div>
+          } @else {
+          <div class="empty-state">
+            <span class="material-icons">history_off</span>
+            <p>Nenhum dado recente encontrado para este jogador.</p>
           </div>
           }
           }
@@ -392,11 +397,11 @@
           <div class="sidebar-stats">
             <div class="sidebar-stat">
               <span class="sidebar-label">Altura</span>
-              <span class="sidebar-value">{{ player.height }}</span>
+              <span class="sidebar-value">{{ formatHeight(player.height) }}</span>
             </div>
             <div class="sidebar-stat">
               <span class="sidebar-label">Peso</span>
-              <span class="sidebar-value">{{ player.weight }}</span>
+              <span class="sidebar-value">{{ formatWeight(player.weight) }}</span>
             </div>
           </div>
         </div>
