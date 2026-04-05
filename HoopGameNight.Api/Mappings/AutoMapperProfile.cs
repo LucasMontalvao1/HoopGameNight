@@ -38,6 +38,8 @@ namespace HoopGameNight.Api.Mappings
             CreateMap<Player, PlayerResponse>()
                 .ForMember(dest => dest.Position, opt => opt.MapFrom(src => src.Position.HasValue ? src.Position.Value.ToString() : null))
                 .ForMember(dest => dest.PositionDisplay, opt => opt.MapFrom(src => src.Position.HasValue ? src.Position.Value.GetDescription() : null))
+                .ForMember(dest => dest.BirthDate, opt => opt.MapFrom(src => src.BirthDate))
+                .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
                 .ForMember(dest => dest.Team, opt => opt.MapFrom(src => src.Team));
 
             CreateMap<Player, PlayerSummaryResponse>()

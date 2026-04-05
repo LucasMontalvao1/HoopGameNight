@@ -16,6 +16,7 @@ namespace HoopGameNight.Core.Services
         private readonly IGameRepository _gameRepository;
         private readonly IEspnApiService _espnApiService;
         private readonly IEspnParser _espnParser;
+        private readonly ITeamService _teamService;
         private readonly ILogger<PlayerStatsSyncService> _logger;
 
         public PlayerStatsSyncService(
@@ -24,6 +25,7 @@ namespace HoopGameNight.Core.Services
             IGameRepository gameRepository,
             IEspnApiService espnApiService,
             IEspnParser espnParser,
+            ITeamService teamService,
             ILogger<PlayerStatsSyncService> logger)
         {
             _statsRepository = statsRepository;
@@ -31,6 +33,7 @@ namespace HoopGameNight.Core.Services
             _gameRepository = gameRepository;
             _espnApiService = espnApiService;
             _espnParser = espnParser;
+            _teamService = teamService;
             _logger = logger;
         }
 
@@ -180,6 +183,9 @@ namespace HoopGameNight.Core.Services
             switch (key.ToLowerInvariant())
             {
                 case "min":
+                case "minutes":
+                case "avgminutes":
+                case "mpg":
                     if (valStr.Contains(":"))
                     {
                         var parts = valStr.Split(':');
@@ -191,9 +197,15 @@ namespace HoopGameNight.Core.Services
                         stats.MinutesPlayed = _espnParser.SafeParseInt(valStr);
                     }
                     break;
-                case "pts": stats.Points = _espnParser.SafeParseInt(valStr); break;
+
+                case "pts":
+                case "points":
+                case "totalpoints":
+                    stats.Points = _espnParser.SafeParseInt(valStr); break;
+
                 case "fg":
                 case "fgm-fga":
+                case "fieldgoals":
                 case "fieldgoalsmade-fieldgoalsattempted":
                     if (valStr.Contains("-") || valStr.Contains("/")) {
                         var fParts = valStr.Split('-', '/');
@@ -201,10 +213,15 @@ namespace HoopGameNight.Core.Services
                         stats.FieldGoalsAttempted = fParts.Length > 1 ? _espnParser.SafeParseInt(fParts[1]) : 0;
                     }
                     break;
-                case "fgm": stats.FieldGoalsMade = _espnParser.SafeParseInt(valStr); break;
-                case "fga": stats.FieldGoalsAttempted = _espnParser.SafeParseInt(valStr); break;
+                case "fgm":
+                case "fieldgoalsmade": stats.FieldGoalsMade = _espnParser.SafeParseInt(valStr); break;
+                case "fga":
+                case "fieldgoalsattempted": stats.FieldGoalsAttempted = _espnParser.SafeParseInt(valStr); break;
+
                 case "3pt":
                 case "3pm-3pa":
+                case "threepointers":
+                case "3p":
                 case "threepointfieldgoalsmade-threepointfieldgoalsattempted":
                     if (valStr.Contains("-") || valStr.Contains("/")) {
                         var tParts = valStr.Split('-', '/');
@@ -212,10 +229,16 @@ namespace HoopGameNight.Core.Services
                         stats.ThreePointersAttempted = tParts.Length > 1 ? _espnParser.SafeParseInt(tParts[1]) : 0;
                     }
                     break;
-                case "3pm": stats.ThreePointersMade = _espnParser.SafeParseInt(valStr); break;
-                case "3pa": stats.ThreePointersAttempted = _espnParser.SafeParseInt(valStr); break;
+                case "3pm":
+                case "threepointersmade":
+                case "threepointfieldgoalsmade": stats.ThreePointersMade = _espnParser.SafeParseInt(valStr); break;
+                case "3pa":
+                case "threepointersattempted":
+                case "threepointfieldgoalsattempted": stats.ThreePointersAttempted = _espnParser.SafeParseInt(valStr); break;
+
                 case "ft":
                 case "ftm-fta":
+                case "freethrows":
                 case "freethrowsmade-freethrowsattempted":
                     if (valStr.Contains("-") || valStr.Contains("/")) {
                         var ftParts = valStr.Split('-', '/');
@@ -223,17 +246,49 @@ namespace HoopGameNight.Core.Services
                         stats.FreeThrowsAttempted = ftParts.Length > 1 ? _espnParser.SafeParseInt(ftParts[1]) : 0;
                     }
                     break;
-                case "ftm": stats.FreeThrowsMade = _espnParser.SafeParseInt(valStr); break;
-                case "fta": stats.FreeThrowsAttempted = _espnParser.SafeParseInt(valStr); break;
-                case "oreb": stats.OffensiveRebounds = _espnParser.SafeParseInt(valStr); break;
-                case "dreb": stats.DefensiveRebounds = _espnParser.SafeParseInt(valStr); break;
-                case "reb": stats.TotalRebounds = _espnParser.SafeParseInt(valStr); break;
-                case "ast": stats.Assists = _espnParser.SafeParseInt(valStr); break;
-                case "stl": stats.Steals = _espnParser.SafeParseInt(valStr); break;
-                case "blk": stats.Blocks = _espnParser.SafeParseInt(valStr); break;
-                case "to": stats.Turnovers = _espnParser.SafeParseInt(valStr); break;
-                case "pf": stats.PersonalFouls = _espnParser.SafeParseInt(valStr); break;
-                case "+/-": stats.PlusMinus = _espnParser.SafeParseInt(valStr); break;
+                case "ftm":
+                case "freethrowsmade": stats.FreeThrowsMade = _espnParser.SafeParseInt(valStr); break;
+                case "fta":
+                case "freethrowsattempted": stats.FreeThrowsAttempted = _espnParser.SafeParseInt(valStr); break;
+
+                case "oreb":
+                case "offensiverebounds": stats.OffensiveRebounds = _espnParser.SafeParseInt(valStr); break;
+                case "dreb":
+                case "defensiverebounds": stats.DefensiveRebounds = _espnParser.SafeParseInt(valStr); break;
+                case "reb":
+                case "totalrebounds":
+                case "rebounds": stats.TotalRebounds = _espnParser.SafeParseInt(valStr); break;
+
+                case "ast":
+                case "assists":
+                case "totalassists": stats.Assists = _espnParser.SafeParseInt(valStr); break;
+
+                case "stl":
+                case "steals":
+                case "totalsteals": stats.Steals = _espnParser.SafeParseInt(valStr); break;
+
+                case "blk":
+                case "blocks":
+                case "totalblocks": stats.Blocks = _espnParser.SafeParseInt(valStr); break;
+
+                case "to":
+                case "tov":
+                case "turnovers":
+                case "totalturnovers": stats.Turnovers = _espnParser.SafeParseInt(valStr); break;
+
+                case "pf":
+                case "fouls":
+                case "personalfouls":
+                case "totalpersonalfouls": stats.PersonalFouls = _espnParser.SafeParseInt(valStr); break;
+
+                case "+/-":
+                case "pm":
+                case "plusminus": stats.PlusMinus = _espnParser.SafeParseInt(valStr); break;
+
+                default:
+                    // Log nomes desconhecidos para facilitar o diagnóstico
+                    _logger.LogDebug("Gamelog Sync: Coluna ESPN desconhecida '{Key}' = '{Value}' — ignorada", key, valStr);
+                    break;
             }
         }
         public async Task<int> SyncPlayerCareerHistoryAsync(int playerId, int startYear, int endYear)
@@ -288,19 +343,105 @@ namespace HoopGameNight.Core.Services
                 var player = await _playerRepository.GetByIdAsync(playerId);
                 if (player == null || string.IsNullOrEmpty(player.EspnId)) return false;
 
-                _logger.LogInformation("Syncing {Count} recent games for player {PlayerId} from ESPN", numberOfGames, playerId);
+                _logger.LogInformation("Gamelog Sync: Iniciando para player {PlayerName} (id={PlayerId}, espnId={EspnId})", player.FullName, playerId, player.EspnId);
                 var gamelog = await _espnApiService.GetPlayerGamelogAsync(player.EspnId);
-                
-                if (gamelog == null) return false;
 
-                // TODO: Consider moving mapping logic to this SyncService or a shared component
-                // to avoid cross-service dependencies.
-                
-                return true;
+                if (gamelog == null)
+                {
+                    _logger.LogWarning("Gamelog Sync: ESPN retornou null para player {PlayerId}", playerId);
+                    return false;
+                }
+
+                // Build stat column names from gamelog root-level names/labels
+                var statNames = gamelog.Names ?? gamelog.Labels ?? new System.Collections.Generic.List<string>();
+                _logger.LogInformation("Gamelog Sync: {Count} colunas de estatísticas encontradas para player {PlayerId}: [{Names}]",
+                    statNames.Count, playerId, string.Join(", ", statNames));
+
+                // Collect all events from all season types
+                var allEntries = new System.Collections.Generic.List<(string eventId, string? gameDate, System.Collections.Generic.List<string>? stats)>();
+
+                // Format 1: root-level entries
+                if (gamelog.Entries != null && gamelog.Entries.Any())
+                {
+                    foreach (var entry in gamelog.Entries)
+                    {
+                        var id = entry.EventId ?? entry.Id;
+                        if (!string.IsNullOrEmpty(id))
+                            allEntries.Add((id, entry.GameDate, entry.Stats));
+                    }
+                }
+
+                // Format 2: seasonTypes[].events
+                if (gamelog.SeasonTypes != null)
+                {
+                    foreach (var season in gamelog.SeasonTypes)
+                    {
+                        // Per-category stat names if different from root
+                        var categoryNames = statNames;
+                        if (season.Categories != null && season.Categories.Any())
+                        {
+                            // Use first category's names if root-level names are empty
+                            var firstCat = season.Categories.FirstOrDefault(c => c.Events != null && c.Events.Any());
+                            // categories don't carry names directly here; root names are authoritative
+                        }
+
+                        if (season.Events == null) continue;
+                        foreach (var ev in season.Events)
+                        {
+                            var id = ev.EventId ?? ev.Id;
+                            if (!string.IsNullOrEmpty(id) && !allEntries.Any(e => e.eventId == id))
+                                allEntries.Add((id, ev.GameDate, ev.Stats));
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Gamelog Sync: {Count} jogos encontrados para player {PlayerId}", allEntries.Count, playerId);
+                if (!allEntries.Any()) return false;
+
+                var statsToUpsert = new System.Collections.Generic.List<PlayerGameStats>();
+                var recentEntries = allEntries.TakeLast(numberOfGames).ToList();
+
+                foreach (var (eventId, gameDate, stats) in recentEntries)
+                {
+                    // Find the corresponding internal game
+                    var game = await _gameRepository.GetByExternalIdAsync(eventId);
+                    if (game == null)
+                    {
+                        _logger.LogDebug("Gamelog Sync: Jogo ESPN {EventId} não encontrado no banco local (data={Date}), pulando", eventId, gameDate);
+                        continue;
+                    }
+
+                    var gameStats = new PlayerGameStats
+                    {
+                        PlayerId = playerId,
+                        GameId = game.Id,
+                        TeamId = player.TeamId ?? 0
+                    };
+
+                    if (stats != null && statNames.Any())
+                    {
+                        for (int i = 0; i < statNames.Count && i < stats.Count; i++)
+                        {
+                            UpdateGameStatsFromKey(gameStats, statNames[i], stats[i]);
+                        }
+                    }
+
+                    statsToUpsert.Add(gameStats);
+                }
+
+                if (statsToUpsert.Any())
+                {
+                    await _statsRepository.BulkUpsertGameStatsAsync(statsToUpsert);
+                    _logger.LogInformation("Gamelog Sync: {Count} jogos persistidos com sucesso para player {PlayerId}", statsToUpsert.Count, playerId);
+                    return true;
+                }
+
+                _logger.LogWarning("Gamelog Sync: Nenhum jogo correspondente encontrado no banco local para player {PlayerId} (ESPN retornou {Count} entradas)", playerId, allEntries.Count);
+                return false;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error syncing recent games for player {PlayerId}", playerId);
+                _logger.LogError(ex, "Gamelog Sync: Erro ao sincronizar jogos recentes para player {PlayerId}", playerId);
                 return false;
             }
         }

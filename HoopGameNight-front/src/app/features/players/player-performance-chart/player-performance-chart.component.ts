@@ -115,9 +115,24 @@ export class PlayerPerformanceChartComponent implements OnInit, OnChanges {
             return;
         }
 
+        // Filter only games with valid dates for the chart
+        const gamesWithDates = this.games.filter(g => {
+            const d = g.gameDate || g.date || g.dateTime;
+            if (!d) return false;
+            const dateObj = new Date(d);
+            return !isNaN(dateObj.getTime()) && dateObj.getFullYear() >= 1990;
+        });
+
+        if (gamesWithDates.length === 0) {
+            this.lineChartData.labels = [];
+            this.lineChartData.datasets[0].data = [];
+            if (this.chart) this.chart.update();
+            return;
+        }
+
         // We show all games provided to see the full "evolution"
         // Valid games for sorting purposes (but we keep all)
-        const sortedGames = [...this.games].sort((a, b) => {
+        const sortedGames = [...gamesWithDates].sort((a, b) => {
             const dA = a.gameDate || a.date || a.dateTime;
             const dB = b.gameDate || b.date || b.dateTime;
             const timeA = dA ? new Date(dA).getTime() : 0;

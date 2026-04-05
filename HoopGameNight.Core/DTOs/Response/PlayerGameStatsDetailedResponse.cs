@@ -35,6 +35,7 @@ namespace HoopGameNight.Core.DTOs.Response
         public string? TeamLogo { get; set; }
 
         // Time Adversário
+        public int OpponentId { get; set; }
         public string OpponentAbbreviation { get; set; } = string.Empty;
         public string OpponentName { get; set; } = string.Empty;
 

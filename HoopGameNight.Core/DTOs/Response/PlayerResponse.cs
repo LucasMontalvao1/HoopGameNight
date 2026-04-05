@@ -1,4 +1,4 @@
-﻿namespace HoopGameNight.Core.DTOs.Response
+namespace HoopGameNight.Core.DTOs.Response
 {
     public class PlayerResponse
     {
@@ -13,6 +13,8 @@
         public string? PositionDisplay { get; set; }
         public string Height { get; set; } = string.Empty;
         public string Weight { get; set; } = string.Empty;
+        public DateTime? BirthDate { get; set; }
+        public int? Age { get; set; }
         public TeamSummaryResponse? Team { get; set; }
         public string DisplayName { get; set; } = string.Empty;
     }

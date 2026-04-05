@@ -14,6 +14,7 @@ using Hangfire;
 using HoopGameNight.Infrastructure.Jobs;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using HoopGameNight.Core.Constants;
 
 namespace HoopGameNight.Api.Controllers.V1
 {
@@ -23,21 +24,21 @@ namespace HoopGameNight.Api.Controllers.V1
         private readonly IGameService _gameService;
         private readonly IGameSyncService _gameSyncService;
         private readonly IEspnApiService _espnService;
-        private readonly IMemoryCache _cache;
+        private readonly ICacheService _cacheService;
         private readonly IBackgroundJobClient _backgroundJobClient;
 
         public GamesController(
             IGameService gameService,
             IGameSyncService gameSyncService,
             IEspnApiService espnService,
-            IMemoryCache cache,
+            ICacheService cacheService,
             IBackgroundJobClient backgroundJobClient,
             ILogger<GamesController> logger) : base(logger)
         {
             _gameService = gameService;
             _gameSyncService = gameSyncService;
             _espnService = espnService;
-            _cache = cache;
+            _cacheService = cacheService;
             _backgroundJobClient = backgroundJobClient;
         }
 
@@ -533,7 +534,12 @@ namespace HoopGameNight.Api.Controllers.V1
         {
             try
             {
-                Logger.LogInformation("Enfileirando sincronização dos jogos de hoje");
+                Logger.LogInformation("Enfileirando sincronização dos jogos de hoje e invalidando cache");
+
+                // Preemptive cache invalidate: impede que a UI pegue um cache de 0 jogos
+                // enquanto o Hangfire ainda não começou 
+                await _cacheService.RemoveAsync(CacheKeys.TodayGames());
+
                 var jobId = _backgroundJobClient.Enqueue<SyncJobs>(job => job.SyncManualTodayGamesJobAsync());
 
                 return Accepted(ApiResponse<object>.SuccessResult(new 
@@ -566,7 +572,12 @@ namespace HoopGameNight.Api.Controllers.V1
                     return BadRequest(ApiResponse<object>.ErrorResult("Não é possível sincronizar jogos futuros"));
                 }
 
-                Logger.LogInformation("Enfileirando sincronização dos jogos para a data: {Date}", date.ToShortDateString());
+                Logger.LogInformation("Enfileirando sincronização dos jogos para a data: {Date} e invalidando cache", date.ToShortDateString());
+
+                // Preemptive cache invalidate: impede que a UI pegue um cache de 0 jogos
+                // enquanto o Hangfire ainda não começou
+                await _cacheService.RemoveAsync(CacheKeys.GamesByDate(date));
+
                 var jobId = _backgroundJobClient.Enqueue<SyncJobs>(job => job.SyncManualGamesByDateJobAsync(date));
 
                 return Accepted(ApiResponse<object>.SuccessResult(new 
@@ -581,6 +592,7 @@ namespace HoopGameNight.Api.Controllers.V1
                 throw;
             }
         }
+
 
         /// <summary>
         /// Verificar status da sincronização de jogos

@@ -31,6 +31,10 @@ SELECT
         WHEN pgs.team_id = g.home_team_id THEN vt.full_name
         ELSE ht.full_name
     END AS opponent_name,
+    CASE 
+        WHEN pgs.team_id = g.home_team_id THEN vt.id
+        ELSE ht.id
+    END AS opponent_id,
     
     CASE 
         WHEN pgs.team_id = g.home_team_id THEN
@@ -115,7 +119,7 @@ SELECT
 FROM player_game_stats pgs
 INNER JOIN players p ON pgs.player_id = p.id
 INNER JOIN games g ON pgs.game_id = g.id
-INNER JOIN teams t ON pgs.team_id = t.id
+LEFT JOIN teams t ON pgs.team_id = t.id
 LEFT JOIN teams ht ON g.home_team_id = ht.id
 LEFT JOIN teams vt ON g.visitor_team_id = vt.id;
 

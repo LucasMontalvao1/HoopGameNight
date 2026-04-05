@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using FluentAssertions;
 using HoopGameNight.Core.DTOs.Response;
 using HoopGameNight.Api.Constants;
@@ -27,6 +27,7 @@ namespace HoopGameNight.Tests.Unit.Core.Services
         private readonly Mock<IMapper> _mockMapper;
         private readonly Mock<ILogger<TeamService>> _mockLogger;
         private readonly Mock<ICacheService> _mockCacheService;
+        private readonly Mock<IEspnParser> _mockEspnParser;
         private readonly TeamService _teamService;
 
         public TeamServiceTests()
@@ -36,12 +37,14 @@ namespace HoopGameNight.Tests.Unit.Core.Services
             _mockMapper = new Mock<IMapper>();
             _mockLogger = new Mock<ILogger<TeamService>>();
             _mockCacheService = MockSetupHelper.CreateCacheServiceMock();
+            _mockEspnParser = new Mock<IEspnParser>();
 
             _teamService = new TeamService(
                 _mockTeamRepository.Object,
                 _mockEspnApiService.Object,
                 _mockMapper.Object,
                 _mockCacheService.Object,
+                _mockEspnParser.Object,
                 _mockLogger.Object
             );
         }

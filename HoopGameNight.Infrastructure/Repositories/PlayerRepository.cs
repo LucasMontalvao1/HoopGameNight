@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -122,7 +122,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                     p.id, p.external_id AS ExternalId, p.nba_stats_id AS NbaStatsId, p.espn_id AS EspnId,
                     p.first_name AS FirstName, p.last_name AS LastName, p.position,
                     p.height_feet AS HeightFeet, p.height_inches AS HeightInches, p.weight_pounds AS WeightPounds,
-                    p.team_id AS TeamId, p.created_at AS CreatedAt, p.updated_at AS UpdatedAt
+                    p.team_id AS TeamId, p.birth_date AS BirthDate, p.created_at AS CreatedAt, p.updated_at AS UpdatedAt
                 FROM players p 
                 WHERE p.id IN @Ids";
 
@@ -251,7 +251,9 @@ namespace HoopGameNight.Infrastructure.Repositories
                 player.WeightPounds,
                 player.TeamId,
                 player.NbaStatsId,
-                player.EspnId
+                player.EspnId,
+                player.BirthDate,
+                player.JerseyNumber
             });
 
             Logger.LogInformation("Player inserted with ID: {PlayerId}", id);
@@ -275,6 +277,9 @@ namespace HoopGameNight.Infrastructure.Repositories
                 player.HeightInches,
                 player.WeightPounds,
                 player.TeamId,
+                player.EspnId,
+                player.BirthDate,
+                player.JerseyNumber,
                 player.UpdatedAt
             });
 

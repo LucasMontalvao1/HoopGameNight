@@ -453,19 +453,28 @@ namespace HoopGameNight.Core.Services
             await _cacheService.RemoveAsync(CacheKeys.TodayGames());
             await _cacheService.RemoveAsync(CacheKeys.GamesByDate(date));
             
-            // Operações por padrão (SCAN no Redis) - Executar apenas uma vez por lote
-            await _cacheService.RemoveByPatternAsync("games:range:*");
-            
-            if (date.Date == DateTime.Today)
+            // Operações por padrão (SCAN no Redis) - Executar em background
+            _ = Task.Run(async () =>
             {
-                await _cacheService.RemoveByPatternAsync("games:today:*");
-            }
+                try
+                {
+                    await _cacheService.RemoveByPatternAsync("games:range:*");
+                    
+                    if (date.Date == DateTime.Today)
+                    {
+                        await _cacheService.RemoveByPatternAsync("games:today:*");
+                    }
 
-            if (teamIds != null && teamIds.Any())
-            {
-                // Invalida o padrão de times uma única vez para evitar múltiplos SCANs pesados no Redis
-                await _cacheService.RemoveByPatternAsync("games:team:*");
-            }
+                    if (teamIds != null && teamIds.Any())
+                    {
+                        await _cacheService.RemoveByPatternAsync("games:team:*");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro background ao limpar padrões de cache para {Date}", date);
+                }
+            });
         }
 
         private async Task UpdateTeamRecordsAsync(List<EspnGameDto> espnGames)

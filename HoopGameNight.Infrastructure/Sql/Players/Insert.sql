@@ -1,4 +1,4 @@
-﻿INSERT INTO players (
+INSERT INTO players (
     external_id,
     first_name,
     last_name,
@@ -8,7 +8,9 @@
     weight_pounds,
     team_id,
     nba_stats_id,
-    espn_id
+    espn_id,
+    birth_date,
+    jersey_number
 ) VALUES (
     @ExternalId,
     @FirstName,
@@ -19,7 +21,9 @@
     @WeightPounds,
     @TeamId,
     @NbaStatsId,
-    @EspnId
+    @EspnId,
+    @BirthDate,
+    @JerseyNumber
 );
 
 SELECT LAST_INSERT_ID();

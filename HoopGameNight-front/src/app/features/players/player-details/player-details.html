@@ -60,6 +60,10 @@
             <span class="meta-item"><span class="material-icons meta-icon">height</span>{{ formatHeight(player.height) }}</span>
             <span class="meta-divider">•</span>
             <span class="meta-item"><span class="material-icons meta-icon">scale</span>{{ formatWeight(player.weight) }}</span>
+            @if (player.age) {
+            <span class="meta-divider">•</span>
+            <span class="meta-item"><span class="material-icons meta-icon">cake</span>{{ player.age }} anos</span>
+            }
           </div>
         </div>
       </div>
@@ -286,7 +290,6 @@
                   <th title="Roubos de Bola">STL</th>
                   <th title="Tocos">BLK</th>
                   <th title="Arremessos de Quadra">FG</th>
-                  <th title="Saldo de Pontos (Plus/Minus)">+/-</th>
                 </tr>
               </thead>
               <tbody>
@@ -294,13 +297,13 @@
                 <tr class="game-row" (click)="router.navigate(['/games', game.gameId])">
                   <td class="opponent-cell sticky-col">
                     <div class="game-brief">
-                      <span class="game-date-mini">{{ game.gameDate | date:'dd/MM' }}</span>
+                      <span class="game-date-mini">{{ (game.gameDate && !game.gameDate.startsWith('0001')) ? (game.gameDate | date:'dd/MM') : 'S/D' }}</span>
                       <span class="home-away">{{ game.isHome ? 'vs' : '@' }}</span>
                       <span class="opponent-abbr">{{ game.opponent }}</span>
                     </div>
                   </td>
-                  <td><span class="result-badge" [class.win]="game.result === 'W'" [class.loss]="game.result === 'L'">{{
-                      game.result }}</span></td>
+                  <td><span class="result-badge" [class.win]="game.result.startsWith('W')" [class.loss]="game.result.startsWith('L') || game.result === 'T'">
+                      {{ game.result.startsWith('W') ? 'W' : game.result.startsWith('L') ? 'L' : (game.result || '-') }}</span></td>
                   <td>{{ game.minutes }}</td>
                   <td class="stat-highlight">{{ game.points }}</td>
                   <td>{{ game.rebounds }}</td>
@@ -308,9 +311,6 @@
                   <td>{{ game.steals }}</td>
                   <td>{{ game.blocks }}</td>
                   <td class="fg-cell">{{ game.fieldGoals }}</td>
-                  <td [class.pos]="game.plusMinus > 0" [class.neg]="game.plusMinus < 0">
-                    {{ game.plusMinus > 0 ? '+' : '' }}{{ game.plusMinus }}
-                  </td>
                 </tr>
                 } @empty {
                 <tr>
@@ -403,6 +403,12 @@
               <span class="sidebar-label">Peso</span>
               <span class="sidebar-value">{{ formatWeight(player.weight) }}</span>
             </div>
+            @if (player.age) {
+            <div class="sidebar-stat">
+              <span class="sidebar-label">Idade</span>
+              <span class="sidebar-value">{{ player.age }} anos</span>
+            </div>
+            }
           </div>
         </div>
 

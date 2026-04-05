@@ -28,6 +28,7 @@ namespace HoopGameNight.Core.Services
         private readonly IGameSyncService _gameSyncService;
         private readonly IBackgroundSyncQueue _syncQueue;
         private readonly IEspnParser _espnParser;
+        private readonly ITeamService _teamService;
         private readonly IMapper _mapper;
         private readonly ILogger<PlayerStatsService> _logger;
 
@@ -43,6 +44,7 @@ namespace HoopGameNight.Core.Services
             IGameSyncService gameSyncService,
             IBackgroundSyncQueue syncQueue,
             IEspnParser espnParser,
+            ITeamService teamService,
             IMemoryCache cache,
             IMapper mapper,
             ILogger<PlayerStatsService> logger)
@@ -56,6 +58,7 @@ namespace HoopGameNight.Core.Services
             _gameSyncService = gameSyncService;
             _syncQueue = syncQueue;
             _espnParser = espnParser;
+            _teamService = teamService;
             _cache = cache;
             _mapper = mapper;
             _logger = logger;
@@ -116,7 +119,7 @@ namespace HoopGameNight.Core.Services
                     return null;
                 }
 
-                var key = $"gamelog_v41_{playerId}"; 
+                var key = $"gamelog_v42_{playerId}"; 
 
                 if (_cache.TryGetValue(key, out PlayerGamelogResponse? cachedResponse))
                 {
@@ -124,15 +127,25 @@ namespace HoopGameNight.Core.Services
                     return cachedResponse;
                 }
 
-                _logger.LogInformation("Buscando gamelog da ESPN para Player {PlayerId}", playerId);
+                _logger.LogInformation("Buscando gamelog da ESPN para Player {PlayerId}", playerId);                _logger.LogInformation("Gamelog Sync: Iniciando para Player {PlayerId} (ESPN: {EspnId})", playerId, player.EspnId);
                 var espnData = await _espnApiService.GetPlayerGamelogAsync(player.EspnId!);
-                if (espnData == null) return null;
+                
+                if (espnData == null)
+                {
+                    _logger.LogWarning("Gamelog Sync: ESPN API retornou NULL para Player {EspnId}", player.EspnId);
+                    return null;
+                }
 
-                    var response = MapEspnGamelogToResponse(espnData, playerId, player.FullName, 100);
+                _logger.LogInformation("Gamelog Sync: Dados recebidos da ESPN. SeasonTypes: {STCount}, Names: {NamesCount}", 
+                    espnData.SeasonTypes?.Count ?? 0, espnData.Names?.Count ?? 0);
+
+                var response = MapEspnGamelogToResponse(espnData, playerId, player.FullName, 100);
 
                 if (response != null && response.Games.Any())
                 {
-                    var updatedSeasons = new HashSet<(int Year, int Type)>();
+                    var updatedSeasons = new HashSet<(int, int)>();
+                    int syncsThisRequest = 0;
+                    const int maxSyncsAllowed = 3;
 
                     foreach (var g in response.Games)
                     {
@@ -142,35 +155,37 @@ namespace HoopGameNight.Core.Services
                             
                             if (gameInDb == null)
                             {
-                                _logger.LogInformation("Gamelog Sync: Jogo {EventId} não encontrado. Sincronizando...", g.EventId);
-                                await _gameSyncService.SyncGameByIdAsync(g.EventId);
-                                gameInDb = await _gameRepository.GetByExternalIdAsync(g.EventId);
-                                
-                                // Fallback: se ainda não encontrou por ID numérico, tenta buscar por times e data
-                                if (gameInDb == null && g.GameDate > DateTime.MinValue)
+                                if (syncsThisRequest < maxSyncsAllowed)
                                 {
-                                    _logger.LogInformation("Gamelog Sync: Fallback - Buscando jogo por times e data ({Date})", g.GameDate.ToShortDateString());
-                                    var homeTeamId = g.IsHome ? (g.TeamId > 0 ? g.TeamId : (player.TeamId ?? 0)) : 0;
-                                    var visitorTeamId = !g.IsHome ? (g.TeamId > 0 ? g.TeamId : (player.TeamId ?? 0)) : 0;
-                                    
-                                    // Precisamos do ID do oponente do sistema aqui, mas g.OpponentId é da ESPN.
-                                    // No entanto, o GetGamesByDateAsync no repositório pode nos ajudar se filtrarmos.
-                                    var gamesOnDate = await _gameRepository.GetGamesByDateAsync(g.GameDate.Date);
-                                    gameInDb = gamesOnDate.FirstOrDefault(x => 
-                                        (x.HomeTeamId == player.TeamId || x.VisitorTeamId == player.TeamId) &&
-                                        x.Date.Date == g.GameDate.Date);
+                                    _logger.LogInformation("Gamelog Sync: Jogo {EventId} não encontrado. Sincronizando...", g.EventId);
+                                    await _gameSyncService.SyncGameByIdAsync(g.EventId);
+                                    gameInDb = await _gameRepository.GetByExternalIdAsync(g.EventId);
+                                    syncsThisRequest++;
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Gamelog Sync: Pulando sincronização do Jogo {EventId} para evitar timeout (limite de 3).", g.EventId);
+                                }
+                            }
 
-                                    if (gameInDb != null)
+                            if (gameInDb == null && g.GameDate > DateTime.MinValue)
+                            {
+                                _logger.LogInformation("Gamelog Sync: Fallback - Buscando jogo por times e data ({Date})", g.GameDate.ToShortDateString());
+                                
+                                var gamesOnDate = await _gameRepository.GetGamesByDateAsync(g.GameDate.Date);
+                                gameInDb = gamesOnDate.FirstOrDefault(x => 
+                                    (x.HomeTeamId == player.TeamId || x.VisitorTeamId == player.TeamId) &&
+                                    x.Date.Date == g.GameDate.Date);
+
+                                if (gameInDb != null)
+                                {
+                                    _logger.LogInformation("Gamelog Sync: Fallback bem sucedido! Encontrado jogo {GameId} por data/times.", gameInDb.Id);
+                                    
+                                    if (gameInDb.ExternalId != g.EventId)
                                     {
-                                        _logger.LogInformation("Gamelog Sync: Falback bem sucedido! Encontrado jogo {GameId} por data/times.", gameInDb.Id);
-                                        
-                                        // Unificar o ID se ele for placeholder
-                                        if (gameInDb.ExternalId != g.EventId)
-                                        {
-                                            _logger.LogInformation("Gamelog Sync: Unificando ExternalId {Old} -> {New}", gameInDb.ExternalId, g.EventId);
-                                            gameInDb.ExternalId = g.EventId;
-                                            await _gameRepository.UpdateAsync(gameInDb);
-                                        }
+                                        _logger.LogInformation("Gamelog Sync: Unificando ExternalId {Old} -> {New}", gameInDb.ExternalId, g.EventId);
+                                        gameInDb.ExternalId = g.EventId;
+                                        await _gameRepository.UpdateAsync(gameInDb);
                                     }
                                 }
                             }
@@ -223,15 +238,18 @@ namespace HoopGameNight.Core.Services
                             }
 
                             int minutes = 0;
-                            if (g.Minutes.Contains(":"))
+                            if (!string.IsNullOrEmpty(g.Minutes))
                             {
-                                var parts = g.Minutes.Split(':');
-                                if (parts.Length == 2 && int.TryParse(parts[0], out int m))
-                                    minutes = m;
-                            }
-                            else if (int.TryParse(g.Minutes, out int m2))
-                            {
-                                minutes = m2;
+                                if (g.Minutes.Contains(":"))
+                                {
+                                    var parts = g.Minutes.Split(':');
+                                    if (parts.Length == 2 && int.TryParse(parts[0], out int m))
+                                        minutes = m;
+                                }
+                                else if (int.TryParse(g.Minutes, out int m2))
+                                {
+                                    minutes = m2;
+                                }
                             }
 
                             int fgm = 0, fga = 0;
@@ -267,11 +285,17 @@ namespace HoopGameNight.Core.Services
                                 }
                             }
 
+                            int systemicTeamId = g.TeamId > 0 
+                                ? await _teamService.MapEspnTeamToSystemIdAsync(g.TeamId.ToString(), "") 
+                                : (player.TeamId ?? 0);
+
+                            if (systemicTeamId == 0) systemicTeamId = player.TeamId ?? 0;
+
                             var statsEntity = new PlayerGameStats
                             {
                                 PlayerId = playerId,
                                 GameId = internalGameId, 
-                                TeamId = g.TeamId > 0 ? g.TeamId : (player.TeamId ?? 0), 
+                                TeamId = systemicTeamId, 
                                 Points = g.Points,
                                 Assists = g.Assists,
                                 TotalRebounds = g.Rebounds,
@@ -284,11 +308,11 @@ namespace HoopGameNight.Core.Services
                                 ThreePointersAttempted = tpa,
                                 FreeThrowsMade = ftm,
                                 FreeThrowsAttempted = fta,
-                                PlusMinus = g.PlusMinus
+                                PlusMinus = g.PlusMinus ?? 0
                             };
 
                             await _statsRepository.UpsertGameStatsAsync(statsEntity);
-                            _logger.LogInformation("Gamelog: Estatísticas persistidas para o Game {GameId} (External: {Ext})", internalGameId, g.GameId);
+                            _logger.LogInformation("Gamelog: Estatísticas persistidas para o Game {GameId} (External: {Ext})", internalGameId, g.EventId);
 
                             updatedSeasons.Add((gameInDb.Season, gameInDb.PostSeason ? 3 : 2));
                         }
@@ -298,18 +322,18 @@ namespace HoopGameNight.Core.Services
                         }
                     }
 
-                    foreach (var season in updatedSeasons)
+                    foreach (var s in updatedSeasons)
                     {
                         try
                         {
-                            _logger.LogInformation("📊 Agregando stats de temporada: Player {PlayerId}, Season {Season}, Type {Type}",
-                                playerId, season.Year, season.Type);
-                            await _statsRepository.AggregateSeasonStatsAsync(playerId, season.Year, season.Type);
+                            _logger.LogInformation("Agregando stats de temporada: Player {PlayerId}, Season {Season}, Type {Type}",
+                                playerId, s.Item1, s.Item2);
+                            await _statsRepository.AggregateSeasonStatsAsync(playerId, s.Item1, s.Item2);
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Erro ao agregar temporada {Season}/{Type} para Player {PlayerId}",
-                                season.Year, season.Type, playerId);
+                                s.Item1, s.Item2, playerId);
                         }
                     }
                 }
@@ -366,6 +390,7 @@ namespace HoopGameNight.Core.Services
             var stats = await _statsRepository.GetPlayerRecentGamesDetailedAsync(playerId, limit);
             if (stats == null || !stats.Any())
             {
+                _cache.Remove(cacheKey); 
                 var syncLockKey = $"sync_lock_player_{playerId}";
                 if (!_cache.TryGetValue(syncLockKey, out _))
                 {
@@ -404,7 +429,10 @@ namespace HoopGameNight.Core.Services
                     {
                         GameId = s.GameId,
                         GameDate = s.GameDate,
+                        OpponentId = s.OpponentId.ToString(),
                         Opponent = s.OpponentAbbreviation,
+                        OpponentAbbreviation = s.OpponentAbbreviation,
+                        OpponentLogo = $"https://a.espncdn.com/i/teamlogos/nba/500/{s.OpponentAbbreviation.ToLower()}.png",
                         IsHome = s.IsHome,
                         Result = s.Result,
 
@@ -958,15 +986,23 @@ namespace HoopGameNight.Core.Services
                 int idxSteals = GetIndex("steals", "stl", "totalSteals");
                 int idxBlocks = GetIndex("blocks", "blk", "totalBlocks");
                 int idxMinutes = GetIndex("minutes", "min", "mpg");
-                int idxFG = GetIndex("fieldGoalsMade", "fieldGoals", "fgm-a", "fg");
-                int idx3P = GetIndex("threePointFieldGoalsMade", "threePoint", "3pm-a", "3p");
-                int idxFT = GetIndex("freeThrowsMade", "freeThrows", "ftm-a", "ft");
-                int idxPlusMinus = GetIndex("plusMinus", "pm", "+/-");
-                int idxTurnovers = GetIndex("turnovers", "to", "tov");
+                int idxFG = GetIndex("fieldGoalsMade", "fieldGoals", "fgm-a", "fg", "fg-a");
+                int idx3P = GetIndex("threePointFieldGoalsMade", "threePoint", "3pm-a", "3p", "3p-a");
+                int idxFT = GetIndex("freeThrowsMade", "freeThrows", "ftm-a", "ft", "ft-a");
+                int idxPlusMinus = GetIndex("plusMinus", "pm", "+/-", "pts+/-");
+                int idxTurnovers = GetIndex("turnovers", "to", "tov", "turnover");
+
+                _logger.LogInformation("Gamelog Mapping: Indices found - Pts:{Pts}, Reb:{Reb}, Ast:{Ast}, PM:{PM}, NamesCount:{NamesCount}", 
+                    idxPoints, idxRebounds, idxAssists, idxPlusMinus, names.Count);
 
                 foreach (var evt in validEvents)
                 {
                     if (evt == null) continue;
+                    
+                    if (evt.Stats == null || !evt.Stats.Any())
+                    {
+                        _logger.LogWarning("Gamelog Mapping: Event {EventId} has NO STATS array!", evt.EventId ?? evt.Id);
+                    }
                     
                     var effectiveId = evt.EventId ?? "";
                     var opponentName = "Unknown";
@@ -1096,7 +1132,13 @@ namespace HoopGameNight.Core.Services
                             }
                             
                             if (idxTurnovers >= 0 && evt.Stats?.Count > idxTurnovers) game.Turnovers = int.TryParse(evt.Stats[idxTurnovers], out var tov) ? tov : 0;
-                            if (idxPlusMinus >= 0 && evt.Stats?.Count > idxPlusMinus) game.PlusMinus = int.TryParse(evt.Stats[idxPlusMinus], out var pm) ? pm : 0;
+                             if (idxPlusMinus >= 0 && evt.Stats?.Count > idxPlusMinus)
+                             {
+                                 var pmStr = evt.Stats[idxPlusMinus];
+                                 game.PlusMinus = !string.IsNullOrEmpty(pmStr) 
+                                     ? (int.TryParse(pmStr, out var pm) ? pm : _espnParser.SafeParseInt(pmStr)) 
+                                     : null;
+                             }
 
                             recentGamesList.Add(game);
                         }

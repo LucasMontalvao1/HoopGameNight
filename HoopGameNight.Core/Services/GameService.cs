@@ -135,7 +135,8 @@ namespace HoopGameNight.Core.Services
             {
                 response = new List<GameResponse>();
                 _logger.LogWarning("Nenhum jogo encontrado para {Date}", date.ToString("yyyy-MM-dd"));
-                await _cacheService.SetAsync(cacheKey, response, CacheDurations.Default);
+                // TTL curto para listas vazias: permite que o sync resolva rapidamente
+                await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromSeconds(15));
             }
 
             return response;

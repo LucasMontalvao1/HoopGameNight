@@ -626,10 +626,22 @@ namespace HoopGameNight.Core.Services
         public int SafeParseInt(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return 0;
-            var parts = value.Split(new[] { '-', '/', '.' });
-            var firstPart = parts[0].Trim();
             
-            var clean = new string(firstPart.Where(c => char.IsDigit(c) || c == '-' || c == '+').ToArray());
+            string part = value.Trim();
+            int dashIndex = part.IndexOf('-', 1); // Ignora sinal de menos no início
+            int slashIndex = part.IndexOf('/');
+            
+            int firstSeparator = -1;
+            if (dashIndex > 0 && slashIndex > 0) firstSeparator = Math.Min(dashIndex, slashIndex);
+            else if (dashIndex > 0) firstSeparator = dashIndex;
+            else if (slashIndex > 0) firstSeparator = slashIndex;
+            
+            if (firstSeparator > 0)
+            {
+                part = part.Substring(0, firstSeparator).Trim();
+            }
+            
+            var clean = new string(part.Where(c => char.IsDigit(c) || c == '-' || c == '+').ToArray());
             if (int.TryParse(clean, out int res)) return res;
             return 0;
         }
@@ -637,9 +649,22 @@ namespace HoopGameNight.Core.Services
         public decimal SafeParseDecimal(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return 0;
-            var clean = value.Split(new[] { '-', '/' })[0].Replace("%", "").Trim();
-            clean = new string(clean.Where(c => char.IsDigit(c) || c == '.' || c == ',' || c == '-' || c == '+').ToArray());
             
+            string part = value.Replace("%", "").Trim();
+            int dashIndex = part.IndexOf('-', 1); // Ignora sinal de menos no início
+            int slashIndex = part.IndexOf('/');
+            
+            int firstSeparator = -1;
+            if (dashIndex > 0 && slashIndex > 0) firstSeparator = Math.Min(dashIndex, slashIndex);
+            else if (dashIndex > 0) firstSeparator = dashIndex;
+            else if (slashIndex > 0) firstSeparator = slashIndex;
+
+            if (firstSeparator > 0)
+            {
+                part = part.Substring(0, firstSeparator).Trim();
+            }
+
+            var clean = new string(part.Where(c => char.IsDigit(c) || c == '.' || c == ',' || c == '-' || c == '+').ToArray());
             if (clean.Contains(",") && !clean.Contains(".")) clean = clean.Replace(",", ".");
 
             if (decimal.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal res)) return res;
@@ -826,13 +851,20 @@ namespace HoopGameNight.Core.Services
                 foreach (var stat in entry.Stats)
                 {
                     var name = stat.Name?.ToLowerInvariant();
-                    if (name == "wins" || name == "w")
+                    if (stat.Value != null && stat.Value.Value.ValueKind != JsonValueKind.Null && stat.Value.Value.ValueKind != JsonValueKind.Undefined)
                     {
-                        wins = (int)SafeParseDecimal(stat.Value);
-                    }
-                    else if (name == "losses" || name == "l")
-                    {
-                        losses = (int)SafeParseDecimal(stat.Value);
+                        var val = stat.Value.Value.ValueKind == JsonValueKind.Number 
+                            ? stat.Value.Value.GetDecimal() 
+                            : SafeParseDecimal(stat.Value.Value.GetString());
+
+                        if (name == "wins" || name == "w")
+                        {
+                            wins = (int)val;
+                        }
+                        else if (name == "losses" || name == "l")
+                        {
+                            losses = (int)val;
+                        }
                     }
                 }
 

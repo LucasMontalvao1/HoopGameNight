@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -25,6 +25,9 @@ namespace HoopGameNight.Infrastructure.Repositories
             _connection = connection ?? throw new ArgumentNullException(nameof(connection));
             _sqlLoader = sqlLoader ?? throw new ArgumentNullException(nameof(sqlLoader));
             Logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            // Configurar Dapper para mapear snake_case do Banco para PascalCase do C#
+            DefaultTypeMap.MatchNamesWithUnderscores = true;
         }
 
         protected async Task<IEnumerable<TResult>> ExecuteQueryAsync<TResult>(string sql, object? parameters = null)

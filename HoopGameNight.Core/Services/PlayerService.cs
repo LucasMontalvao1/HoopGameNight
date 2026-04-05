@@ -379,6 +379,11 @@ namespace HoopGameNight.Core.Services
                     {
                         var espnTeamId = team.ExternalId.ToString();
                         var roster = await _espnService.GetTeamRosterAsync(espnTeamId);
+                        
+                        _logger.LogInformation("Time {TeamName} (ID: {TeamId}): Roster com {Count} jogadores", 
+                            team.FullName, team.Id, roster?.Count ?? 0);
+
+                        if (roster == null || !roster.Any()) continue;
 
                         foreach (var espnPlayer in roster)
                         {
@@ -455,11 +460,73 @@ namespace HoopGameNight.Core.Services
                     existingPlayer.HeightInches = heightInches > 0 || (heightFeet > 0) ? heightInches : existingPlayer.HeightInches;
                     existingPlayer.WeightPounds = weightPounds > 0 ? weightPounds : existingPlayer.WeightPounds;
                     existingPlayer.Position = position ?? existingPlayer.Position;
-                    existingPlayer.TeamId = teamId; 
+                    existingPlayer.TeamId = teamId;
+                    
+                    // Always ensure EspnId is set for existing players (critical fix for Jaylen Brown case)
+                    if (string.IsNullOrEmpty(existingPlayer.EspnId) || existingPlayer.EspnId != espnPlayer.Id)
+                    {
+                        existingPlayer.EspnId = espnPlayer.Id;
+                    }
+
+                    // Map birth date from ESPN if not already set (or if it's default min value)
+                    if (!existingPlayer.BirthDate.HasValue || existingPlayer.BirthDate.Value == DateTime.MinValue)
+                    {
+                        if (!string.IsNullOrEmpty(espnPlayer.DateOfBirth))
+                        {
+                            if (DateTime.TryParse(espnPlayer.DateOfBirth, out var dob))
+                                existingPlayer.BirthDate = dob;
+                        }
+                        
+                        // If still null/min, fetch from full detail API
+                        if (!existingPlayer.BirthDate.HasValue || existingPlayer.BirthDate.Value == DateTime.MinValue)
+                        {
+                            try
+                            {
+                                var details = await _espnService.GetPlayerDetailsAsync(espnPlayer.Id);
+                                if (details != null && !string.IsNullOrEmpty(details.DateOfBirth))
+                                {
+                                    if (DateTime.TryParse(details.DateOfBirth, out var dob))
+                                        existingPlayer.BirthDate = dob;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning("Não foi possível buscar detalhes extras para o jogador {PlayerId}: {Message}", espnPlayer.Id, ex.Message);
+                            }
+                        }
+                    }
+                    if (espnPlayer.Jersey != null && int.TryParse(espnPlayer.Jersey, out var jersey))
+                        existingPlayer.JerseyNumber = jersey;
 
                     await _playerRepository.UpdateAsync(existingPlayer);
                     return true;
                 }
+
+                DateTime? birthDate = null;
+                if (!string.IsNullOrEmpty(espnPlayer.DateOfBirth))
+                {
+                    if (DateTime.TryParse(espnPlayer.DateOfBirth, out var parsedDob))
+                        birthDate = parsedDob;
+                }
+                
+                // If new player and birthdate missing from roster, fetch details
+                if (!birthDate.HasValue)
+                {
+                    try
+                    {
+                        var details = await _espnService.GetPlayerDetailsAsync(espnPlayer.Id);
+                        if (details != null && !string.IsNullOrEmpty(details.DateOfBirth))
+                        {
+                            if (DateTime.TryParse(details.DateOfBirth, out var parsedDob))
+                                birthDate = parsedDob;
+                        }
+                    }
+                    catch { /* ignorar erro na busca de detalhes para novos jogadores */ }
+                }
+
+                int? jerseyNumber = null;
+                if (!string.IsNullOrEmpty(espnPlayer.Jersey) && int.TryParse(espnPlayer.Jersey, out var jn))
+                    jerseyNumber = jn;
 
                 var player = new Player
                 {
@@ -471,7 +538,9 @@ namespace HoopGameNight.Core.Services
                     HeightInches = heightInches,
                     WeightPounds = weightPounds,
                     TeamId = teamId,
-                    EspnId = espnPlayer.Id
+                    EspnId = espnPlayer.Id,
+                    BirthDate = birthDate,
+                    JerseyNumber = jerseyNumber
                 };
 
                 var id = await _playerRepository.InsertAsync(player);

@@ -35,7 +35,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             _cacheService = cacheService;
             _espnParser = espnParser;
 
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
+            _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             _httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
         }
 
@@ -187,10 +187,10 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         #region Standings
 
         public async Task<EspnStandingsDto?> GetConferenceStandingsAsync() =>
-            await GetAsync<EspnStandingsDto>($"{BASE_URL.Replace("/site", "")}/standings?type=conference", "conference standings");
+            await GetAsync<EspnStandingsDto>("https://site.api.espn.com/apis/v2/sports/basketball/nba/standings", "standings");
 
         public async Task<EspnStandingsDto?> GetDivisionStandingsAsync() =>
-            await GetAsync<EspnStandingsDto>($"{BASE_URL.Replace("/site", "")}/standings?type=division", "division standings");
+            await GetAsync<EspnStandingsDto>("https://site.api.espn.com/apis/v2/sports/basketball/nba/standings", "standings");
 
         #endregion
 
@@ -228,7 +228,7 @@ namespace HoopGameNight.Infrastructure.ExternalServices
             await GetAsync<EspnPlayerSplitsDto>($"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/splits", $"player splits {playerId}");
 
         public async Task<EspnPlayerGamelogDto?> GetPlayerGamelogAsync(string playerId) =>
-            await GetWithCacheAsync<EspnPlayerGamelogDto>($"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/gamelog", $"player_gamelog_v37_{playerId}", TimeSpan.FromHours(4));
+            await GetWithCacheAsync<EspnPlayerGamelogDto>($"https://site.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/{playerId}/gamelog", $"player_gamelog_v38_{playerId}", TimeSpan.FromHours(4));
 
         public async Task<EspnPlayerStatsDto?> GetPlayerSeasonStatsAsync(string playerId, int season, int seasonType = 2)
         {

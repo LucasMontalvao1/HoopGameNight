@@ -1,4 +1,4 @@
-﻿SELECT 
+SELECT 
     p.id,
     p.external_id AS ExternalId,
     p.first_name AS FirstName,
@@ -8,6 +8,8 @@
     p.height_inches AS HeightInches,
     p.weight_pounds AS WeightPounds,
     p.team_id AS TeamId,
+    p.birth_date AS BirthDate,
+    p.jersey_number AS JerseyNumber,
     p.created_at AS CreatedAt,
     p.updated_at AS UpdatedAt
 FROM players p

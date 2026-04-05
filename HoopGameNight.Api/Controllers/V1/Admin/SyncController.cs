@@ -31,6 +31,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         private readonly ICacheService _cacheService;
         private readonly ISyncHealthService _healthService;
         private readonly IBackgroundSyncService _backgroundSyncService;
+        private readonly IPlayerStatsSyncService _playerStatsSyncService;
         private readonly IBackgroundJobClient _backgroundJobClient;
 
         public SyncController(
@@ -43,6 +44,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
             ICacheService cacheService,
             ISyncHealthService healthService,
             IBackgroundSyncService backgroundSyncService,
+            IPlayerStatsSyncService playerStatsSyncService,
             IBackgroundJobClient backgroundJobClient,
             ILogger<SyncController> logger) : base(logger)
         {
@@ -55,6 +57,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
             _cacheService = cacheService;
             _healthService = healthService;
             _backgroundSyncService = backgroundSyncService;
+            _playerStatsSyncService = playerStatsSyncService;
             _backgroundJobClient = backgroundJobClient;
         }
 
@@ -384,6 +387,30 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
                     DurationSeconds = duration.TotalSeconds,
                     Timestamp = DateTime.UtcNow
                 }, "Cache refresh process triggered");
+            });
+        }
+
+        /// <summary>
+        /// Sincroniza dados biométricos de um jogador específico.
+        /// </summary>
+        [HttpPost("player/{id}")]
+        [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<ApiResponse<bool>>> SyncPlayer(int id)
+        {
+            return await ExecuteAsync(async () =>
+            {
+                Logger.LogInformation("Sincronizando jogador individual: {PlayerId}", id);
+                
+                var player = await _playerService.GetPlayerByIdAsync(id);
+                if (player == null)
+                {
+                    return NotFound<bool>($"Jogador {id} não encontrado.");
+                }
+
+                await _playerService.SyncPlayersAsync(player.FullName);
+                await _playerStatsSyncService.SyncPlayerRecentGamesAsync(id, 20);
+                
+                return Ok(true, $"Sincronização do jogador {player.FullName} (dados e stats) concluída.");
             });
         }
     }

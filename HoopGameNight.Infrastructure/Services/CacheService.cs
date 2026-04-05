@@ -233,14 +233,17 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
+                // CRÍTICO: Limpar a memória local ANTES de tentar limpar a nuvem/Redis.
+                // Isso evita que um timeout no cache distribuído faça a aplicação continuar 
+                // devolvendo lixo (Stale Data) armazenado em RAM.
+                _memoryCache.Remove(key);
+                _logger.LogDebug("MEMORY REMOVE: {Key}", key);
+
                 if (_distributedCache != null)
                 {
                     await _distributedCache.RemoveAsync(key);
                     _logger.LogDebug("REDIS REMOVE: {Key}", key);
                 }
-
-                _memoryCache.Remove(key);
-                _logger.LogDebug("MEMORY REMOVE: {Key}", key);
             }
             catch (Exception ex)
             {
@@ -250,7 +253,6 @@ namespace HoopGameNight.Infrastructure.Services
 
         /// <summary>
         /// Remove múltiplas entradas de cache baseadas em um padrão (ex: "games:*").
-        /// NOTA: Esta operação tem suporte limitado através da interface IDistributedCache padrão.
         /// </summary>
         public async Task RemoveByPatternAsync(string pattern)
         {
@@ -264,22 +266,31 @@ namespace HoopGameNight.Infrastructure.Services
                 if (_connectionMultiplexer != null)
                 {
                     var endpoints = _connectionMultiplexer.GetEndPoints();
-                    var deleteTasks = new List<Task>();
+                    var db = _connectionMultiplexer.GetDatabase();
 
                     foreach (var endpoint in endpoints)
                     {
                         var server = _connectionMultiplexer.GetServer(endpoint);
-                        foreach (var key in server.Keys(pattern: pattern))
+                        
+                        // Envolver a localização em Task.Run para liberar a thread principal caso o Redis esteja pesado demais com a iteração do cursor SCAN.
+                        await Task.Run(() =>
                         {
-                            deleteTasks.Add(_distributedCache!.RemoveAsync(key!));
-                            _memoryCache.Remove(key!); 
-                        }
-                    }
+                            var keys = server.Keys(pattern: pattern, pageSize: 250).ToArray();
+                            
+                            if (keys.Any())
+                            {
+                                // Invalida no local cache imediatamente (o que é rápido)
+                                foreach (var key in keys)
+                                {
+                                    _memoryCache.Remove(key!);
+                                }
 
-                    if (deleteTasks.Any())
-                    {
-                        await Task.WhenAll(deleteTasks);
-                        _logger.LogDebug("Pattern '{Pattern}': {Count} keys removed from Redis", pattern, deleteTasks.Count);
+                                // Invalida no redis no estilo FireAndForget usando KeyDeleteAsync (Suporta UNLINK)
+                                _ = db.KeyDeleteAsync(keys, CommandFlags.FireAndForget);
+                            }
+                            
+                            _logger.LogDebug("Pattern '{Pattern}': {Count} keys removed/invalidated", pattern, keys.Length);
+                        });
                     }
                 }
             }

@@ -167,7 +167,7 @@ namespace HoopGameNight.Core.DTOs.Response
         public int DefensiveRebounds { get; set; }
 
         // On/off impact
-        public int PlusMinus { get; set; }
+        public int? PlusMinus { get; set; }
 
         // ESPN / opponent metadata
         public string EventId { get; set; } = string.Empty;

@@ -156,6 +156,8 @@ export interface PlayerResponse {
   positionDisplay: string;
   height: string;
   weight: string;
+  birthDate?: string | null;
+  age?: number | null;
   team?: TeamSummaryResponse | null;
   displayName: string;
 }

@@ -318,7 +318,7 @@ namespace HoopGameNight.Api.Extensions
             {
                 client.BaseAddress = new Uri("https://site.api.espn.com/");
                 client.Timeout = TimeSpan.FromSeconds(30);
-                client.DefaultRequestHeaders.Add("User-Agent", "HoopGameNight/1.0");
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
                 client.DefaultRequestHeaders.Add("Accept", "application/json");
             })
             .AddPolicyHandler(GetRetryPolicy())
@@ -397,9 +397,14 @@ namespace HoopGameNight.Api.Extensions
             var redisSettings = configuration.GetSection("Redis").Get<Core.Configuration.RedisSettings>();
             if (redisSettings?.Enabled == true)
             {
+                var redisConfig = StackExchange.Redis.ConfigurationOptions.Parse(redisSettings.ConnectionString);
+                redisConfig.AbortOnConnectFail = false;
+                redisConfig.SyncTimeout = 2000;
+                redisConfig.AsyncTimeout = 2000;
+
                 services.AddStackExchangeRedisCache(options =>
                 {
-                    options.Configuration = redisSettings.ConnectionString;
+                    options.ConfigurationOptions = redisConfig;
                     options.InstanceName = redisSettings.InstanceName;
                 });
 
@@ -408,7 +413,7 @@ namespace HoopGameNight.Api.Extensions
                     configuration.GetSection("Redis"));
 
                 // RedLock - Bloqueio distribuído
-                var multiplexer = ConnectionMultiplexer.Connect(redisSettings.ConnectionString);
+                var multiplexer = ConnectionMultiplexer.Connect(redisConfig);
                 services.AddSingleton<IConnectionMultiplexer>(multiplexer);
                 services.AddSingleton<IDistributedLockFactory>(RedLockFactory.Create(new List<RedLockMultiplexer>
                 {
@@ -643,7 +648,7 @@ namespace HoopGameNight.Api.Extensions
                         return $"{name}Of{argNames}";
                     }
 
-                    return type.Name;
+                    return type.FullName?.Replace("HoopGameNight.Api.Controllers.", "").Replace(".", "") ?? type.Name;
                 });
 
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";

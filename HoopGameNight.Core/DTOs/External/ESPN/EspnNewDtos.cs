@@ -206,7 +206,7 @@ namespace HoopGameNight.Core.DTOs.External.ESPN
     {
         public string? Name { get; set; }
         public string? DisplayValue { get; set; }
-        public string? Value { get; set; }
+        public JsonElement? Value { get; set; }
     }
 
     public class EspnInjuriesDto

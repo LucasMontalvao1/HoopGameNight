@@ -1,4 +1,4 @@
-﻿INSERT INTO player_game_stats (
+INSERT INTO player_game_stats (
     player_id, game_id, team_id, did_not_play, is_starter,
     minutes_played, seconds_played, points,
     field_goals_made, field_goals_attempted,
@@ -17,6 +17,7 @@
     @Assists, @Steals, @Blocks, @Turnovers, @PersonalFouls, @PlusMinus,
     NOW(), NOW()
 ) ON DUPLICATE KEY UPDATE
+    team_id = VALUES(team_id),
     did_not_play = VALUES(did_not_play),
     is_starter = VALUES(is_starter),
     minutes_played = VALUES(minutes_played),

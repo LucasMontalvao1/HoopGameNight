@@ -79,9 +79,8 @@ namespace HoopGameNight.Core.Services
             try
             {
                 _logger.LogInformation("POST-GAME SYNC: Processando jogo {GameId}", gameId);
-                var games = await _gameRepository.GetGamesByDateAsync(DateTime.Today.AddDays(-1));
-                var game = games.FirstOrDefault(g => g.ExternalId == gameId) 
-                           ?? (await _gameRepository.GetGamesByDateAsync(DateTime.Today)).FirstOrDefault(g => g.ExternalId == gameId);
+                // Busca diretamente pelo ExternalId, sem depender da data do jogo
+                var game = await _gameRepository.GetByExternalIdAsync(gameId);
 
                 if (game == null)
                 {
@@ -103,6 +102,9 @@ namespace HoopGameNight.Core.Services
                     }
                     _logger.LogInformation("POST-GAME SYNC: Caches de stats individuais invalidados para {Count} jogadores do jogo {GameId}", playersInGame.Count(), gameId);
                 }
+
+                await _cacheService.RemoveAsync(CacheKeys.ALL_TEAMS);
+                _logger.LogInformation("POST-GAME SYNC: Cache de Times/Standings invalidado");
 
                 _logger.LogInformation("POST-GAME SYNC: Concluído com sucesso para o jogo {GameId}", gameId);
             }
