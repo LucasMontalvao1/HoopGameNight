@@ -1,0 +1,30 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/TestResults
+**/logs
+**/.env
+**/.env.*
+**/docker-compose.*
+
+# Ignorar o Universo Javascript / Frontend na build do .NET 
+HoopGameNight-front/node_modules/
+HoopGameNight-front/.angular/
+HoopGameNight-front/dist/
+HoopGameNight-front/out/
+
+# Ignorar lixos soltos 
+*.log
+*.txt
+*.json
+*.md
+
+# Exceções (Não ignorar esses jsons essenciais para a subida/testes locais)
+!appsettings.json
+!appsettings.*.json
+!angular.json
+!package.json
+!package-lock.json
+!tsconfig.json
