@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -73,6 +73,22 @@ namespace HoopGameNight.Infrastructure.Data
             {
                 using var connection = new MySqlConnector.MySqlConnection(builder.ConnectionString);
                 await connection.OpenAsync();
+
+                try 
+                {
+                    // [TiDB COMPATIBILITY FIX]
+                    // O Hangfire exige READ-UNCOMMITTED nos seus locks, o TiDB Serverless não suporta 
+                    // diretamente mas permite ignorar o erro se ligarmos essa flag globalmente.
+                    using var setGlobalCmd = connection.CreateCommand();
+                    setGlobalCmd.CommandText = "SET GLOBAL tidb_skip_isolation_level_check=1;";
+                    await setGlobalCmd.ExecuteNonQueryAsync();
+                    _logger.LogInformation("Flag de compatibilidade do TiDB (skip_isolation_level) ativada com sucesso.");
+                }
+                catch(Exception ex)
+                {
+                    // Engolir erro caso não seja TiDB ou caso não tenha privilégio Global
+                    _logger.LogWarning("Não foi possível setar a flag de compatibilidade do TiDB: {Message}", ex.Message);
+                }
 
                 using var checkCommand = connection.CreateCommand();
                 checkCommand.CommandText = @"
