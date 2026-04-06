@@ -28,6 +28,18 @@ namespace HoopGameNight.Api.Middleware
             var path = context.Request.Path;
             var queryString = context.Request.QueryString.ToString();
 
+            if (path.StartsWithSegments("/health") || path.StartsWithSegments("/api/status"))
+            {
+                await _next(context);
+                return;
+            }
+
+            if (path.StartsWithSegments("/health") || path.StartsWithSegments("/api/status"))
+            {
+                await _next(context);
+                return;
+            }
+
             try
             {
                 _logger.LogInformation(

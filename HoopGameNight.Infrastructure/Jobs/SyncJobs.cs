@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using HoopGameNight.Core.Enums;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using RedLockNet;
 using Hangfire;
 using HoopGameNight.Core.Constants;
+using HoopGameNight.Core.DTOs.Response;
 
 namespace HoopGameNight.Infrastructure.Jobs
 {
@@ -200,7 +202,7 @@ namespace HoopGameNight.Infrastructure.Jobs
             var todayGames = await _gameService.GetTodayGamesAsync();
             
             var affectedTeamIds = yesterdayGames.Concat(todayGames)
-                .SelectMany(g => new[] { g.HomeTeamId, g.VisitorTeamId })
+                .SelectMany(g => new[] { g.HomeTeam.Id, g.VisitorTeam.Id })
                 .Distinct()
                 .ToList();
                 

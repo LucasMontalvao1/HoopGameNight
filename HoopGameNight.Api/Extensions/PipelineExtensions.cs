@@ -505,11 +505,11 @@ namespace HoopGameNight.Api.Extensions
                         new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
                     );
 
-                    // Job ultra-rápido para jogos ao vivo (A cada 1 minuto)
+                    // Job para jogos ao vivo (A cada 15 minutos)
                     recurringJobManager.AddOrUpdate<SyncJobs>(
                         "sync-live-games",
                         job => job.SyncLiveGamesAsync(),
-                        "* * * * *",
+                        "*/15 * * * *",
                         new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
                     );
 
