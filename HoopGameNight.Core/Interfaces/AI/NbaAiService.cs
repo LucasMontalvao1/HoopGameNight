@@ -71,7 +71,10 @@ namespace HoopGameNight.Core.Services.AI
         {
             try
             {
+                // Prioridade 1: Diretório da aplicação (ideal para Docker/Produção)
                 var filePath = Path.Combine(AppContext.BaseDirectory, "Resources", "teams_keywords.json");
+                
+                // Prioridade 2: Subdiretório do projeto (útil para desenvolvimento local)
                 if (!File.Exists(filePath))
                 {
                     filePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "HoopGameNight.Core", "Resources", "teams_keywords.json");
@@ -91,12 +94,13 @@ namespace HoopGameNight.Core.Services.AI
                 }
                 else
                 {
-                    _logger.LogWarning("Arquivo de keywords não encontrado em: {Path}", filePath);
+                    _logger.LogWarning("Arquivo de keywords de times não encontrado. Caminhos tentados: BaseDir={BaseDir}, CurrentDir={CurrDir}", 
+                        AppContext.BaseDirectory, Directory.GetCurrentDirectory());
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao carregar keywords do JSON");
+                _logger.LogError(ex, "Erro ao carregar keywords de times do JSON");
             }
         }
 
@@ -104,7 +108,10 @@ namespace HoopGameNight.Core.Services.AI
         {
             try
             {
+                // Prioridade 1: Diretório da aplicação
                 var filePath = Path.Combine(AppContext.BaseDirectory, "Resources", "players_keywords.json");
+
+                // Prioridade 2: Subdiretório do projeto
                 if (!File.Exists(filePath))
                 {
                     filePath = Path.Combine(Directory.GetCurrentDirectory(), "..", "HoopGameNight.Core", "Resources", "players_keywords.json");
@@ -124,7 +131,7 @@ namespace HoopGameNight.Core.Services.AI
                 }
                 else
                 {
-                    _logger.LogWarning("Arquivo de keywords de jogadores não encontrado em: {Path}", filePath);
+                    _logger.LogWarning("Arquivo de keywords de jogadores não encontrado.");
                 }
             }
             catch (Exception ex)
