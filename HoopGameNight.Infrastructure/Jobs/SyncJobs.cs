@@ -191,8 +191,35 @@ namespace HoopGameNight.Infrastructure.Jobs
         public async Task SyncManualEssentialJobAsync()
         {
             _logger.LogInformation("MANUAL SYNC: Iniciando Sincronização Essencial (On-Demand)");
+            
+            // 1. Sincronizar Jogos (Ontem, Hoje, Futuro)
             await ExecuteGameSyncLogic(bypassCache: true);
-            _logger.LogInformation("MANUAL SYNC: Sincronização Essencial concluída");
+            
+            // 2. Sincronizar Jogadores dos times que jogam hoje/ontem
+            var yesterdayGames = await _gameService.GetGamesByDateAsync(DateTime.Today.AddDays(-1));
+            var todayGames = await _gameService.GetTodayGamesAsync();
+            
+            var affectedTeamIds = yesterdayGames.Concat(todayGames)
+                .SelectMany(g => new[] { g.HomeTeamId, g.VisitorTeamId })
+                .Distinct()
+                .ToList();
+                
+            _logger.LogInformation("MANUAL SYNC: Sincronizando elencos para {Count} times detectados entre ontem e hoje", affectedTeamIds.Count);
+            
+            foreach (var teamId in affectedTeamIds)
+            {
+                try 
+                {
+                    await _playerService.SyncPlayersAsync(teamId.ToString());
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Falha ao sincronizar elenco do time {TeamId}: {Error}", teamId, ex.Message);
+                }
+            }
+
+            _cacheService.Clear();
+            _logger.LogInformation("MANUAL SYNC: Sincronização Essencial concluída com sucesso (Jogos + {Count} Times)", affectedTeamIds.Count);
         }
 
         [AutomaticRetry(Attempts = 0)]
