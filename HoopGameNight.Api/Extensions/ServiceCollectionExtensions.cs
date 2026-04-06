@@ -449,8 +449,11 @@ namespace HoopGameNight.Api.Extensions
                     }
                     else
                     {
-                        policy.WithOrigins(corsConfig.AllowedOrigins ??
-                            new[] { "http://localhost:4200", "http://localhost:3000" });
+                        var origins = corsConfig.AllowedOrigins?.Length > 0 
+                            ? corsConfig.AllowedOrigins 
+                            : new[] { "https://hoop-game-night.vercel.app", "http://localhost:4200" };
+                            
+                        policy.WithOrigins(origins);
                     }
 
                     policy.WithMethods(corsConfig.AllowedMethods ??

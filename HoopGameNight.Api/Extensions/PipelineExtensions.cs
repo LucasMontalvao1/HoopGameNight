@@ -65,6 +65,19 @@ namespace HoopGameNight.Api.Extensions
 
         private static void ConfigureMiddleware(this WebApplication app)
         {
+            // 0. CORS (Primeiro de tudo para lidar com OPTIONS requests)
+            var corsPolicy = app.Configuration["Cors:PolicyName"] ?? "HoopGameNightPolicy";
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseCors("DevelopmentPolicy");
+                Log.Information("CORS: Development Policy (Allow All)");
+            }
+            else
+            {
+                app.UseCors(corsPolicy);
+                Log.Information("CORS: Production Policy ({Policy})", corsPolicy);
+            }
+
             // 1. Exception Handler (ASP.NET Core 8+) 
             app.UseExceptionHandler();
 
@@ -104,19 +117,6 @@ namespace HoopGameNight.Api.Extensions
                 });
 
                 Log.Information("Swagger UI disponível em: /");
-            }
-
-            // 6. CORS
-            var corsPolicy = app.Configuration["Cors:PolicyName"] ?? "HoopGameNightPolicy";
-            if (app.Environment.IsDevelopment())
-            {
-                app.UseCors("DevelopmentPolicy");
-                Log.Information("CORS: Development Policy (Allow All)");
-            }
-            else
-            {
-                app.UseCors(corsPolicy);
-                Log.Information("CORS: Production Policy ({Policy})", corsPolicy);
             }
 
             // 7. Routing
