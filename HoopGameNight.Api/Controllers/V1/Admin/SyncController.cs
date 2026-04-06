@@ -65,6 +65,7 @@ namespace HoopGameNight.Api.Controllers.V1.Admin
         /// Sincroniza dados fundamentais para o funcionamento do sistema (Times e Jogos de hoje).
         /// </summary>
         [HttpPost("essential")]
+        [HttpGet("essential")]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status202Accepted)]
         public async Task<ActionResult<ApiResponse<object>>> SyncEssential()
         {

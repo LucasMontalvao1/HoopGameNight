@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using HoopGameNight.Api.Extensions;
 using HoopGameNight.Core.Enums;
 using HoopGameNight.Infrastructure.TypeHandlers;
@@ -55,7 +55,7 @@ try
     Log.Information("Aplicação construída com sucesso");
 
     // ===== CONFIGURAR PIPELINE =====
-    await app.ConfigureHoopGameNightPipeline();
+    app.ConfigureHoopGameNightPipeline();
 
     // ===== EXECUTAR =====
     var serverUrls = string.Join(", ", app.Urls);

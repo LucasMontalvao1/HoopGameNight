@@ -29,11 +29,21 @@ namespace HoopGameNight.Api.Extensions
         /// <summary>
         /// Configura o pipeline completo da aplicação Hoop Game Night
         /// </summary>
-        public static async Task<WebApplication> ConfigureHoopGameNightPipeline(
+        public static WebApplication ConfigureHoopGameNightPipeline(
             this WebApplication app)
         {
-            // 1. Initialize Database
-            await app.InitializeDatabaseAsync();
+            // 1. Initialize Database (Em segundo plano para não travar o Startup no Render)
+            _ = Task.Run(async () => 
+            {
+                try 
+                {
+                    await app.InitializeDatabaseAsync();
+                }
+                catch (Exception ex)
+                {
+                    Log.Fatal(ex, "Falha crítica na inicialização do banco de dados em segundo plano");
+                }
+            });
 
             // 2. Configure Middleware Pipeline
             app.ConfigureMiddleware();
