@@ -38,7 +38,7 @@ try
     Log.Information("DB Config - Server: {Server}, Port: {Port}, Database: {Database}, User: {User}, HasPassword: {HasPassword}",
         dbServer ?? "NULL", dbPort ?? "NULL", dbName ?? "NULL", dbUser ?? "NULL", !string.IsNullOrEmpty(dbPassword));
 
-    var connectionString = $"Server={dbServer};Port={dbPort};Database={dbName};Uid={dbUser};Pwd={dbPassword};CharSet=utf8mb4;AllowUserVariables=true;Enlist=false;IgnorePrepare=true;";
+    var connectionString = $"Server={dbServer};Port={dbPort};Database={dbName};Uid={dbUser};Pwd={dbPassword};CharSet=utf8mb4;AllowUserVariables=true;AutoEnlist=false;";
     builder.Configuration.GetSection("ConnectionStrings")["MySqlConnection"] = connectionString;
 
     // Configurar Serilog do appsettings.json
