@@ -188,25 +188,37 @@ namespace HoopGameNight.Core.Services
         {
             if (string.IsNullOrEmpty(espnTeamId) && string.IsNullOrEmpty(espnAbbreviation))
             {
-                _logger.LogWarning("ESPN Team ID and Abbreviation are both null/empty.");
+                _logger.LogWarning("Scoreboard ESPN: Team ID e Abreviação estão nulos/vazios.");
                 return 0;
             }
 
+            // 1. Tentar por ExternalId (mais confiável)
             if (int.TryParse(espnTeamId, out var extId))
             {
                 var teamById = await _teamRepository.GetByExternalIdAsync(extId);
                 if (teamById != null) return teamById.Id;
             }
 
+            // 2. Tentar por Abreviação (normalizada)
             if (!string.IsNullOrEmpty(espnAbbreviation))
             {
-                var teamByAbbr = await _teamRepository.GetByAbbreviationAsync(espnAbbreviation);
+                var normAbbr = espnAbbreviation.Trim().ToUpperInvariant();
+                var teamByAbbr = await _teamRepository.GetByAbbreviationAsync(normAbbr);
                 if (teamByAbbr != null) return teamByAbbr.Id;
+
+                // Fallback: Tentativa de mapeamento manual para casos conhecidos (ex: SLC -> UTA)
+                var mappedAbbr = MapAbbreviationAlias(normAbbr);
+                if (mappedAbbr != normAbbr)
+                {
+                    var teamByAlias = await _teamRepository.GetByAbbreviationAsync(mappedAbbr);
+                    if (teamByAlias != null) return teamByAlias.Id;
+                }
             }
 
-            _logger.LogInformation("Time {EspnId} ({Abbr}) não encontrado. Sincronizando times...", espnTeamId, espnAbbreviation);
+            _logger.LogInformation("Time {EspnId} ({Abbr}) não encontrado localmente. Forçando sincronização global de times...", espnTeamId, espnAbbreviation);
             await SyncAllTeamsAsync();
 
+            // Re-tentar após sync
             if (int.TryParse(espnTeamId, out var extIdRetry))
             {
                 var teamById = await _teamRepository.GetByExternalIdAsync(extIdRetry);
@@ -215,14 +227,27 @@ namespace HoopGameNight.Core.Services
 
             if (!string.IsNullOrEmpty(espnAbbreviation))
             {
-                var teamByAbbr = await _teamRepository.GetByAbbreviationAsync(espnAbbreviation);
+                var normAbbr = espnAbbreviation.Trim().ToUpperInvariant();
+                var teamByAbbr = await _teamRepository.GetByAbbreviationAsync(normAbbr);
                 if (teamByAbbr != null) return teamByAbbr.Id;
             }
 
-            _logger.LogWarning(
-                "Team not found in database even after sync | ESPN Abbr: {Abbr}, ESPN ID: {EspnId}",
-                espnAbbreviation, espnTeamId);
+            _logger.LogWarning("FALHA CRÍTICA: Time não localizado após sync | Favor verificar se o time '{Abbr}' (ID: {EspnId}) está na base de dados.", espnAbbreviation, espnTeamId);
             return 0;
+        }
+
+        private string MapAbbreviationAlias(string abbr)
+        {
+            return abbr switch
+            {
+                "SLC" or "UTAH" => "UTA",
+                "WIZ" or "WAS" => "WSH",
+                "PHX" => "PHO", // Alguns parsers usam PHO em vez de PHX
+                "BKN" => "BRK", // Referência cruzada comum
+                "CHA" => "CHO",
+                "NOP" => "NOH",
+                _ => abbr
+            };
         }
 
         private Models.Entities.Team MapEspnTeamToEntity(DTOs.External.ESPN.EspnTeamDto espnTeam)

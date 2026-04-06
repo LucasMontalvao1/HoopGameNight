@@ -1,0 +1,18 @@
+<nav class="bottom-nav">
+  <div class="nav-container">
+    <a *ngFor="let item of navItems" 
+       [routerLink]="item.route" 
+       routerLinkActive="active" 
+       [routerLinkActiveOptions]="{exact: true}"
+       class="nav-item"
+       [class.highlight]="item.highlight">
+      
+      <div class="icon-wrapper">
+        <span class="material-icons-round">{{ item.icon }}</span>
+      </div>
+      <span class="label">{{ item.label }}</span>
+      
+      <div class="active-indicator"></div>
+    </a>
+  </div>
+</nav>

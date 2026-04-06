@@ -177,7 +177,8 @@ namespace HoopGameNight.Core.Services.AI
             var gameLeaders = new Dictionary<int, GameLeadersResponse>();
             foreach (var g in gamesWithPerformance)
             {
-                var leaders = await CalculateLeadersFromBoxscoreAsync(g.Id);
+                // Busca líderes APENAS se já existirem no banco/cache. Não força sincronização síncrona.
+                var leaders = await _gameStatsService.GetGameLeadersAsync(g.Id);
                 
                 if (leaders != null)
                 {
@@ -189,11 +190,19 @@ namespace HoopGameNight.Core.Services.AI
             if (gamesWithPerformance.Count == 1)
             {
                 var focusedGame = gamesWithPerformance[0];
+                
+                // Busca estatísticas detalhadas APENAS se já existirem.
                 var boxscore = await _gameStatsService.GetGamePlayerStatsAsync(focusedGame.Id);
                 if (boxscore != null)
                 {
                     var boxscoreText = _promptBuilder.FormatFullBoxscore(boxscore);
                     statsText += $"\n--- Boxscore Detalhado ({focusedGame.GameTitle}) ---\n{boxscoreText}";
+                }
+                else
+                {
+                    // Se não houver boxscore, enfileira a sincronização em background para a próxima pergunta
+                    _logger.LogInformation("Boxscore ausente para jogo {GameId}. Resposta AI será baseada em dados parciais.", focusedGame.Id);
+                    _ = Task.Run(() => _gameStatsService.SyncGameStatsAsync(focusedGame.Id));
                 }
             }
 

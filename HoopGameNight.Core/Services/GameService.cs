@@ -77,7 +77,7 @@ namespace HoopGameNight.Core.Services
                 var response = _mapper.Map<List<GameResponse>>(games);
 
                 var hasLiveGames = response.Any(g => g.IsLive);
-                var cacheDuration = hasLiveGames ? TimeSpan.FromSeconds(30) : CacheDurations.TodayGames;
+                var cacheDuration = hasLiveGames ? TimeSpan.FromSeconds(15) : TimeSpan.FromSeconds(30);
 
                 await _cacheService.SetAsync(cacheKey, response, cacheDuration);
                 _logger.LogInformation("Recuperados {Count} jogos de hoje do BANCO DE DADOS (TTL: {TTL}s)", response.Count, cacheDuration.TotalSeconds);

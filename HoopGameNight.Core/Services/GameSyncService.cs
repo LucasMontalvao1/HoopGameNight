@@ -97,7 +97,12 @@ namespace HoopGameNight.Core.Services
                         var homeTeamId = await _teamService.MapEspnTeamToSystemIdAsync(espnGame.HomeTeamId, espnGame.HomeTeamAbbreviation);
                         var visitorTeamId = await _teamService.MapEspnTeamToSystemIdAsync(espnGame.AwayTeamId, espnGame.AwayTeamAbbreviation);
 
-                        if (homeTeamId == 0 || visitorTeamId == 0) continue;
+                        if (homeTeamId == 0 || visitorTeamId == 0)
+                        {
+                            _logger.LogWarning("Jogo pulado: Time não mapeado. Home: {HomeAbbr} (ID: {HomeId}), Away: {AwayAbbr} (ID: {AwayId})", 
+                                espnGame.HomeTeamAbbreviation, espnGame.HomeTeamId, espnGame.AwayTeamAbbreviation, espnGame.AwayTeamId);
+                            continue;
+                        }
 
                         var gameDate = espnGame.Date.Date;
                         var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate);
@@ -449,9 +454,10 @@ namespace HoopGameNight.Core.Services
 
         private async Task InvalidateCacheForDate(DateTime date, IEnumerable<int>? teamIds = null)
         {
-            // Operações atômicas/diretas (IDs fixos)
+            // Primeiro, garantir que o cache fixo de 'Hoje' e a data específica sejam limpos IMEDIATAMENTE
             await _cacheService.RemoveAsync(CacheKeys.TodayGames());
             await _cacheService.RemoveAsync(CacheKeys.GamesByDate(date));
+            _logger.LogInformation("Cache de jogos invalidado para {Date}", date);
             
             // Operações por padrão (SCAN no Redis) - Executar em background
             _ = Task.Run(async () =>

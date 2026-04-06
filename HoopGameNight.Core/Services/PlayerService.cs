@@ -70,8 +70,8 @@ namespace HoopGameNight.Core.Services
                 // 3. If not found and searching by name, sync from ESPN
                 if (!players.Any() && !string.IsNullOrWhiteSpace(request.Search))
                 {
-                    _logger.LogInformation("BANCO vazio para busca '{Search}', sincronizando da ESPN...", request.Search);
-                    await SyncAllTeamRostersAsync();
+                    _logger.LogInformation("BANCO vazio para busca '{Search}', enfileirando sync em background...", request.Search);
+                    _ = Task.Run(() => SyncAllTeamRostersAsync());
 
                     // Tentar novamente após sync
                     (players, totalCount) = await _playerRepository.SearchPlayersAsync(request);
@@ -198,8 +198,8 @@ namespace HoopGameNight.Core.Services
                 // 3. If none found, sync all rosters from ESPN
                 if (!players.Any())
                 {
-                    _logger.LogInformation("BANCO vazio, sincronizando todos os rosters da ESPN...");
-                    await SyncAllTeamRostersAsync();
+                    _logger.LogInformation("BANCO vazio, enfileirando sync total em background...");
+                    _ = Task.Run(() => SyncAllTeamRostersAsync());
 
                     // Tentar novamente após sync
                     (players, totalCount) = await _playerRepository.GetAllPlayersAsync(page, pageSize);
