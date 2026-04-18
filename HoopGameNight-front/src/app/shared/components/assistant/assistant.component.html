@@ -10,8 +10,8 @@
   <div class="assistant-chat" #chatContainer>
     @for (msg of assistantService.messages(); track msg.timestamp) {
     <div class="chat-msg" [class]="'chat-msg--' + msg.role">
-      <div class="chat-msg__bubble">
-        {{ msg.content }}
+      <div class="chat-msg__bubble markdown-body" 
+           [innerHTML]="msg.parsedContent || msg.content">
       </div>
     </div>
     } @empty {
@@ -38,10 +38,13 @@
   </div>
 
   <div class="assistant-input-area">
-    <input type="text" #questionInput placeholder="Diga algo..." [disabled]="assistantService.isTyping()"
-      (keyup.enter)="askAssistant(questionInput.value)">
-    <button class="assistant-send-btn" [disabled]="assistantService.isTyping() || !questionInput.value"
-      (click)="askAssistant(questionInput.value)">
+    <input type="text" placeholder="Diga algo..." 
+      [disabled]="assistantService.isTyping()"
+      [(ngModel)]="questionText"
+      (keyup.enter)="askAssistant()">
+    <button class="assistant-send-btn" 
+      [disabled]="assistantService.isTyping() || !questionText?.trim()"
+      (click)="askAssistant()">
       <span class="material-icons">send</span>
     </button>
   </div>

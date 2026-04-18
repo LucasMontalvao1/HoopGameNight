@@ -78,7 +78,7 @@
   align-items: start;
 
   @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -690,11 +690,11 @@
   }
 
   .games-grid-premium {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .secondary-content-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .assistant-pane {

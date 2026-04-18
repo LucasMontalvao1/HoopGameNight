@@ -16,12 +16,14 @@ export class AssistantComponent implements AfterViewChecked {
   @ViewChild('chatContainer') private chatContainer!: ElementRef;
   @ViewChild('questionInput') private questionInput!: ElementRef;
 
-  async askAssistant(question: string) {
-    if (!question.trim() || this.assistantService.isTyping()) return;
-    await this.assistantService.sendMessage(question);
-    if (this.questionInput) {
-      this.questionInput.nativeElement.value = '';
-    }
+  questionText = '';
+
+  async askAssistant() {
+    const q = this.questionText;
+    if (!q || !q.trim() || this.assistantService.isTyping()) return;
+    
+    this.questionText = '';
+    await this.assistantService.sendMessage(q);
   }
 
   ngAfterViewChecked() {

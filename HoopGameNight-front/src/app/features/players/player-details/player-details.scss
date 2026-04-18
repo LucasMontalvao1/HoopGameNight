@@ -291,7 +291,7 @@
   gap: var(--spacing-xl);
 
   @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -413,7 +413,6 @@
   }
 }
 
-// TABS
 .player-tabs {
   @extend .glass-panel;
   padding: 6px;
@@ -421,6 +420,14 @@
   gap: 4px;
   margin-bottom: var(--spacing-lg);
   border-radius: 100px;
+  overflow-x: auto;
+  white-space: nowrap;
+  
+  // Hide scrollbar within tabs
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   button {
     flex: 1;

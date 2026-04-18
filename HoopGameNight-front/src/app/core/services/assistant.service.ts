@@ -5,6 +5,7 @@ import { AskResponse } from '../interfaces/api.interface';
 export interface ChatMessage {
     role: 'user' | 'assistant';
     content: string;
+    parsedContent?: string;
     timestamp: Date;
     gamesAnalyzed?: number;
 }
@@ -37,10 +38,14 @@ export class AssistantService {
 
         try {
             const response = await this.apiService.ask(content);
+            const { marked } = await import('marked');
+
+            const parsed = await marked.parse(response.answer);
 
             const assistantMsg: ChatMessage = {
                 role: 'assistant',
                 content: response.answer,
+                parsedContent: parsed as string,
                 timestamp: new Date(),
                 gamesAnalyzed: response.gamesAnalyzed
             };
