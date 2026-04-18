@@ -331,7 +331,7 @@ namespace HoopGameNight.Api.Extensions
         {
             return HttpPolicyExtensions
                 .HandleTransientHttpError()
-                .OrResult(msg => !msg.IsSuccessStatusCode)
+                .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 .Or<TaskCanceledException>() 
                 .WaitAndRetryAsync(
                     2,
@@ -348,7 +348,7 @@ namespace HoopGameNight.Api.Extensions
                 .HandleTransientHttpError()
                 .Or<TaskCanceledException>()
                 .CircuitBreakerAsync(
-                    handledEventsAllowedBeforeBreaking: 5,
+                    handledEventsAllowedBeforeBreaking: 15,
                     durationOfBreak: TimeSpan.FromSeconds(30));
         }
 
