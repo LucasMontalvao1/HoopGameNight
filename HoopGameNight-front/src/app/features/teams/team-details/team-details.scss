@@ -1,7 +1,7 @@
 @use '../../../../styles/design-system' as *;
 
 .team-details-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--background-primary);
   color: var(--text-primary);
   transition: background-color var(--transition-normal), color var(--transition-normal);

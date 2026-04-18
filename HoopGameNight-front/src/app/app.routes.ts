@@ -47,6 +47,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/players/player-details/player-details').then(m => m.PlayerDetailsComponent),
     title: 'Player Details - HoopGameNight'
   },
+  {
+    path: 'ask',
+    loadComponent: () => import('./features/ask/ask.component').then(m => m.AskComponent),
+    title: 'Coach Assistant - HoopGameNight'
+  },
   // {
   //   path: 'settings',
   //   loadComponent: () => import('./features/settings/settings').then(m => m.Settings),

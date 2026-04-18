@@ -15,11 +15,12 @@ import { AssistantService } from '../../core/services/assistant.service';
 import { StatusIndicator } from '../../shared/components/status-indicator/status-indicator';
 import { ApiStatus, PlayerResponse } from '../../core/interfaces/api.interface';
 import { LeagueLeadersComponent } from '../players/league-leaders/league-leaders.component';
+import { AssistantComponent } from '../../shared/components/assistant/assistant.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule, LeagueLeadersComponent],
+  imports: [CommonModule, RouterModule, StatusIndicator, FormsModule, LeagueLeadersComponent, AssistantComponent],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -69,10 +70,6 @@ export class Dashboard implements OnInit {
     });
   }
 
-  async askAssistant(question: string) {
-    if (!question.trim() || this.assistantService.isTyping()) return;
-    await this.assistantService.sendMessage(question);
-  }
 
   async ngOnInit(): Promise<void> {
     this.seoService.updateTitle('NBA Dashboard | HoopGameNight');

@@ -12,11 +12,19 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+}
+
+html, body {
+  height: 100%;
+  height: -webkit-fill-available;
+  overflow-x: hidden;
+  overscroll-behavior-y: none; /* Prevents pull-to-refresh elastic scrolling for native feel */
 }
 
 body {
@@ -338,7 +346,7 @@ a {
 // ===== MOBILE REFINEMENTS =====
 @media (max-width: 768px) {
   .main-content {
-    padding-bottom: 90px !important; /* Spacing for BottomNav */
+    padding-bottom: calc(90px + env(safe-area-inset-bottom)) !important; /* Spacing for BottomNav + Safe Area */
   }
 
   .card {
@@ -355,7 +363,16 @@ a {
   }
   
   .container {
-    padding-left: 12px !important;
-    padding-right: 12px !important;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
+  /* Native App Feel: Hide scrollbars */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  * {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 }

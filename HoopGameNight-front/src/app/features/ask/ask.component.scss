@@ -1,0 +1,34 @@
+@use "../../../styles/design-system" as *;
+
+.ask-page {
+  height: calc(100dvh - var(--header-height, 0px) - var(--bottom-nav-height, 0px));
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  background: var(--background-primary);
+}
+
+.ask-container {
+  flex: 1;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 768px) {
+  .ask-page {
+    padding: 0;
+    height: calc(100dvh - 72px - env(safe-area-inset-bottom));
+  }
+
+  .ask-container {
+    border-radius: 0;
+  }
+
+  // To target the assistant component internal styles if needed
+  :host ::ng-child(app-assistant) .assistant-pane {
+    border-radius: 0;
+    border: none;
+  }
+}
