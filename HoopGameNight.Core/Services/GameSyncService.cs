@@ -171,6 +171,22 @@ namespace HoopGameNight.Core.Services
                     }
                 }
 
+                // Detect and mark cancelled games (Ghost Games)
+                var existingGamesInDb = await _gameRepository.GetGamesByDateAsync(date.Date);
+                var espnExternalIds = espnGames.Select(eg => eg.Id).ToHashSet();
+
+                foreach (var dbGame in existingGamesInDb)
+                {
+                    if (dbGame.Status != GameStatus.Final && dbGame.Status != GameStatus.Cancelled && !espnExternalIds.Contains(dbGame.ExternalId))
+                    {
+                        dbGame.Status = GameStatus.Cancelled;
+                        dbGame.UpdatedAt = DateTime.UtcNow;
+                        await _gameRepository.UpdateAsync(dbGame);
+                        _logger.LogInformation("Game {Id} ({ExternalId}) marked as Cancelled because it is missing from ESPN API for date {Date}",
+                            dbGame.Id, dbGame.ExternalId, date.ToShortDateString());
+                    }
+                }
+
                 // Update Team Records
                 await UpdateTeamRecordsAsync(espnGames);
 

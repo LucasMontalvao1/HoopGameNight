@@ -41,4 +41,5 @@ LEFT JOIN teams ht ON g.home_team_id = ht.id
 LEFT JOIN teams vt ON g.visitor_team_id = vt.id
 WHERE DATE(g.date) BETWEEN @StartDate AND @EndDate
   AND (g.home_team_id IN @TeamIds OR g.visitor_team_id IN @TeamIds)
+  AND g.status != 'Cancelled'
 ORDER BY g.date;

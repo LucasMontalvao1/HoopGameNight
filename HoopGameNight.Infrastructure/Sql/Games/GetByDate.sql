@@ -47,5 +47,5 @@ SELECT
 FROM games g
 LEFT JOIN teams ht ON g.home_team_id = ht.id
 LEFT JOIN teams vt ON g.visitor_team_id = vt.id
-WHERE DATE(g.date) = @Date
+WHERE DATE(g.date) = @Date AND g.status != 'Cancelled'
 ORDER BY g.date;

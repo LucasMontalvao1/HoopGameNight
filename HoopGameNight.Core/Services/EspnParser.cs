@@ -553,6 +553,16 @@ namespace HoopGameNight.Core.Services
                         };
                         game.GameLeadersJson = JsonSerializer.Serialize(leadersObj);
                     }
+
+                    // Extract Series Info
+                    if (competition.ValueKind != JsonValueKind.Undefined && competition.TryGetProperty("notes", out var notes))
+                    {
+                        var firstNote = notes.EnumerateArray().FirstOrDefault();
+                        if (firstNote.ValueKind != JsonValueKind.Undefined)
+                        {
+                            game.SeriesNote = GetPropertySafe(firstNote, "headline");
+                        }
+                    }
                 }
 
                 if (eventElement.TryGetProperty("season", out var seasonElement))

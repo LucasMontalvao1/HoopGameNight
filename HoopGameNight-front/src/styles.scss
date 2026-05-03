@@ -17,19 +17,22 @@
 
 html {
   font-size: 16px;
-  scroll-behavior: smooth;
+  /* scroll-behavior: smooth; // Removed as it can interfere with some desktop mouse drivers */
 }
 
 html, body {
-  min-height: 100%;
-  min-height: -webkit-fill-available;
-  overflow-x: hidden;
-  /* overscroll-behavior-y: none; // Moved to mobile-only media query to avoid desktop scroll lock */
+  min-height: 100vh;
+  /* Removed -webkit-fill-available as it can lock height on desktop */
 }
 
 app-root {
   display: block;
-  min-height: 100%;
+  min-height: 100vh;
+}
+
+body {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 body {
@@ -382,9 +385,13 @@ a {
       scrollbar-width: none; /* Firefox */
     }
   }
+}
 
-  /* Maintain native feel but only prevent pull-to-refresh on mobile */
+/* Final fix for desktop scroll issues */
+@media (pointer: fine) {
   html, body {
-    overscroll-behavior-y: none;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100% !important;
   }
 }

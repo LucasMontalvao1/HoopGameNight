@@ -1,4 +1,4 @@
-﻿SELECT 
+SELECT 
     g.id,
     g.external_id,
     g.date,
@@ -21,6 +21,7 @@ WHERE
     AND (@EndDate IS NULL OR g.date <= @EndDate)
     AND (@TeamId IS NULL OR g.home_team_id = @TeamId OR g.visitor_team_id = @TeamId)
     AND (@Status IS NULL OR @Status = '' OR g.status = @Status)
+    AND g.status != 'Cancelled'
     AND (@PostSeason IS NULL OR g.postseason = @PostSeason)
     AND (@Season IS NULL OR g.season = @Season)
 ORDER BY g.datetime DESC

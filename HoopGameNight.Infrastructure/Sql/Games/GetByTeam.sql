@@ -1,4 +1,4 @@
-﻿SELECT 
+SELECT 
     g.id,
     g.external_id,
     g.date,
@@ -40,6 +40,7 @@ FROM games g
 LEFT JOIN teams ht ON g.home_team_id = ht.id
 LEFT JOIN teams vt ON g.visitor_team_id = vt.id
 WHERE (g.home_team_id = @TeamId OR g.visitor_team_id = @TeamId)
+  AND g.status != 'Cancelled'
   AND (@StartDate IS NULL OR g.date >= @StartDate)
   AND (@EndDate IS NULL OR g.date <= @EndDate)
 ORDER BY g.date DESC

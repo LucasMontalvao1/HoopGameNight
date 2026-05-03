@@ -23,5 +23,6 @@ namespace HoopGameNight.Core.DTOs.External
         public string? GameLeadersJson { get; set; }
         public string? HomeTeamRecord { get; set; }
         public string? AwayTeamRecord { get; set; }
+        public string? SeriesNote { get; set; }
     }
 }
