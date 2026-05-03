@@ -24,7 +24,12 @@ html, body {
   min-height: 100%;
   min-height: -webkit-fill-available;
   overflow-x: hidden;
-  overscroll-behavior-y: none; /* Prevents pull-to-refresh elastic scrolling for native feel */
+  /* overscroll-behavior-y: none; // Moved to mobile-only media query to avoid desktop scroll lock */
+}
+
+app-root {
+  display: block;
+  min-height: 100%;
 }
 
 body {
@@ -366,13 +371,20 @@ a {
     padding-left: max(12px, env(safe-area-inset-left)) !important;
     padding-right: max(12px, env(safe-area-inset-right)) !important;
   }
-  /* Native App Feel: Hide scrollbars */
-  ::-webkit-scrollbar {
-    display: none;
+  /* Native App Feel: Hide scrollbars on mobile touch devices */
+  @media (pointer: coarse) {
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    
+    * {
+      -ms-overflow-style: none; /* IE and Edge */
+      scrollbar-width: none; /* Firefox */
+    }
   }
-  
-  * {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+
+  /* Maintain native feel but only prevent pull-to-refresh on mobile */
+  html, body {
+    overscroll-behavior-y: none;
   }
 }
