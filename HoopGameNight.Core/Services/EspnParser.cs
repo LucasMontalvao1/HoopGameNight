@@ -444,7 +444,9 @@ namespace HoopGameNight.Core.Services
                     if (dateElement.ValueKind == JsonValueKind.String)
                     {
                         var dateString = dateElement.GetString() ?? "";
-                        game.Date = DateTime.TryParse(dateString, out var d) ? d : DateTime.Now;
+                        game.Date = DateTime.TryParse(dateString, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var d) 
+                            ? d 
+                            : DateTime.UtcNow;
                     }
                 }
 

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS games (
     -- Lideres do jogo
     line_score_json JSON DEFAULT NULL COMMENT 'Parciais por período',
     game_leaders_json JSON DEFAULT NULL COMMENT 'Líderes de estatísticas do jogo',
+    series_note VARCHAR(255) DEFAULT NULL COMMENT 'Nota da série (ex: Game 7 If Necessary)',
 
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

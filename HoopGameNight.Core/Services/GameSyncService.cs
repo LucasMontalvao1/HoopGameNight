@@ -150,7 +150,6 @@ namespace HoopGameNight.Core.Services
                             var hasChanges = ApplyGameUpdates(existingGame, espnGame);
                             if (hasChanges)
                             {
-                                existingGame.DateTime = espnGame.Date;
                                 existingGame.UpdatedAt = DateTime.UtcNow;
                                 await _gameRepository.UpdateAsync(existingGame);
                                 updateCount++;
@@ -433,6 +432,14 @@ namespace HoopGameNight.Core.Services
 
             if (existingGame.LineScoreJson != espnGame.LineScoreJson) { existingGame.LineScoreJson = espnGame.LineScoreJson; hasChanges = true; }
             if (existingGame.GameLeadersJson != espnGame.GameLeadersJson) { existingGame.GameLeadersJson = espnGame.GameLeadersJson; hasChanges = true; }
+            if (existingGame.SeriesNote != espnGame.SeriesNote) { existingGame.SeriesNote = espnGame.SeriesNote; hasChanges = true; }
+
+            // Check for DateTime changes (avoiding small drifts)
+            if (Math.Abs((existingGame.DateTime - espnGame.Date).TotalMinutes) > 1)
+            {
+                existingGame.DateTime = espnGame.Date;
+                hasChanges = true;
+            }
 
             return hasChanges;
         }

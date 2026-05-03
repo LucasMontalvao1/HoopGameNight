@@ -21,6 +21,7 @@ namespace HoopGameNight.Core.Models.Entities
         public string? AiHighlights { get; set; }
         public string? LineScoreJson { get; set; }
         public string? GameLeadersJson { get; set; }
+        public string? SeriesNote { get; set; }
 
         public Team? HomeTeam { get; set; }
         public Team? VisitorTeam { get; set; }

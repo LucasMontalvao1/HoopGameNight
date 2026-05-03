@@ -5,7 +5,7 @@ INSERT INTO games (
     status, period, time_remaining,
     postseason, season,
     ai_summary, ai_highlights,
-    line_score_json, game_leaders_json,
+    line_score_json, game_leaders_json, series_note,
     created_at, updated_at
 ) VALUES (
     @ExternalId, @Date, @DateTime,
@@ -14,7 +14,7 @@ INSERT INTO games (
     @Status, @Period, @TimeRemaining,
     @PostSeason, @Season,
     @AiSummary, @AiHighlights,
-    @LineScoreJson, @GameLeadersJson,
+    @LineScoreJson, @GameLeadersJson, @SeriesNote,
     NOW(), NOW()
 )
 ON DUPLICATE KEY UPDATE
@@ -25,6 +25,7 @@ ON DUPLICATE KEY UPDATE
     time_remaining = VALUES(time_remaining),
     line_score_json = VALUES(line_score_json),
     game_leaders_json = VALUES(game_leaders_json),
+    series_note = VALUES(series_note),
     updated_at = NOW();
 
 SELECT LAST_INSERT_ID();
