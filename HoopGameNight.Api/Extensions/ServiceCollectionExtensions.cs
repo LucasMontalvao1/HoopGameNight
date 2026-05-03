@@ -41,7 +41,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Hangfire;
-using Hangfire.MySql;
+using Hangfire.Storage.MySql;
 
 namespace HoopGameNight.Api.Extensions
 {
@@ -253,7 +253,7 @@ namespace HoopGameNight.Api.Extensions
             var connectionString = configuration.GetConnectionString("MySqlConnection")
                 ?? throw new InvalidOperationException("MySQL connection string not found for Hangfire");
 
-            // Configurar Hangfire com MySQL
+            // Configurar Hangfire com MySQL (Modern Storage Provider)
             services.AddHangfire(config => config
                 .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
                 .UseSimpleAssemblyNameTypeSerializer()

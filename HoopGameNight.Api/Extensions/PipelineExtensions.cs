@@ -500,33 +500,37 @@ namespace HoopGameNight.Api.Extensions
                     // Job de sincronização de jogos (A cada 10 minutos)
                     recurringJobManager.AddOrUpdate<SyncJobs>(
                         "sync-games",
+                        "sync",
                         job => job.SyncGamesAsync(),
                         "0 */6 * * *",
-                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local }
                     );
 
                     // Job para jogos ao vivo (A cada 15 minutos)
                     recurringJobManager.AddOrUpdate<SyncJobs>(
                         "sync-live-games",
+                        "sync",
                         job => job.SyncLiveGamesAsync(),
                         "*/15 * * * *",
-                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local }
                     );
 
                     // Job de estatísticas de jogadores (A cada 30 minutos)
                     recurringJobManager.AddOrUpdate<SyncJobs>(
                         "sync-player-stats",
+                        "stats",
                         job => job.SyncPlayerStatsAsync(),
                         "0 */12 * * *",
-                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "stats" }
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local }
                     );
 
                     // Dawn Master Sync (03:00 AM)
                     recurringJobManager.AddOrUpdate<IBackgroundSyncService>(
                         "dawn-master-sync",
+                        "sync",
                         job => job.DawnMasterSyncAsync(),
                         "0 3 * * *",
-                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local, QueueName = "sync" }
+                        new RecurringJobOptions { TimeZone = TimeZoneInfo.Local }
                     );
 
                     Log.Information("Hangfire Recurring Jobs registrados com sucesso.");
