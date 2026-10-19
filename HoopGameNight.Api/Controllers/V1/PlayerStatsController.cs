@@ -32,7 +32,7 @@ namespace HoopGameNight.Api.Controllers.V1
             return await ExecuteAsync<PlayerSeasonStatsResponse>(async () =>
             {
                 var stats = await _playerStatsService.GetPlayerSeasonStatsAsync(playerId, season);
-                if (stats == null) return Ok(new PlayerSeasonStatsResponse(), "Sincronizando estatísticas...", true);
+                if (stats == null) return Ok(new PlayerSeasonStatsResponse { Season = season, SeasonName = HoopGameNight.Core.Helpers.NbaSeasonHelper.GetSeasonName(season) }, "Temporada sem estatísticas registradas.", true);
                 return Ok(stats);
             });
         }

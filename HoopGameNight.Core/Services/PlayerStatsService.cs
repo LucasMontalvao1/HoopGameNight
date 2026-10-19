@@ -422,7 +422,7 @@ namespace HoopGameNight.Core.Services
             {
                 PlayerId = playerId,
                 PlayerName = player.FullName,
-                Season = DateTime.Now.Month >= 10 ? DateTime.Now.Year : DateTime.Now.Year - 1, 
+                Season = Helpers.NbaSeasonHelper.GetCurrentSeason(), 
                 Games = stats.Select(s =>
                 {
                     var recent = new PlayerRecentGameResponse
@@ -1500,29 +1500,53 @@ namespace HoopGameNight.Core.Services
         }
         public async Task<StatLeadersResponse> GetLeagueLeadersAsync(int season)
         {
-            var cacheKey = $"league_leaders_v3_{season}";
+            var cacheKey = $"league_leaders_v4_{season}";
             if (_cache.TryGetValue(cacheKey, out StatLeadersResponse? cached)) return cached!;
 
             var response = new StatLeadersResponse { LastUpdated = DateTime.UtcNow };
 
             try {
+                // ESPN usa o ano final como identificador de temporada (2027 para 2026-27)
+                var espnSeason = season + 1;
+
                 // Pontos - Offensive Index 0
-                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0, season);
+                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0, espnSeason);
                 
+                // Verifica se a ESPN retornou dados obsoletos da temporada anterior (preseason/início da temporada)
+                // Se o GP do primeiro líder é > 70, são dados da temporada passada completa (fallback da ESPN)
+                if (response.ScoringLeaders.Count > 0 && Helpers.NbaSeasonHelper.IsCurrentSeason(season))
+                {
+                    var isStaleData = await IsEspnReturningStaleLeaders(espnSeason);
+                    if (isStaleData)
+                    {
+                        _logger.LogInformation("ESPN retornou dados da temporada anterior como fallback para season {Season}. Retornando líderes vazios.", season);
+                        response.ScoringLeaders = new List<StatLeader>();
+                        response.AssistLeaders = new List<StatLeader>();
+                        response.ThreePointLeaders = new List<StatLeader>();
+                        response.ReboundLeaders = new List<StatLeader>();
+                        response.StealsLeaders = new List<StatLeader>();
+                        response.BlocksLeaders = new List<StatLeader>();
+
+                        // Cache curto durante preseason para re-verificar rapidamente quando jogos começarem
+                        _cache.Set(cacheKey, response, TimeSpan.FromMinutes(10));
+                        return response;
+                    }
+                }
+
                 // Assistências - Offensive Index 10
-                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10, season);
+                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10, espnSeason);
                 
                 // 3 Pontos - Offensive Index 4
-                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4, season);
+                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4, espnSeason);
                 
                 // Rebotes - General Index 11
-                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11, season);
+                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11, espnSeason);
                 
                 // Roubos - Defensive Index 0
-                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0, season);
+                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0, espnSeason);
                 
                 // Tocos - Defensive Index 1
-                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1, season);
+                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1, espnSeason);
 
                 // Fallback para banco local se ESPN falhar totalmente (apenas se Scoring estiver vazio)
                 if (response.ScoringLeaders.Count == 0)
@@ -1545,6 +1569,50 @@ namespace HoopGameNight.Core.Services
             }
 
             return response;
+        }
+
+        /// <summary>
+        /// Verifica se a ESPN está retornando dados da temporada anterior como fallback.
+        /// Durante a preseason ou início da temporada, a ESPN pode retornar stats completas
+        /// da temporada anterior quando a nova ainda não tem dados suficientes.
+        /// Detecta isso verificando: se GP (games played) do líder > 70, são dados obsoletos.
+        /// </summary>
+        private async Task<bool> IsEspnReturningStaleLeaders(int espnSeason)
+        {
+            try
+            {
+                var json = await _espnApiService.GetStatsByAthleteAsync("points", 1, "offensive.avgPoints:desc", espnSeason);
+                if (json.ValueKind == JsonValueKind.Undefined || !json.TryGetProperty("athletes", out var athletes))
+                    return false;
+
+                foreach (var entry in athletes.EnumerateArray())
+                {
+                    if (entry.TryGetProperty("categories", out var categories))
+                    {
+                        foreach (var cat in categories.EnumerateArray())
+                        {
+                            if (GetPropertySafe(cat, "name").GetString() == "general" && cat.TryGetProperty("values", out var values))
+                            {
+                                var statsArray = values.EnumerateArray().ToList();
+                                if (statsArray.Count > 0)
+                                {
+                                    var gamesPlayed = (int)statsArray[0].GetDouble();
+                                    _logger.LogInformation("ESPN Leaders: GP do líder de pontos = {GP} para season {Season}", gamesPlayed, espnSeason);
+                                    // Na NBA, impossível ter >70 jogos nas primeiras semanas da temporada
+                                    // Se GP > 70, a ESPN está retornando fallback da temporada anterior
+                                    return gamesPlayed > 70;
+                                }
+                            }
+                        }
+                    }
+                    break; // Só precisa verificar o primeiro atleta
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Erro ao verificar dados stale da ESPN");
+            }
+            return false;
         }
 
         private async Task<List<StatLeader>> MapEspnByAthleteStats(string categoryName, string sort, string targetCategory, int statIndex, int? season = null)

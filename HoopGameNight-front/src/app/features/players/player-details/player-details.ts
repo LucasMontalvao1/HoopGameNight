@@ -193,14 +193,10 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     const statsFromCareer = this._allStatsData.find(s => s.season === season && s.isPlayoffs === false)
       || this._allStatsData.find(s => s.season === season);
 
-    if (statsFromCareer) {
+    if (statsFromCareer && statsFromCareer.gamesPlayed > 0) {
       this._seasonStats.set(statsFromCareer);
     } else {
       await this.loadSeasonStatsFromDb(season);
-      // Se não encontrou no banco (temporada 2026/27 que ainda vai iniciar), inicializa zerado
-      if (!this._seasonStats()) {
-        this.setZeroedSeasonStats(season);
-      }
     }
   }
 
@@ -266,16 +262,23 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
 
   private async loadSeasonStatsFromDb(season: number): Promise<void> {
     const playerId = this._currentPlayerId();
-    if (!playerId) return;
+    if (!playerId) {
+      this.setZeroedSeasonStats(season);
+      return;
+    }
 
     try {
       this._loadingStats.set(true);
       const stats = await this.playerStatsService.getPlayerSeasonStats(playerId, season);
       console.log(`Stats carregadas via DB View para season ${season}:`, stats);
-      this._seasonStats.set(stats);
+      if (stats && stats.season === season && stats.gamesPlayed > 0) {
+        this._seasonStats.set(stats);
+      } else {
+        this.setZeroedSeasonStats(season);
+      }
     } catch (error) {
       console.error(`Erro ao carregar stats da season ${season} via DB:`, error);
-      this._seasonStats.set(null);
+      this.setZeroedSeasonStats(season);
     } finally {
       this._loadingStats.set(false);
     }
