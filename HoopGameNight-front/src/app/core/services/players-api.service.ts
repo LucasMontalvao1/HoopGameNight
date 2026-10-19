@@ -103,8 +103,9 @@ export class PlayersApiService {
   }
 
   // GET /api/v1/playerstats/leaders
-  async getLeagueLeaders(season: number = 2024): Promise<StatLeadersResponse> {
-    const url = `${environment.apiUrl}/api/v1/playerstats/leaders?season=${season}`;
+  async getLeagueLeaders(season?: number): Promise<StatLeadersResponse> {
+    const query = season ? `?season=${season}` : '';
+    const url = `${environment.apiUrl}/api/v1/playerstats/leaders${query}`;
 
     const response = await firstValueFrom(
       this.http.get<ApiResponse<StatLeadersResponse>>(url)

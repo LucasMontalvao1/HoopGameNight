@@ -94,7 +94,7 @@
             <div class="season-selector-inline">
               <select class="season-dropdown" [value]="selectedSeason()" (change)="onSeasonChange($event)">
                 @for (season of availableSeasons(); track season) {
-                <option [value]="season">Temporada {{ season }}/{{ (season + 1).toString().slice(-2) }}</option>
+                <option [value]="season">Temporada {{ season }}/{{ (season + 1).toString().slice(-2) }}{{ isCurrentSeason(season) ? ' (Atual)' : '' }}</option>
                 }
               </select>
             </div>

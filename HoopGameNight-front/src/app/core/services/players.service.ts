@@ -339,7 +339,7 @@ export class PlayersService {
     }
   }
 
-  async loadLeagueLeaders(season: number = 2024): Promise<void> {
+  async loadLeagueLeaders(season?: number): Promise<void> {
     this._isLoading.set(true);
     try {
       const data = await this.playersApiService.getLeagueLeaders(season);

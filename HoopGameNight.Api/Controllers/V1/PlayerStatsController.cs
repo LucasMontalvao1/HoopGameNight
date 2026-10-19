@@ -114,11 +114,12 @@ namespace HoopGameNight.Api.Controllers.V1
         }
         [HttpGet("leaders")]
         [ProducesResponseType(typeof(ApiResponse<StatLeadersResponse>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<ApiResponse<StatLeadersResponse>>> GetLeagueLeaders([FromQuery] int season = 2024)
+        public async Task<ActionResult<ApiResponse<StatLeadersResponse>>> GetLeagueLeaders([FromQuery] int? season = null)
         {
+            var targetSeason = season ?? HoopGameNight.Core.Helpers.NbaSeasonHelper.GetCurrentSeason();
             return await ExecuteAsync<StatLeadersResponse>(async () =>
             {
-                var data = await _playerStatsService.GetLeagueLeadersAsync(season);
+                var data = await _playerStatsService.GetLeagueLeadersAsync(targetSeason);
                 return Ok(data);
             });
         }

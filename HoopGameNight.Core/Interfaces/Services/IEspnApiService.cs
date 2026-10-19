@@ -149,7 +149,7 @@ namespace HoopGameNight.Core.Interfaces.Services
         /// <summary>
         /// Busca estatísticas por atleta com suporte a ordenação customizada
         /// </summary>
-        Task<JsonElement> GetStatsByAthleteAsync(string category, int limit = 10, string sort = "");
+        Task<JsonElement> GetStatsByAthleteAsync(string category, int limit = 10, string sort = "", int? season = null);
 
         #endregion
 

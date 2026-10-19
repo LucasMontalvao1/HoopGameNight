@@ -1507,22 +1507,22 @@ namespace HoopGameNight.Core.Services
 
             try {
                 // Pontos - Offensive Index 0
-                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0);
+                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0, season);
                 
                 // Assistências - Offensive Index 10
-                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10);
+                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10, season);
                 
                 // 3 Pontos - Offensive Index 4
-                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4);
+                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4, season);
                 
                 // Rebotes - General Index 11
-                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11);
+                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11, season);
                 
                 // Roubos - Defensive Index 0
-                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0);
+                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0, season);
                 
                 // Tocos - Defensive Index 1
-                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1);
+                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1, season);
 
                 // Fallback para banco local se ESPN falhar totalmente (apenas se Scoring estiver vazio)
                 if (response.ScoringLeaders.Count == 0)
@@ -1538,7 +1538,8 @@ namespace HoopGameNight.Core.Services
                     }).ToList();
                 }
 
-                _cache.Set(cacheKey, response, TimeSpan.FromHours(2));
+                var ttl = response.ScoringLeaders.Count > 0 ? TimeSpan.FromHours(2) : TimeSpan.FromMinutes(2);
+                _cache.Set(cacheKey, response, ttl);
             } catch (Exception ex) {
                 _logger.LogError(ex, "Error fetching league leaders for season {Season}", season);
             }
@@ -1546,12 +1547,12 @@ namespace HoopGameNight.Core.Services
             return response;
         }
 
-        private async Task<List<StatLeader>> MapEspnByAthleteStats(string categoryName, string sort, string targetCategory, int statIndex)
+        private async Task<List<StatLeader>> MapEspnByAthleteStats(string categoryName, string sort, string targetCategory, int statIndex, int? season = null)
         {
             var list = new List<StatLeader>();
             try
             {
-                var json = await _espnApiService.GetStatsByAthleteAsync(categoryName, 10, sort);
+                var json = await _espnApiService.GetStatsByAthleteAsync(categoryName, 10, sort, season);
                 if (json.ValueKind == JsonValueKind.Undefined || !json.TryGetProperty("athletes", out var athletes)) return list;
 
                 int rank = 1;

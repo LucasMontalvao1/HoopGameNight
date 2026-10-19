@@ -16,7 +16,7 @@ import { PlayerPerformanceChartComponent } from '../player-performance-chart/pla
   styleUrl: './player-details.scss'
 })
 export class PlayerDetailsComponent implements OnInit, OnDestroy {
-  private readonly _selectedSeason = signal<number>(2025);
+  private readonly _selectedSeason = signal<number>(new Date().getMonth() >= 9 ? new Date().getFullYear() : new Date().getFullYear() - 1);
   private readonly _seasonStats = signal<PlayerSeasonStats | null>(null);
   private readonly _availableSeasons = signal<number[]>([]);
   private readonly _loadingStats = signal<boolean>(false);
@@ -146,27 +146,42 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
     return this.TEAM_COLORS[cleanAbbr]?.[type] || (type === 'primary' ? '#202020' : '#101010');
   }
 
+  getCurrentSeason(): number {
+    const now = new Date();
+    return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+  }
+
+  isCurrentSeason(season: number): boolean {
+    return season === this.getCurrentSeason();
+  }
+
   private async loadPlayerStats(playerId: number): Promise<void> {
     try {
       this._loadingStats.set(true);
 
       const allSeasons = await this.playerStatsService.getPlayerAllSeasons(playerId);
-
       this._allStatsData = allSeasons || [];
 
-      if (this._allStatsData.length > 0) {
-        const seasons = this._allStatsData
-          .map(s => s.season)
-          .filter((v, i, a) => a.indexOf(v) === i)
-          .sort((a, b) => b - a);
+      const currentSeason = this.getCurrentSeason();
+      const seasons = this._allStatsData
+        .map(s => s.season)
+        .filter((v, i, a) => a.indexOf(v) === i);
 
-        this._availableSeasons.set(seasons);
-
-        const latestSeason = seasons[0];
-        await this.selectSeason(latestSeason);
+      // Garante que a temporada atual (2026/27) esteja sempre disponível no topo da lista
+      if (!seasons.includes(currentSeason)) {
+        seasons.push(currentSeason);
       }
+      seasons.sort((a, b) => b - a);
+
+      this._availableSeasons.set(seasons);
+
+      // Seleciona a temporada atual por padrão
+      await this.selectSeason(currentSeason);
     } catch (error) {
       console.error('Erro ao carregar estatísticas:', error);
+      const currentSeason = this.getCurrentSeason();
+      this._availableSeasons.set([currentSeason]);
+      await this.selectSeason(currentSeason);
     } finally {
       this._loadingStats.set(false);
     }
@@ -182,7 +197,57 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
       this._seasonStats.set(statsFromCareer);
     } else {
       await this.loadSeasonStatsFromDb(season);
+      // Se não encontrou no banco (temporada 2026/27 que ainda vai iniciar), inicializa zerado
+      if (!this._seasonStats()) {
+        this.setZeroedSeasonStats(season);
+      }
     }
+  }
+
+  private setZeroedSeasonStats(season: number): void {
+    const player = this.playersService.selectedPlayer();
+    this._seasonStats.set({
+      season: season,
+      teamName: player?.team?.name || '',
+      teamId: player?.team?.id || null,
+      gamesPlayed: 0,
+      gamesStarted: 0,
+      ppg: 0,
+      rpg: 0,
+      apg: 0,
+      spg: 0,
+      bpg: 0,
+      mpg: 0,
+      tpg: 0,
+      fpg: 0,
+      avgPoints: 0,
+      avgRebounds: 0,
+      avgAssists: 0,
+      avgMinutes: 0,
+      avgTurnovers: 0,
+      avgFouls: 0,
+      totalPoints: 0,
+      totalRebounds: 0,
+      totalAssists: 0,
+      fieldGoalsMade: 0,
+      fieldGoalsAttempted: 0,
+      threePointersMade: 0,
+      threePointersAttempted: 0,
+      freeThrowsMade: 0,
+      freeThrowsAttempted: 0,
+      offensiveRebounds: 0,
+      defensiveRebounds: 0,
+      steals: 0,
+      blocks: 0,
+      turnovers: 0,
+      personalFouls: 0,
+      minutesPlayed: 0,
+      points: 0,
+      fgPercentage: null,
+      threePointPercentage: null,
+      ftPercentage: null,
+      isPlayoffs: false
+    });
   }
 
   async setTab(tab: 'stats' | 'gamelog' | 'career'): Promise<void> {

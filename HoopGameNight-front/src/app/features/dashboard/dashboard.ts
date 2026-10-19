@@ -43,6 +43,13 @@ export class Dashboard implements OnInit {
     return this.playersService.favoritePlayers();
   });
 
+  protected readonly currentSeasonLabel = computed(() => {
+    const now = new Date();
+    const year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+    const nextYear = (year + 1).toString().slice(-2);
+    return `TEMPORADA ${year}/${nextYear}`;
+  });
+
   private destroy$ = new Subject<void>();
   private searchSubject = new Subject<string>();
 

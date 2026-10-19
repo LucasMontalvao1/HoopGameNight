@@ -362,12 +362,13 @@ namespace HoopGameNight.Infrastructure.ExternalServices
         public async Task<EspnLeadersDto?> GetLeagueLeadersAsync() =>
             await GetWithCacheAsync<EspnLeadersDto>($"{BASE_URL}/leaders", "league_leaders", TimeSpan.FromHours(6));
 
-        public async Task<JsonElement> GetStatsByAthleteAsync(string category, int limit = 10, string sort = "")
+        public async Task<JsonElement> GetStatsByAthleteAsync(string category, int limit = 10, string sort = "", int? season = null)
         {
             try
             {
                 var sortParam = string.IsNullOrEmpty(sort) ? "" : $"&sort={sort}";
-                var url = $"https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?isqualified=true&limit={limit}{sortParam}";
+                var seasonParam = season.HasValue ? $"&season={season.Value}" : "";
+                var url = $"https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/statistics/byathlete?isqualified=true&limit={limit}{sortParam}{seasonParam}";
                 
                 var response = await _httpClient.GetAsync(url);
                 if (!response.IsSuccessStatusCode) return default;
