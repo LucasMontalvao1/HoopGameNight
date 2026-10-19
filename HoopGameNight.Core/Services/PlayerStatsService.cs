@@ -545,7 +545,7 @@ namespace HoopGameNight.Core.Services
                     return false;
                 }
 
-                var espnSeasonStats = await _espnApiService.GetPlayerSeasonStatsAsync(player.EspnId!, season + 1);
+                var espnSeasonStats = await _espnApiService.GetPlayerSeasonStatsAsync(player.EspnId!, season);
                 
                 if (espnSeasonStats == null || string.IsNullOrEmpty(espnSeasonStats.Athlete?.Id))
                 {
@@ -571,7 +571,7 @@ namespace HoopGameNight.Core.Services
                     _logger.LogWarning("SyncSeason: Falha no mapeamento das estatísticas de temporada regular para Player {PlayerId}, Season {Season}", playerId, season);
                 }
 
-                var espnPlayoffsStats = await _espnApiService.GetPlayerSeasonStatsAsync(player.EspnId!, season + 1, 3); 
+                var espnPlayoffsStats = await _espnApiService.GetPlayerSeasonStatsAsync(player.EspnId!, season, 3); 
                 if (espnPlayoffsStats != null)
                 {
                     var playoffsEntity = _espnParser.ParseSeasonStats(espnPlayoffsStats, playerId);
@@ -626,7 +626,7 @@ namespace HoopGameNight.Core.Services
                     return null;
                 }
 
-                var key = $"career_v40_{playerId}"; 
+                var key = $"career_v41_{playerId}"; 
 
                 if (_cache.TryGetValue(key, out PlayerCareerResponse? cachedResponse))
                 {
@@ -1278,7 +1278,7 @@ namespace HoopGameNight.Core.Services
                     {
                         var seasonStats = new PlayerSeasonStatsResponse
                         {
-                            Season = (seasonData.Season?.Year ?? 1) - 1,
+                            Season = seasonData.Season?.Year ?? 1,
                             SeasonName = seasonData.Season?.Year > 1900 ? $"{seasonData.Season.Year - 1}/{seasonData.Season.Year}" : "Unknown",
                             SeasonType = seasonData.SeasonTypeId, 
                             TeamId = int.TryParse(seasonData.Team?.Id, out var teamId) && teamId > 0 ? teamId : 0,
@@ -1500,23 +1500,20 @@ namespace HoopGameNight.Core.Services
         }
         public async Task<StatLeadersResponse> GetLeagueLeadersAsync(int season)
         {
-            var cacheKey = $"league_leaders_v4_{season}";
+            var cacheKey = $"league_leaders_v6_{season}";
             if (_cache.TryGetValue(cacheKey, out StatLeadersResponse? cached)) return cached!;
 
             var response = new StatLeadersResponse { LastUpdated = DateTime.UtcNow };
 
             try {
-                // ESPN usa o ano final como identificador de temporada (2027 para 2026-27)
-                var espnSeason = season + 1;
-
                 // Pontos - Offensive Index 0
-                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0, espnSeason);
+                response.ScoringLeaders = await MapEspnByAthleteStats("points", "offensive.avgPoints:desc", "offensive", 0, season);
                 
                 // Verifica se a ESPN retornou dados obsoletos da temporada anterior (preseason/início da temporada)
                 // Se o GP do primeiro líder é > 70, são dados da temporada passada completa (fallback da ESPN)
                 if (response.ScoringLeaders.Count > 0 && Helpers.NbaSeasonHelper.IsCurrentSeason(season))
                 {
-                    var isStaleData = await IsEspnReturningStaleLeaders(espnSeason);
+                    var isStaleData = await IsEspnReturningStaleLeaders(season);
                     if (isStaleData)
                     {
                         _logger.LogInformation("ESPN retornou dados da temporada anterior como fallback para season {Season}. Retornando líderes vazios.", season);
@@ -1534,19 +1531,19 @@ namespace HoopGameNight.Core.Services
                 }
 
                 // Assistências - Offensive Index 10
-                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10, espnSeason);
+                response.AssistLeaders = await MapEspnByAthleteStats("assists", "offensive.avgAssists:desc", "offensive", 10, season);
                 
                 // 3 Pontos - Offensive Index 4
-                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4, espnSeason);
+                response.ThreePointLeaders = await MapEspnByAthleteStats("3p", "offensive.avgThreePointFieldGoalsMade:desc", "offensive", 4, season);
                 
                 // Rebotes - General Index 11
-                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11, espnSeason);
+                response.ReboundLeaders = await MapEspnByAthleteStats("rebounds", "general.avgRebounds:desc", "general", 11, season);
                 
                 // Roubos - Defensive Index 0
-                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0, espnSeason);
+                response.StealsLeaders = await MapEspnByAthleteStats("steals", "defensive.avgSteals:desc", "defensive", 0, season);
                 
                 // Tocos - Defensive Index 1
-                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1, espnSeason);
+                response.BlocksLeaders = await MapEspnByAthleteStats("blocks", "defensive.avgBlocks:desc", "defensive", 1, season);
 
                 // Fallback para banco local se ESPN falhar totalmente (apenas se Scoring estiver vazio)
                 if (response.ScoringLeaders.Count == 0)
@@ -1575,14 +1572,27 @@ namespace HoopGameNight.Core.Services
         /// Verifica se a ESPN está retornando dados da temporada anterior como fallback.
         /// Durante a preseason ou início da temporada, a ESPN pode retornar stats completas
         /// da temporada anterior quando a nova ainda não tem dados suficientes.
-        /// Detecta isso verificando: se GP (games played) do líder > 70, são dados obsoletos.
+        /// Detecta se a ESPN retornou dados obsoletos da temporada anterior como fallback.
         /// </summary>
         private async Task<bool> IsEspnReturningStaleLeaders(int espnSeason)
         {
             try
             {
                 var json = await _espnApiService.GetStatsByAthleteAsync("points", 1, "offensive.avgPoints:desc", espnSeason);
-                if (json.ValueKind == JsonValueKind.Undefined || !json.TryGetProperty("athletes", out var athletes))
+                if (json.ValueKind == JsonValueKind.Undefined)
+                    return false;
+
+                // 1. A ESPN informa requestedSeason na resposta. Se o ano retornado for anterior à temporada requisitada,
+                // significa que a nova temporada ainda não tem estatísticas consolidadas e a ESPN fez downgrade para a temporada passada.
+                if (json.TryGetProperty("requestedSeason", out var reqSeason) &&
+                    reqSeason.TryGetProperty("year", out var reqYear) &&
+                    reqYear.GetInt32() < espnSeason)
+                {
+                    _logger.LogInformation("ESPN Leaders: requestedSeason ({ReqYear}) < target season ({Season}). Dados são da temporada anterior.", reqYear.GetInt32(), espnSeason);
+                    return true;
+                }
+
+                if (!json.TryGetProperty("athletes", out var athletes))
                     return false;
 
                 foreach (var entry in athletes.EnumerateArray())
@@ -1598,8 +1608,15 @@ namespace HoopGameNight.Core.Services
                                 {
                                     var gamesPlayed = (int)statsArray[0].GetDouble();
                                     _logger.LogInformation("ESPN Leaders: GP do líder de pontos = {GP} para season {Season}", gamesPlayed, espnSeason);
-                                    // Na NBA, impossível ter >70 jogos nas primeiras semanas da temporada
-                                    // Se GP > 70, a ESPN está retornando fallback da temporada anterior
+
+                                    // No início da temporada (Outubro/Novembro), ninguém pode ter mais de 15 jogos disputados.
+                                    var now = DateTime.UtcNow;
+                                    if ((now.Month == 10 || now.Month == 11) && gamesPlayed > 15)
+                                    {
+                                        _logger.LogInformation("ESPN Leaders: Início de temporada com GP={GP} > 15. Dados são da temporada anterior.", gamesPlayed);
+                                        return true;
+                                    }
+
                                     return gamesPlayed > 70;
                                 }
                             }

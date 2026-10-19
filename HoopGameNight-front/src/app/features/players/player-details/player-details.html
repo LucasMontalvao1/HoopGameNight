@@ -94,7 +94,7 @@
             <div class="season-selector-inline">
               <select class="season-dropdown" [value]="selectedSeason()" (change)="onSeasonChange($event)">
                 @for (season of availableSeasons(); track season) {
-                <option [value]="season">Temporada {{ season }}/{{ (season + 1).toString().slice(-2) }}{{ isCurrentSeason(season) ? ' (Atual)' : '' }}</option>
+                <option [value]="season">Temporada {{ season - 1 }}/{{ season.toString().slice(-2) }}{{ isCurrentSeason(season) ? ' (Atual)' : '' }}</option>
                 }
               </select>
             </div>
@@ -362,8 +362,7 @@
                 season.seasonType) {
                 <tr class="game-row">
                   <td class="opponent-cell sticky-col">
-                    <span class="game-date-mini">{{ season.season }}/{{ (season.season + 1).toString().slice(-2)
-                      }}</span>
+                    <span class="game-date-mini">{{ season.season - 1 }}/{{ season.season.toString().slice(-2) }}</span>
                     @if (season.isPlayoffs) { <span class="home-away">PLY</span> }
                   </td>
                   <td>{{ season.teamName || '-' }}</td>

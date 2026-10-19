@@ -45,9 +45,9 @@ export class Dashboard implements OnInit {
 
   protected readonly currentSeasonLabel = computed(() => {
     const now = new Date();
-    const year = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
-    const nextYear = (year + 1).toString().slice(-2);
-    return `TEMPORADA ${year}/${nextYear}`;
+    const endYear = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
+    const startYear = endYear - 1;
+    return `TEMPORADA ${startYear}/${endYear.toString().slice(-2)}`;
   });
 
   private destroy$ = new Subject<void>();

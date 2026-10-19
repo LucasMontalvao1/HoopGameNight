@@ -16,7 +16,7 @@ import { PlayerPerformanceChartComponent } from '../player-performance-chart/pla
   styleUrl: './player-details.scss'
 })
 export class PlayerDetailsComponent implements OnInit, OnDestroy {
-  private readonly _selectedSeason = signal<number>(new Date().getMonth() >= 9 ? new Date().getFullYear() : new Date().getFullYear() - 1);
+  private readonly _selectedSeason = signal<number>(new Date().getMonth() >= 9 ? new Date().getFullYear() + 1 : new Date().getFullYear());
   private readonly _seasonStats = signal<PlayerSeasonStats | null>(null);
   private readonly _availableSeasons = signal<number[]>([]);
   private readonly _loadingStats = signal<boolean>(false);
@@ -148,7 +148,7 @@ export class PlayerDetailsComponent implements OnInit, OnDestroy {
 
   getCurrentSeason(): number {
     const now = new Date();
-    return now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+    return now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
   }
 
   isCurrentSeason(season: number): boolean {

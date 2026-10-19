@@ -10,19 +10,17 @@ namespace HoopGameNight.Core.Helpers
     public static class NbaSeasonHelper
     {
         /// <summary>
-        /// Determina a temporada "NBA-style".
-        /// Regras da NBA:
-        /// - Temporada 2025-2026 é representada externamente como "2025".
-        /// - Começa oficialmente em OUTUBRO
-        /// - Playoffs vão até JUNHO do ano seguinte
+        /// Determina a temporada conforme o padrão adotado na ESPN e no banco de dados,
+        /// onde a temporada é identificada pelo ano de término (ex: 2026-27 -> 2027, 2025-26 -> 2026).
+        /// A temporada regular começa em Outubro e vai até Junho do ano seguinte.
         /// </summary>
         public static int GetCurrentSeason()
         {
             var now = DateTime.UtcNow; // Utc para evitar divergências em deploys
 
-            // Janeiro – Setembro → temporada pertence ao ano anterior
-            // Outubro – Dezembro → temporada pertence ao ano atual
-            return now.Month >= 10 ? now.Year : now.Year - 1;
+            // A partir de Outubro, já pertence à temporada que termina no ano seguinte (ex: Outubro/2026 -> 2027)
+            // De Janeiro a Setembro, pertence à temporada que termina no ano atual (ex: Maio/2027 -> 2027)
+            return now.Month >= 10 ? now.Year + 1 : now.Year;
         }
 
         /// <summary>
@@ -31,7 +29,7 @@ namespace HoopGameNight.Core.Helpers
         /// </summary>
         public static int GetSeasonFromDate(DateTime date)
         {
-            return date.Month >= 10 ? date.Year : date.Year - 1;
+            return date.Month >= 10 ? date.Year + 1 : date.Year;
         }
 
         /// <summary>
@@ -44,11 +42,11 @@ namespace HoopGameNight.Core.Helpers
         }
 
         /// <summary>
-        /// Retorna o nome completo da temporada (ex.: "2025-2026").
+        /// Retorna o nome completo da temporada (ex.: "2026-2027").
         /// </summary>
         public static string GetSeasonName(int season)
         {
-            return $"{season}-{season + 1}";
+            return $"{season - 1}-{season}";
         }
 
         /// <summary>
