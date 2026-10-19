@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -15,16 +15,11 @@ namespace HoopGameNight.Infrastructure.Repositories
     {
         protected override string EntityName => "PlayerStats";
 
-        private readonly IDatabaseConnection _connection;
-        private readonly ILogger<PlayerStatsRepository> _logger;
-
         public PlayerStatsRepository(
             IDatabaseConnection connection,
             ISqlLoader sqlLoader,
             ILogger<PlayerStatsRepository> logger) : base(connection, sqlLoader, logger)
         {
-            _connection = connection;
-            _logger = logger;
         }
 
         private IDbConnection GetConnection() => _connection.CreateConnection();
@@ -131,7 +126,7 @@ namespace HoopGameNight.Infrastructure.Repositories
             catch (Exception ex)
             {
                 transaction.Rollback();
-                _logger.LogError(ex, "Error during bulk upsert of season stats");
+                Logger.LogError(ex, "Error during bulk upsert of season stats");
                 return false;
             }
         }
@@ -159,7 +154,7 @@ namespace HoopGameNight.Infrastructure.Repositories
             catch (Exception ex)
             {
                 transaction.Rollback();
-                _logger.LogError(ex, "Error during bulk upsert of game stats");
+                Logger.LogError(ex, "Error during bulk upsert of game stats");
                 return false;
             }
         }

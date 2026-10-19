@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Mvc;
 using Hangfire;
 using HoopGameNight.Infrastructure.Jobs;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using HoopGameNight.Core.Constants;
 
 namespace HoopGameNight.Api.Controllers.V1

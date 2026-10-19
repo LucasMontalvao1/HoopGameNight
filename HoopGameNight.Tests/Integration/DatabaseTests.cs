@@ -1,4 +1,4 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using HoopGameNight.Core.Interfaces.Infrastructure;
 using HoopGameNight.Infrastructure.Data;
 using Microsoft.Extensions.Configuration;
@@ -27,14 +27,14 @@ namespace HoopGameNight.Tests.Integration
         public DatabaseTests()
         {
             // Configura uma connection string de teste em memória
-            var configuration = new ConfigurationBuilder()
+            _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string>
                 {
                     ["ConnectionStrings:MySqlConnection"] = "Server=localhost;Database=hoopgamenight_test;Uid=test;Pwd=test;"
                 })
                 .Build();
 
-            var connectionString = configuration.GetConnectionString("MySqlConnection")!;
+            var connectionString = _configuration.GetConnectionString("MySqlConnection")!;
 
             // Cria as abstrações em camadas: Connection -> QueryExecutor -> DatabaseInitializer
             _databaseConnection = new HoopGameNight.Infrastructure.Data.MySqlConnection(connectionString);
