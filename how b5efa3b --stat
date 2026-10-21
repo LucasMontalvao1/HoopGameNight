@@ -1,0 +1,20 @@
+ .env.example                                       |   9 [32m++[m
+ .gitignore                                         |   3 [32m+[m
+ .../src/app/core/services/players-api.service.ts   |   5 [32m+[m[31m-[m
+ .../src/app/core/services/players.service.ts       |   2 [32m+[m[31m-[m
+ .../src/app/features/dashboard/dashboard.html      |   2 [32m+[m[31m-[m
+ .../src/app/features/dashboard/dashboard.ts        |   7 [32m++[m
+ .../league-leaders/league-leaders.component.html   |   6 [32m+[m[31m-[m
+ .../league-leaders/league-leaders.component.scss   |  29 [32m+++++[m[31m-[m
+ .../players/player-details/player-details.html     |   7 [32m+[m[31m-[m
+ .../players/player-details/player-details.ts       |  98 [32m++++++++++++++[m[31m---[m
+ .../Controllers/V1/GamesController.cs              |   1 [31m-[m
+ .../Controllers/V1/PlayerStatsController.cs        |   7 [32m+[m[31m-[m
+ HoopGameNight.Core/Helpers/NbaSeasonHelper.cs      |  20 [32m++[m[31m--[m
+ .../Interfaces/Services/IEspnApiService.cs         |   2 [32m+[m[31m-[m
+ HoopGameNight.Core/Services/PlayerStatsService.cs  | 116 [32m++++++++++++++++++[m[31m---[m
+ .../ExternalServices/EspnApiService.cs             |   5 [32m+[m[31m-[m
+ .../Repositories/PlayerStatsRepository.cs          |  11 [32m+[m[31m-[m
+ .../Services/SyncMetricsService.cs                 |   3 [32m+[m[31m-[m
+ HoopGameNight.Tests/Integration/DatabaseTests.cs   |   6 [32m+[m[31m-[m
+ 19 files changed, 267 insertions(+), 72 deletions(-)

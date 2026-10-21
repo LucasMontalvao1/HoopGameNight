@@ -247,7 +247,8 @@ namespace HoopGameNight.Infrastructure.Repositories
                 game.AiSummary,
                 game.AiHighlights,
                 game.LineScoreJson,
-                game.GameLeadersJson
+                game.GameLeadersJson,
+                game.SeriesNote
             });
 
             game.Id = id;
@@ -274,6 +275,7 @@ namespace HoopGameNight.Infrastructure.Repositories
                 game.AiHighlights,
                 game.LineScoreJson,
                 game.GameLeadersJson,
+                game.SeriesNote,
                 game.UpdatedAt
             });
 

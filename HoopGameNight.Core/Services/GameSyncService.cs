@@ -473,7 +473,7 @@ namespace HoopGameNight.Core.Services
         }
 
         private int GetSeasonYear(DateTime date)
-            => date.Month >= 10 ? date.Year : date.Year - 1;
+            => date.Month >= 10 ? date.Year + 1 : date.Year;
 
         private async Task InvalidateCacheForDate(DateTime date, IEnumerable<int>? teamIds = null)
         {
