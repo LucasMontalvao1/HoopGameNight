@@ -399,8 +399,18 @@ namespace HoopGameNight.Api.Extensions
             {
                 var redisConfig = StackExchange.Redis.ConfigurationOptions.Parse(redisSettings.ConnectionString);
                 redisConfig.AbortOnConnectFail = false;
+                redisConfig.ConnectTimeout = 5000;
                 redisConfig.SyncTimeout = 2000;
                 redisConfig.AsyncTimeout = 2000;
+
+                // Auto-ativar SSL se a conexao for para Upstash ou especificar rediss/ssl
+                if (redisSettings.ConnectionString.Contains("upstash.io", StringComparison.OrdinalIgnoreCase) ||
+                    redisSettings.ConnectionString.StartsWith("rediss://", StringComparison.OrdinalIgnoreCase) ||
+                    redisSettings.ConnectionString.Contains("ssl=true", StringComparison.OrdinalIgnoreCase))
+                {
+                    redisConfig.Ssl = true;
+                    redisConfig.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13;
+                }
 
                 services.AddStackExchangeRedisCache(options =>
                 {
@@ -408,19 +418,25 @@ namespace HoopGameNight.Api.Extensions
                     options.InstanceName = redisSettings.InstanceName;
                 });
 
-                // Registrar configurações do Redis
+                // Registrar configuracoes do Redis
                 services.Configure<Core.Configuration.RedisSettings>(
                     configuration.GetSection("Redis"));
 
-                // RedLock - Bloqueio distribuído
-                var multiplexer = ConnectionMultiplexer.Connect(redisConfig);
-                services.AddSingleton<IConnectionMultiplexer>(multiplexer);
-                services.AddSingleton<IDistributedLockFactory>(RedLockFactory.Create(new List<RedLockMultiplexer>
+                // RedLock - Bloqueio distribuido
+                try
                 {
-                    new RedLockMultiplexer(multiplexer)
-                }));
+                    var multiplexer = ConnectionMultiplexer.Connect(redisConfig);
+                    services.AddSingleton<IConnectionMultiplexer>(multiplexer);
+                    services.AddSingleton<IDistributedLockFactory>(RedLockFactory.Create(new List<RedLockMultiplexer>
+                    {
+                        new RedLockMultiplexer(multiplexer)
+                    }));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[AVISO REDIS] Falha na conexao inicial do ConnectionMultiplexer/RedLock: {ex.Message}");
+                }
             }
-
             services.AddSingleton<ICacheService, CacheService>();
 
             return services;

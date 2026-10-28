@@ -15,7 +15,7 @@ namespace HoopGameNight.Infrastructure.Services
 {
     /// <summary>
     /// Fornece uma abstração de cache em múltiplas camadas (Redis como distribuído e IMemoryCache como local).
-    /// Gerencia fallbacks e sincronização entre os níveis de persistência temporária.
+    /// Gerencia fallbacks e sincronização resiliente entre os níveis de persistência temporária.
     /// </summary>
     public class CacheService : ICacheService
     {
@@ -29,6 +29,7 @@ namespace HoopGameNight.Infrastructure.Services
         private long _memoryHits = 0;
         private long _memoryMisses = 0;
         private readonly DateTime _startTime = DateTime.UtcNow;
+        private DateTime _redisCircuitBrokenUntil = DateTime.MinValue;
 
         public CacheService(
             IMemoryCache memoryCache,
@@ -49,6 +50,14 @@ namespace HoopGameNight.Infrastructure.Services
             {
                 _logger.LogInformation("CacheService inicializado com Redis + Memory Cache");
             }
+        }
+
+        private bool IsRedisAvailable()
+        {
+            if (_distributedCache == null) return false;
+            if (_connectionMultiplexer != null && !_connectionMultiplexer.IsConnected) return false;
+            if (DateTime.UtcNow < _redisCircuitBrokenUntil) return false;
+            return true;
         }
 
         /// <summary>
@@ -90,26 +99,34 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                if (_distributedCache != null)
+                if (IsRedisAvailable())
                 {
-                    var redisData = await _distributedCache.GetStringAsync(key);
-                    if (redisData != null)
+                    try
                     {
-                        Interlocked.Increment(ref _redisHits);
-                        _logger.LogDebug("REDIS HIT: {Key}", key);
-
-                        var deserializedData = JsonSerializer.Deserialize<T>(redisData);
-
-                        if (deserializedData != null)
+                        var redisData = await _distributedCache!.GetStringAsync(key);
+                        if (redisData != null)
                         {
-                            _memoryCache.Set(key, deserializedData, TimeSpan.FromMinutes(5));
+                            Interlocked.Increment(ref _redisHits);
+                            _logger.LogDebug("REDIS HIT: {Key}", key);
+
+                            var deserializedData = JsonSerializer.Deserialize<T>(redisData);
+
+                            if (deserializedData != null)
+                            {
+                                _memoryCache.Set(key, deserializedData, TimeSpan.FromMinutes(5));
+                            }
+
+                            return deserializedData;
                         }
 
-                        return deserializedData;
+                        Interlocked.Increment(ref _redisMisses);
+                        _logger.LogDebug("REDIS MISS: {Key}", key);
                     }
-
-                    Interlocked.Increment(ref _redisMisses);
-                    _logger.LogDebug("REDIS MISS: {Key}", key);
+                    catch (Exception ex)
+                    {
+                        _redisCircuitBrokenUntil = DateTime.UtcNow.AddSeconds(30);
+                        _logger.LogWarning(ex, "Falha ao consultar Redis para a chave {Key}. Circuit breaker ativado por 30s. Usando fallback de memória local.", key);
+                    }
                 }
 
                 if (_memoryCache.TryGetValue(key, out T? memCached))
@@ -163,7 +180,7 @@ namespace HoopGameNight.Infrastructure.Services
 
         /// <summary>
         /// Persiste um objeto de forma assíncrona em ambas as camadas: Redis (distribuído) e Memory Cache (local).
-        /// Garante a consistência entre os níveis de cache configurados.
+        /// Garante consistência e que a aplicação continue funcionando mesmo com indisponibilidade do Redis.
         /// </summary>
         public async Task SetAsync<T>(string key, T value, TimeSpan? expiration = null)
         {
@@ -176,20 +193,9 @@ namespace HoopGameNight.Infrastructure.Services
             var ttl = expiration ?? CacheDurations.Default;
             TimeSpan? finalTtl = ttl == Timeout.InfiniteTimeSpan ? null : ttl;
 
+            // 1. Sempre salva no MemoryCache primeiro (imediato e confiável)
             try
             {
-                if (_distributedCache != null)
-                {
-                    var json = JsonSerializer.Serialize(value);
-                    var options = new DistributedCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = finalTtl
-                    };
-
-                    await _distributedCache.SetStringAsync(key, json, options);
-                    _logger.LogDebug("REDIS SET: {Key} (TTL: {TTL})", key, finalTtl?.ToString() ?? "Infinite");
-                }
-
                 var cacheOptions = new MemoryCacheEntryOptions
                 {
                     AbsoluteExpirationRelativeToNow = finalTtl
@@ -200,7 +206,28 @@ namespace HoopGameNight.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro ao salvar no cache: {Key}", key);
+                _logger.LogError(ex, "Erro ao salvar no MemoryCache: {Key}", key);
+            }
+
+            // 2. Tenta persistir no Redis se disponível
+            if (IsRedisAvailable())
+            {
+                try
+                {
+                    var json = JsonSerializer.Serialize(value);
+                    var options = new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = finalTtl
+                    };
+
+                    await _distributedCache!.SetStringAsync(key, json, options);
+                    _logger.LogDebug("REDIS SET: {Key} (TTL: {TTL})", key, finalTtl?.ToString() ?? "Infinite");
+                }
+                catch (Exception ex)
+                {
+                    _redisCircuitBrokenUntil = DateTime.UtcNow.AddSeconds(30);
+                    _logger.LogWarning(ex, "Erro ao salvar no Redis para chave {Key}. Circuit breaker ativado por 30s.", key);
+                }
             }
         }
 
@@ -234,15 +261,21 @@ namespace HoopGameNight.Infrastructure.Services
             try
             {
                 // CRÍTICO: Limpar a memória local ANTES de tentar limpar a nuvem/Redis.
-                // Isso evita que um timeout no cache distribuído faça a aplicação continuar 
-                // devolvendo lixo (Stale Data) armazenado em RAM.
                 _memoryCache.Remove(key);
                 _logger.LogDebug("MEMORY REMOVE: {Key}", key);
 
-                if (_distributedCache != null)
+                if (IsRedisAvailable())
                 {
-                    await _distributedCache.RemoveAsync(key);
-                    _logger.LogDebug("REDIS REMOVE: {Key}", key);
+                    try
+                    {
+                        await _distributedCache!.RemoveAsync(key);
+                        _logger.LogDebug("REDIS REMOVE: {Key}", key);
+                    }
+                    catch (Exception ex)
+                    {
+                        _redisCircuitBrokenUntil = DateTime.UtcNow.AddSeconds(30);
+                        _logger.LogWarning(ex, "Erro ao remover chave do Redis: {Key}", key);
+                    }
                 }
             }
             catch (Exception ex)
@@ -263,7 +296,7 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                if (_connectionMultiplexer != null)
+                if (_connectionMultiplexer != null && _connectionMultiplexer.IsConnected && DateTime.UtcNow >= _redisCircuitBrokenUntil)
                 {
                     var endpoints = _connectionMultiplexer.GetEndPoints();
                     var db = _connectionMultiplexer.GetDatabase();
@@ -272,20 +305,17 @@ namespace HoopGameNight.Infrastructure.Services
                     {
                         var server = _connectionMultiplexer.GetServer(endpoint);
                         
-                        // Envolver a localização em Task.Run para liberar a thread principal caso o Redis esteja pesado demais com a iteração do cursor SCAN.
                         await Task.Run(() =>
                         {
                             var keys = server.Keys(pattern: pattern, pageSize: 250).ToArray();
                             
                             if (keys.Any())
                             {
-                                // Invalida no local cache imediatamente (o que é rápido)
                                 foreach (var key in keys)
                                 {
                                     _memoryCache.Remove(key!);
                                 }
 
-                                // Invalida no redis no estilo FireAndForget usando KeyDeleteAsync (Suporta UNLINK)
                                 _ = db.KeyDeleteAsync(keys, CommandFlags.FireAndForget);
                             }
                             
@@ -296,7 +326,8 @@ namespace HoopGameNight.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error removing keys by pattern: {Pattern}", pattern);
+                _redisCircuitBrokenUntil = DateTime.UtcNow.AddSeconds(30);
+                _logger.LogWarning(ex, "Error removing keys by pattern: {Pattern}", pattern);
             }
         }
 
@@ -329,11 +360,19 @@ namespace HoopGameNight.Infrastructure.Services
 
             try
             {
-                if (_distributedCache != null)
+                if (IsRedisAvailable())
                 {
-                    var redisData = await _distributedCache.GetStringAsync(key);
-                    if (redisData != null)
-                        return true;
+                    try
+                    {
+                        var redisData = await _distributedCache!.GetStringAsync(key);
+                        if (redisData != null)
+                            return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        _redisCircuitBrokenUntil = DateTime.UtcNow.AddSeconds(30);
+                        _logger.LogWarning(ex, "Erro ao verificar existência no Redis: {Key}", key);
+                    }
                 }
 
                 return _memoryCache.TryGetValue(key, out _);

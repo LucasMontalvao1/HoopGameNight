@@ -76,12 +76,28 @@ namespace HoopGameNight.Core.Services
                 var games = await _gameRepository.GetTodayGamesAsync();
                 var response = _mapper.Map<List<GameResponse>>(games);
 
+
+                // Fallback ESPN: se banco nao tem jogos de hoje, busca direto da ESPN
+                if (!response.Any())
+                {
+                    _logger.LogInformation("BANCO sem jogos para hoje, consultando ESPN scoreboard...");
+                    try
+                    {
+                        var espnGames = await _espnService.GetGamesByDateAsync(DateTime.Today);
+                        response = await ConvertEspnGamesToResponseAsync(espnGames);
+                        _logger.LogInformation("ESPN scoreboard: {Count} jogos de hoje", response.Count);
+                    }
+                    catch (Exception espnEx)
+                    {
+                        _logger.LogWarning(espnEx, "Falha ao buscar jogos de hoje na ESPN, retornando lista vazia.");
+                    }
+                }
+
                 var hasLiveGames = response.Any(g => g.IsLive);
                 var cacheDuration = hasLiveGames ? TimeSpan.FromSeconds(15) : TimeSpan.FromSeconds(30);
 
                 await _cacheService.SetAsync(cacheKey, response, cacheDuration);
-                _logger.LogInformation("Recuperados {Count} jogos de hoje do BANCO DE DADOS (TTL: {TTL}s)", response.Count, cacheDuration.TotalSeconds);
-
+                _logger.LogInformation("Retornando {Count} jogos de hoje (TTL: {TTL}s)", response.Count, cacheDuration.TotalSeconds);
                 return response;
             }
             catch (Exception ex)
@@ -133,12 +149,25 @@ namespace HoopGameNight.Core.Services
             }
             else
             {
-                response = new List<GameResponse>();
-                _logger.LogWarning("Nenhum jogo encontrado para {Date}", date.ToString("yyyy-MM-dd"));
-                // TTL curto para listas vazias: permite que o sync resolva rapidamente
-                await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromSeconds(15));
-            }
+                // Banco sem jogos para hoje ou datas passadas: fallback ESPN scoreboard
+                _logger.LogInformation("BANCO sem jogos para {Date}, consultando ESPN scoreboard como fallback...", date.ToString("yyyy-MM-dd"));
+                try
+                {
+                    var espnGames = await _espnService.GetGamesByDateAsync(date);
+                    response = await ConvertEspnGamesToResponseAsync(espnGames);
+                    _logger.LogInformation("ESPN fallback: {Count} jogos para {Date}", response.Count, date.ToString("yyyy-MM-dd"));
 
+                    // TTL curto para fallback ESPN
+                    var fallbackTtl = response.Any(g => g.IsLive) ? TimeSpan.FromSeconds(15) : TimeSpan.FromSeconds(30);
+                    await _cacheService.SetAsync(cacheKey, response, fallbackTtl);
+                }
+                catch (Exception espnEx)
+                {
+                    _logger.LogWarning(espnEx, "Falha ao buscar jogos na ESPN para {Date}, retornando lista vazia.", date.ToString("yyyy-MM-dd"));
+                    response = new List<GameResponse>();
+                    await _cacheService.SetAsync(cacheKey, response, TimeSpan.FromSeconds(15));
+                }
+            }
             return response;
         }
 
