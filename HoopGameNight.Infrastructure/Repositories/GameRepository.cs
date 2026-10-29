@@ -251,6 +251,11 @@ namespace HoopGameNight.Infrastructure.Repositories
                 game.SeriesNote
             });
 
+            if (id == 0 && !string.IsNullOrEmpty(game.ExternalId))
+            {
+                var existing = await GetByExternalIdAsync(game.ExternalId);
+                if (existing != null) id = existing.Id;
+            }
             game.Id = id;
             Logger.LogInformation("Game inserted with ID: {GameId}", id);
             return id;

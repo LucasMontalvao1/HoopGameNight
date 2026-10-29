@@ -18,6 +18,7 @@ INSERT INTO games (
     NOW(), NOW()
 )
 ON DUPLICATE KEY UPDATE
+    id = LAST_INSERT_ID(id),
     home_team_score = VALUES(home_team_score),
     visitor_team_score = VALUES(visitor_team_score),
     status = VALUES(status),

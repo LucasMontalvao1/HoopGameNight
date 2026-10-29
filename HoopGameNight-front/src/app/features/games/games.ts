@@ -184,7 +184,6 @@ export class Games implements OnInit, OnDestroy {
   }
 
   viewGameDetails(gameId: number): void {
-    if (!gameId || gameId <= 0) return;
     this.router.navigate(['/games', gameId]);
   }
 
