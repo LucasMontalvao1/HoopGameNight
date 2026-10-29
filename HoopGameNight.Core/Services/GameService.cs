@@ -126,6 +126,29 @@ namespace HoopGameNight.Core.Services
 
             if (gamesFromDb.Any())
             {
+                var needsScoreUpdate = date <= DateTime.Today && gamesFromDb.Any(g => !g.IsCompleted || !g.HomeTeamScore.HasValue);
+                if (needsScoreUpdate)
+                {
+                    _logger.LogInformation("Jogos no banco para {Date} estão sem placar ou incompletos. Buscando atualização na ESPN...", date.ToString("yyyy-MM-dd"));
+                    try
+                    {
+                        var espnGames = await _espnService.GetGamesByDateAsync(date);
+                        if (espnGames.Any())
+                        {
+                            response = await ConvertEspnGamesToResponseAsync(espnGames);
+                            var updateDuration = response.Any(g => g.IsLive) 
+                                ? CacheDurations.LiveGames 
+                                : CacheDurations.GetGameCacheDuration(date);
+                            await _cacheService.SetAsync(cacheKey, response, updateDuration);
+                            return response;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Falha ao buscar atualização de placar na ESPN para {Date}. Retornando dados do banco.", date.ToString("yyyy-MM-dd"));
+                    }
+                }
+
                 response = _mapper.Map<List<GameResponse>>(gamesFromDb);
                 _logger.LogInformation("BANCO: Encontrou {Count} jogos para {Date}",
                     response.Count, date.ToString("yyyy-MM-dd"));
@@ -622,6 +645,7 @@ namespace HoopGameNight.Core.Services
                             Season = eg.Season ?? (eg.Date.Month >= 10 ? eg.Date.Year + 1 : eg.Date.Year),
                             LineScoreJson = eg.LineScoreJson,
                             GameLeadersJson = eg.GameLeadersJson,
+                            SeriesNote = eg.SeriesNote,
                             CreatedAt = DateTime.UtcNow,
                             UpdatedAt = DateTime.UtcNow
                         };

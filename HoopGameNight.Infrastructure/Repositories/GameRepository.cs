@@ -230,26 +230,83 @@ namespace HoopGameNight.Infrastructure.Repositories
             Logger.LogDebug("Inserting game: {GameTitle}", game.GameTitle);
 
             var sql = await LoadSqlAsync("Insert");
-            var id = await ExecuteScalarAsync<int>(sql, new
+            int id = 0;
+            try
             {
-                game.ExternalId,
-                game.Date,
-                DateTime = game.DateTime,
-                game.HomeTeamId,
-                game.VisitorTeamId,
-                game.HomeTeamScore,
-                game.VisitorTeamScore,
-                Status = game.Status.ToString(),
-                game.Period,
-                game.TimeRemaining,
-                game.PostSeason,
-                game.Season,
-                game.AiSummary,
-                game.AiHighlights,
-                game.LineScoreJson,
-                game.GameLeadersJson,
-                game.SeriesNote
-            });
+                id = await ExecuteScalarAsync<int>(sql, new
+                {
+                    game.ExternalId,
+                    game.Date,
+                    DateTime = game.DateTime,
+                    game.HomeTeamId,
+                    game.VisitorTeamId,
+                    game.HomeTeamScore,
+                    game.VisitorTeamScore,
+                    Status = game.Status.ToString(),
+                    game.Period,
+                    game.TimeRemaining,
+                    game.PostSeason,
+                    game.Season,
+                    game.AiSummary,
+                    game.AiHighlights,
+                    game.LineScoreJson,
+                    game.GameLeadersJson,
+                    game.SeriesNote
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Falha no insert padrão para {GameTitle}. Tentando fallback de compatibilidade...", game.GameTitle);
+                try
+                {
+                    var fallbackSql = @"
+                        INSERT INTO games (
+                            external_id, date, datetime,
+                            home_team_id, visitor_team_id,
+                            home_team_score, visitor_team_score,
+                            status, period, time_remaining,
+                            postseason, season,
+                            created_at, updated_at
+                        ) VALUES (
+                            @ExternalId, @Date, @DateTime,
+                            @HomeTeamId, @VisitorTeamId,
+                            @HomeTeamScore, @VisitorTeamScore,
+                            @Status, @Period, @TimeRemaining,
+                            @PostSeason, @Season,
+                            NOW(), NOW()
+                        )
+                        ON DUPLICATE KEY UPDATE
+                            id = LAST_INSERT_ID(id),
+                            home_team_score = VALUES(home_team_score),
+                            visitor_team_score = VALUES(visitor_team_score),
+                            status = VALUES(status),
+                            period = VALUES(period),
+                            time_remaining = VALUES(time_remaining),
+                            updated_at = NOW();
+
+                        SELECT LAST_INSERT_ID();";
+
+                    id = await ExecuteScalarAsync<int>(fallbackSql, new
+                    {
+                        game.ExternalId,
+                        game.Date,
+                        DateTime = game.DateTime,
+                        game.HomeTeamId,
+                        game.VisitorTeamId,
+                        game.HomeTeamScore,
+                        game.VisitorTeamScore,
+                        Status = game.Status.ToString(),
+                        game.Period,
+                        game.TimeRemaining,
+                        game.PostSeason,
+                        game.Season
+                    });
+                }
+                catch (Exception fallbackEx)
+                {
+                    Logger.LogError(fallbackEx, "Falha também no fallback de insert para {GameTitle}", game.GameTitle);
+                }
+            }
 
             if (id == 0 && !string.IsNullOrEmpty(game.ExternalId))
             {
@@ -271,6 +328,7 @@ namespace HoopGameNight.Infrastructure.Repositories
             var rowsAffected = await ExecuteAsync(sql, new
             {
                 game.Id,
+                DateTime = game.DateTime,
                 game.HomeTeamScore,
                 game.VisitorTeamScore,
                 Status = game.Status.ToString(),

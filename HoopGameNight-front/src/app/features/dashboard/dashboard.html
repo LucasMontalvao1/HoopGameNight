@@ -84,7 +84,7 @@
               <div class="game-card-premium__header">
                 @if (game.isLive) {
                 <span class="badge badge--live">LIVE</span>
-                } @else if (game.isCompleted) {
+                } @else if (game.isCompleted || (game.homeTeamScore !== null && game.homeTeamScore !== undefined && !game.isFutureGame)) {
                 <span class="badge badge--final">FINAL</span>
                 } @else {
                 <span class="badge badge--time">{{ formatGameTime(game.dateTime) }}</span>
@@ -98,7 +98,7 @@
                     (error)="handleLogoError($event, game.visitorTeam.abbreviation)">
                   <span class="team-abbr-lg">{{ game.visitorTeam.abbreviation }}</span>
                   <span class="team-record-mini">{{ game.visitorTeam.wins }}-{{ game.visitorTeam.losses }}</span>
-                  @if (game.isCompleted || game.isLive) {
+                  @if (game.isCompleted || game.isLive || (game.visitorTeamScore !== null && game.visitorTeamScore !== undefined)) {
                   <span class="team-score-lg" [class.is-winner]="game.winningTeam?.id === game.visitorTeam.id">
                     {{ game.visitorTeamScore }}
                   </span>
@@ -113,7 +113,7 @@
                     (error)="handleLogoError($event, game.homeTeam.abbreviation)">
                   <span class="team-abbr-lg">{{ game.homeTeam.abbreviation }}</span>
                   <span class="team-record-mini">{{ game.homeTeam.wins }}-{{ game.homeTeam.losses }}</span>
-                  @if (game.isCompleted || game.isLive) {
+                  @if (game.isCompleted || game.isLive || (game.homeTeamScore !== null && game.homeTeamScore !== undefined)) {
                   <span class="team-score-lg" [class.is-winner]="game.winningTeam?.id === game.homeTeam.id">
                     {{ game.homeTeamScore }}
                   </span>

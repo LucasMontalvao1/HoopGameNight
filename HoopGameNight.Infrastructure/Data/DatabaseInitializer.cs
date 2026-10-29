@@ -37,6 +37,8 @@ namespace HoopGameNight.Infrastructure.Data
 
                 await CreateTablesAsync();
 
+                await RunMigrationsAsync();
+
                 await CreateTriggersAsync();
 
                 await CreateViewsAsync();
@@ -173,6 +175,52 @@ namespace HoopGameNight.Infrastructure.Data
                     _logger.LogError(ex, "\r\nFalha ao criar a tabela {Table}", table);
                     throw;
                 }
+            }
+        }
+
+        private async Task RunMigrationsAsync()
+        {
+            _logger.LogInformation("Verificando migrações de schema necessárias...");
+
+            // Tabela games
+            await EnsureColumnExistsAsync("games", "series_note", "VARCHAR(255) DEFAULT NULL COMMENT 'Nota da série (ex: Game 7 If Necessary)'");
+            await EnsureColumnExistsAsync("games", "line_score_json", "JSON DEFAULT NULL COMMENT 'Parciais por período'");
+            await EnsureColumnExistsAsync("games", "game_leaders_json", "JSON DEFAULT NULL COMMENT 'Líderes de estatísticas do jogo'");
+            await EnsureColumnExistsAsync("games", "ai_summary", "TEXT DEFAULT NULL COMMENT 'Resumo gerado por IA'");
+            await EnsureColumnExistsAsync("games", "ai_highlights", "JSON DEFAULT NULL COMMENT 'Destaques e insights da IA'");
+
+            // Tabela teams
+            await EnsureColumnExistsAsync("teams", "wins", "INT DEFAULT NULL");
+            await EnsureColumnExistsAsync("teams", "losses", "INT DEFAULT NULL");
+            await EnsureColumnExistsAsync("teams", "external_espn_id", "VARCHAR(50) DEFAULT NULL");
+
+            // Tabela players
+            await EnsureColumnExistsAsync("players", "espn_id", "VARCHAR(50) DEFAULT NULL");
+            await EnsureColumnExistsAsync("players", "nba_stats_id", "VARCHAR(50) DEFAULT NULL");
+        }
+
+        private async Task EnsureColumnExistsAsync(string tableName, string columnName, string columnDefinition)
+        {
+            try
+            {
+                var sql = $@"
+                    SELECT COUNT(*) 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                      AND TABLE_NAME = '{tableName}' 
+                      AND COLUMN_NAME = '{columnName}'";
+
+                var count = await _queryExecutor.QuerySingleAsync<int>(sql);
+                if (count == 0)
+                {
+                    _logger.LogInformation("Adicionando coluna '{Column}' na tabela '{Table}'...", columnName, tableName);
+                    await _queryExecutor.ExecuteAsync($"ALTER TABLE `{tableName}` ADD COLUMN `{columnName}` {columnDefinition};");
+                    _logger.LogInformation("Coluna '{Column}' adicionada com sucesso na tabela '{Table}'.", columnName, tableName);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Aviso ao verificar ou adicionar coluna '{Column}' na tabela '{Table}'", columnName, tableName);
             }
         }
 
