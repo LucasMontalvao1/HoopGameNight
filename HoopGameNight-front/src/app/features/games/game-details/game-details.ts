@@ -80,10 +80,13 @@ export class GameDetails implements OnInit, OnDestroy {
 
     async ngOnInit(): Promise<void> {
         this.route.params.subscribe(async params => {
-            const id = params['id'];
-            if (id) {
-                this._gameId.set(+id);
-                await this.loadData(+id);
+            const numId = +params['id'];
+            if (numId && numId > 0) {
+                this._gameId.set(numId);
+                await this.loadData(numId);
+            } else {
+                console.warn('Game ID inválido na rota:', params['id']);
+                this.router.navigate(['/games']);
             }
         });
     }

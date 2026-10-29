@@ -66,7 +66,7 @@ namespace HoopGameNight.Core.Services
                 var cacheKey = CacheKeys.TodayGames();
 
                 var cachedData = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
-                if (cachedData != null)
+                if (cachedData != null && !cachedData.Any(g => g.Id == 0))
                 {
                     _logger.LogInformation("CACHE HIT: Jogos de hoje ({Count} jogos)", cachedData.Count);
                     return cachedData;
@@ -113,7 +113,7 @@ namespace HoopGameNight.Core.Services
             _logger.LogInformation("GET GAMES: Buscando jogos para {Date}", date.ToString("yyyy-MM-dd"));
 
             var cachedData = await _cacheService.GetAsync<List<GameResponse>>(cacheKey);
-            if (cachedData != null)
+            if (cachedData != null && !cachedData.Any(g => g.Id == 0))
             {
                 _logger.LogInformation("CACHE HIT: {Date} ({Count} jogos)", date.ToString("yyyy-MM-dd"), cachedData.Count);
                 return cachedData;
@@ -579,8 +579,16 @@ namespace HoopGameNight.Core.Services
                 int gameId = 0;
                 try
                 {
-                    var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate);
-                    var existingGame = existingGames.FirstOrDefault(g => g.HomeTeamId == homeTeamId && g.VisitorTeamId == awayTeamId);
+                    Game? existingGame = null;
+                    if (!string.IsNullOrEmpty(eg.Id))
+                    {
+                        existingGame = await _gameRepository.GetByExternalIdAsync(eg.Id);
+                    }
+                    if (existingGame == null)
+                    {
+                        var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate);
+                        existingGame = existingGames.FirstOrDefault(g => g.HomeTeamId == homeTeamId && g.VisitorTeamId == awayTeamId);
+                    }
 
                     if (existingGame != null)
                     {
