@@ -565,47 +565,141 @@ namespace HoopGameNight.Core.Services
                     continue;
                 }
 
+                var statusEnum = !string.IsNullOrEmpty(eg.Status)
+                    ? _espnParser.MapGameStatus(eg.Status)
+                    : (eg.HomeTeamScore.HasValue && eg.AwayTeamScore.HasValue && eg.Date < DateTime.UtcNow.AddHours(-3)
+                        ? GameStatus.Final
+                        : (eg.Date > DateTime.UtcNow ? GameStatus.Scheduled : GameStatus.Final));
+
+                var isCompleted = statusEnum == GameStatus.Final;
+                var isLive = statusEnum == GameStatus.Live;
+                var isFutureGame = eg.Date.Date > DateTime.Today;
+                var gameDate = eg.Date.Date;
+
+                int gameId = 0;
+                try
+                {
+                    var existingGames = await _gameRepository.GetGamesByDateAsync(gameDate);
+                    var existingGame = existingGames.FirstOrDefault(g => g.HomeTeamId == homeTeamId && g.VisitorTeamId == awayTeamId);
+
+                    if (existingGame != null)
+                    {
+                        gameId = existingGame.Id;
+                        if (eg.HomeTeamScore.HasValue && eg.AwayTeamScore.HasValue &&
+                            (!existingGame.HomeTeamScore.HasValue || existingGame.HomeTeamScore != eg.HomeTeamScore || existingGame.Status != statusEnum))
+                        {
+                            existingGame.HomeTeamScore = eg.HomeTeamScore;
+                            existingGame.VisitorTeamScore = eg.AwayTeamScore;
+                            existingGame.Status = statusEnum;
+                            existingGame.Period = eg.Period;
+                            existingGame.TimeRemaining = eg.TimeRemaining;
+                            await _gameRepository.UpdateAsync(existingGame);
+                        }
+                    }
+                    else
+                    {
+                        var newGame = new Game
+                        {
+                            ExternalId = !string.IsNullOrEmpty(eg.Id) ? eg.Id : $"espn_{gameDate:yyyyMMdd}_{awayTeam.Abbreviation}_{homeTeam.Abbreviation}",
+                            Date = gameDate,
+                            DateTime = eg.Date,
+                            HomeTeamId = homeTeamId,
+                            VisitorTeamId = awayTeamId,
+                            HomeTeamScore = eg.HomeTeamScore,
+                            VisitorTeamScore = eg.AwayTeamScore,
+                            Status = statusEnum,
+                            Period = eg.Period,
+                            TimeRemaining = eg.TimeRemaining,
+                            PostSeason = eg.IsPostseason ?? false,
+                            Season = eg.Season ?? (eg.Date.Month >= 10 ? eg.Date.Year + 1 : eg.Date.Year),
+                            LineScoreJson = eg.LineScoreJson,
+                            GameLeadersJson = eg.GameLeadersJson,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        gameId = await _gameRepository.InsertAsync(newGame);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Erro ao associar ou salvar jogo no banco para {Away} @ {Home} em {Date}", awayTeam.Abbreviation, homeTeam.Abbreviation, gameDate);
+                }
+
+                var homeSummary = new TeamSummaryResponse
+                {
+                    Id = homeTeam.Id,
+                    Name = homeTeam.Name,
+                    DisplayName = string.IsNullOrEmpty(homeTeam.DisplayName) ? homeTeam.Name : homeTeam.DisplayName,
+                    Abbreviation = homeTeam.Abbreviation,
+                    City = homeTeam.City,
+                    LogoUrl = TeamExtensions.GetTeamLogoUrl(homeTeam.Abbreviation),
+                    Wins = homeTeam.Wins,
+                    Losses = homeTeam.Losses
+                };
+
+                var awaySummary = new TeamSummaryResponse
+                {
+                    Id = awayTeam.Id,
+                    Name = awayTeam.Name,
+                    DisplayName = string.IsNullOrEmpty(awayTeam.DisplayName) ? awayTeam.Name : awayTeam.DisplayName,
+                    Abbreviation = awayTeam.Abbreviation,
+                    City = awayTeam.City,
+                    LogoUrl = TeamExtensions.GetTeamLogoUrl(awayTeam.Abbreviation),
+                    Wins = awayTeam.Wins,
+                    Losses = awayTeam.Losses
+                };
+
+                TeamSummaryResponse? winningTeam = null;
+                if (isCompleted && eg.HomeTeamScore.HasValue && eg.AwayTeamScore.HasValue)
+                {
+                    if (eg.HomeTeamScore > eg.AwayTeamScore) winningTeam = homeSummary;
+                    else if (eg.AwayTeamScore > eg.HomeTeamScore) winningTeam = awaySummary;
+                }
+
+                string statusDisplay;
+                if (isCompleted)
+                {
+                    statusDisplay = "Final";
+                }
+                else if (isLive)
+                {
+                    statusDisplay = !string.IsNullOrEmpty(eg.TimeRemaining)
+                        ? $"Q{eg.Period ?? 1} - {eg.TimeRemaining}"
+                        : "Ao Vivo";
+                }
+                else
+                {
+                    statusDisplay = eg.Date.ToString("HH:mm");
+                }
+
                 responses.Add(new GameResponse
                 {
-                    Id = 0,
+                    Id = gameId,
+                    ExternalId = eg.Id ?? string.Empty,
                     Date = eg.Date,
                     DateTime = eg.Date,
-                    HomeTeam = new TeamSummaryResponse
-                    {
-                        Id = homeTeam.Id,
-                        Name = homeTeam.Name,
-                        Abbreviation = homeTeam.Abbreviation,
-                        LogoUrl = TeamExtensions.GetTeamLogoUrl(homeTeam.Abbreviation),
-                        Wins = homeTeam.Wins,
-                        Losses = homeTeam.Losses
-                    },
-                    VisitorTeam = new TeamSummaryResponse
-                    {
-                        Id = awayTeam.Id,
-                        Name = awayTeam.Name,
-                        Abbreviation = awayTeam.Abbreviation,
-                        LogoUrl = TeamExtensions.GetTeamLogoUrl(awayTeam.Abbreviation),
-                        Wins = awayTeam.Wins,
-                        Losses = awayTeam.Losses
-                    },
+                    HomeTeam = homeSummary,
+                    VisitorTeam = awaySummary,
                     HomeTeamScore = eg.HomeTeamScore,
                     VisitorTeamScore = eg.AwayTeamScore,
-                    Status = "Scheduled",
-                    StatusDisplay = eg.Date.ToString("MMM dd, h:mm tt"),
+                    Status = statusEnum.ToString(),
+                    StatusDisplay = statusDisplay,
                     GameTitle = $"{awayTeam.Name} @ {homeTeam.Name}",
                     Score = eg.HomeTeamScore.HasValue && eg.AwayTeamScore.HasValue
                         ? $"{eg.AwayTeamScore} - {eg.HomeTeamScore}"
                         : "-",
-                    IsLive = false,
-                    IsCompleted = false,
-                    IsFutureGame = true,
+                    Period = eg.Period,
+                    TimeRemaining = eg.TimeRemaining,
+                    IsLive = isLive,
+                    IsCompleted = isCompleted,
+                    IsFutureGame = isFutureGame,
+                    WinningTeam = winningTeam,
                     DataSource = "ESPN"
                 });
             }
 
             return responses;
         }
-
         private Dictionary<int, List<GameResponse>> GroupGamesByTeam(List<GameResponse> games, List<int> teamIds)
         {
             var grouped = new Dictionary<int, List<GameResponse>>();

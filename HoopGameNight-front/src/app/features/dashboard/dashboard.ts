@@ -172,6 +172,7 @@ export class Dashboard implements OnInit {
   }
 
   viewGameDetails(gameId: number): void {
+    if (!gameId || gameId <= 0) return;
     this.router.navigate(['/games', gameId]);
   }
 
