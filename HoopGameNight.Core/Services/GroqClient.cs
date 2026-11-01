@@ -18,14 +18,16 @@ namespace HoopGameNight.Core.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<GroqClient> _logger;
         private readonly string _apiKey;
-        private const string DefaultModel = "llama-3.3-70b-versatile"; 
+        private readonly string _model;
+        private const string FallbackModel = "llama-3.1-8b-instant"; 
         private const int MaxPromptLength = 32000; 
 
-        public GroqClient(HttpClient httpClient, ILogger<GroqClient> logger, string apiKey = "")
+        public GroqClient(HttpClient httpClient, ILogger<GroqClient> logger, string apiKey = "", string model = "llama-3.1-8b-instant")
         {
             _httpClient = httpClient;
             _logger = logger;
             _apiKey = apiKey;
+            _model = string.IsNullOrWhiteSpace(model) ? FallbackModel : model;
         }
 
         public Task<bool> IsAvailableAsync()
@@ -34,6 +36,11 @@ namespace HoopGameNight.Core.Services
         }
 
         public async Task<string> GenerateAsync(string prompt)
+        {
+            return await GenerateWithModelAsync(prompt, _model);
+        }
+
+        private async Task<string> GenerateWithModelAsync(string prompt, string modelName)
         {
             try
             {
@@ -48,7 +55,7 @@ namespace HoopGameNight.Core.Services
 
                 var requestBody = new
                 {
-                    model = DefaultModel,
+                    model = modelName,
                     messages = new[]
                     {
                         new { role = "user", content = prompt }
@@ -60,7 +67,7 @@ namespace HoopGameNight.Core.Services
                 var jsonRequest = JsonSerializer.Serialize(requestBody);
                 var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
-                _logger.LogDebug("Enviando requisição para Groq API...");
+                _logger.LogDebug("Enviando requisição para Groq API com modelo {Model}...", modelName);
                 
                 var response = await _httpClient.PostAsync("openai/v1/chat/completions", content);
                 
@@ -68,6 +75,14 @@ namespace HoopGameNight.Core.Services
                 {
                     var error = await response.Content.ReadAsStringAsync();
                     _logger.LogError("Erro na API do Groq: {StatusCode} - {Error}", response.StatusCode, error);
+
+                    // Se o modelo falhar por model_not_found e não for o fallback, tenta o fallback
+                    if (error.Contains("model_not_found") && modelName != FallbackModel)
+                    {
+                        _logger.LogWarning("Modelo {Model} não encontrado no Groq. Tentando com fallback {Fallback}...", modelName, FallbackModel);
+                        return await GenerateWithModelAsync(prompt, FallbackModel);
+                    }
+
                     return "Ocorreu um erro ao processar sua pergunta com a IA. Por favor, tente novamente em instantes.";
                 }
 

@@ -291,11 +291,9 @@ namespace HoopGameNight.Core.Services.AI
                 if (firstBrace >= 0 && lastBrace > firstBrace)
                 {
                     cleanerResponse = cleanerResponse.Substring(firstBrace, lastBrace - firstBrace + 1);
-                }
+                    cleanerResponse = SanitizeJsonString(cleanerResponse);
 
-                cleanerResponse = SanitizeJsonString(cleanerResponse);
-
-                var aiData = JsonSerializer.Deserialize<AiGameStory>(cleanerResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    var aiData = JsonSerializer.Deserialize<AiGameStory>(cleanerResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 
                 if (aiData != null && !string.IsNullOrEmpty(aiData.Summary))
                 {
@@ -326,6 +324,7 @@ namespace HoopGameNight.Core.Services.AI
                         DataSource = "Database (Processed)",
                         DetectedTeams = new List<string> { game.HomeTeam.Abbreviation, game.VisitorTeam.Abbreviation }
                     };
+                }
                 }
             }
             catch (Exception ex)

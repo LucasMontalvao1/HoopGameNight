@@ -208,6 +208,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<INbaAiService, NbaAiService>();
 
             var apiKey = configuration["GROQ_API_KEY"] ?? configuration["Groq:ApiKey"] ?? Environment.GetEnvironmentVariable("GROQ_API_KEY") ?? "";
+            var model = configuration["GROQ_MODEL"] ?? configuration["Groq:Model"] ?? Environment.GetEnvironmentVariable("GROQ_MODEL") ?? "llama-3.1-8b-instant";
 
             services.AddHttpClient("Groq", client =>
             {
@@ -229,7 +230,7 @@ namespace HoopGameNight.Api.Extensions
                 var factory = sp.GetRequiredService<IHttpClientFactory>();
                 var client = factory.CreateClient("Groq");
                 var logger = sp.GetRequiredService<ILogger<GroqClient>>();
-                return new GroqClient(client, logger, apiKey);
+                return new GroqClient(client, logger, apiKey, model);
             });
 
             // Repositories
