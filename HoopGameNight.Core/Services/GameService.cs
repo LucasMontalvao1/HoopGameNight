@@ -878,7 +878,14 @@ namespace HoopGameNight.Core.Services
                         var parsedPlays = _espnParser.ParsePlaysResponse(rawPlays, gameId);
                         if (parsedPlays.Any())
                         {
-                            await _gamePlayRepository.SavePlaysAsync(gameId, parsedPlays);
+                            try
+                            {
+                                await _gamePlayRepository.SavePlaysAsync(gameId, parsedPlays);
+                            }
+                            catch (Exception saveEx)
+                            {
+                                _logger.LogWarning(saveEx, "Erro ao salvar jogadas no banco para jogo {GameId}", gameId);
+                            }
                             plays = parsedPlays;
                             _logger.LogInformation("Successfully parsed {Count} plays from ESPN for game {GameId}", plays.Count(), gameId);
                         }

@@ -197,6 +197,52 @@ namespace HoopGameNight.Infrastructure.Data
             // Tabela players
             await EnsureColumnExistsAsync("players", "espn_id", "VARCHAR(50) DEFAULT NULL");
             await EnsureColumnExistsAsync("players", "nba_stats_id", "VARCHAR(50) DEFAULT NULL");
+
+            // Tabela game_plays
+            await EnsureGamePlaysTableAsync();
+        }
+
+        private async Task EnsureGamePlaysTableAsync()
+        {
+            try
+            {
+                var checkSql = @"
+                    SELECT COUNT(*) 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                      AND TABLE_NAME = 'game_plays'";
+
+                var count = await _queryExecutor.QuerySingleAsync<int>(checkSql);
+                if (count == 0)
+                {
+                    _logger.LogInformation("Criando tabela 'game_plays'...");
+                    var createSql = @"
+                        CREATE TABLE IF NOT EXISTS `game_plays` (
+                            `id` INT AUTO_INCREMENT PRIMARY KEY,
+                            `game_id` INT NOT NULL,
+                            `external_id` VARCHAR(50) DEFAULT NULL,
+                            `sequence` INT NOT NULL DEFAULT 0,
+                            `period` INT NOT NULL DEFAULT 1,
+                            `clock` VARCHAR(20) DEFAULT NULL,
+                            `text` TEXT NOT NULL,
+                            `type` VARCHAR(100) DEFAULT NULL,
+                            `team_id` INT DEFAULT NULL,
+                            `player_id` INT DEFAULT NULL,
+                            `score_value` INT NOT NULL DEFAULT 0,
+                            `home_score` INT NOT NULL DEFAULT 0,
+                            `away_score` INT NOT NULL DEFAULT 0,
+                            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            INDEX `idx_game_plays_game_id` (`game_id`)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+
+                    await _queryExecutor.ExecuteAsync(createSql);
+                    _logger.LogInformation("Tabela 'game_plays' criada com sucesso.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Aviso ao verificar ou criar tabela 'game_plays'");
+            }
         }
 
         private async Task EnsureColumnExistsAsync(string tableName, string columnName, string columnDefinition)

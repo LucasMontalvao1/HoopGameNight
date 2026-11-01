@@ -325,22 +325,55 @@ namespace HoopGameNight.Infrastructure.Repositories
             game.UpdateTimestamp();
 
             var sql = await LoadSqlAsync("Update");
-            var rowsAffected = await ExecuteAsync(sql, new
+            int rowsAffected = 0;
+            try
             {
-                game.Id,
-                DateTime = game.DateTime,
-                game.HomeTeamScore,
-                game.VisitorTeamScore,
-                Status = game.Status.ToString(),
-                game.Period,
-                game.TimeRemaining,
-                game.AiSummary,
-                game.AiHighlights,
-                game.LineScoreJson,
-                game.GameLeadersJson,
-                game.SeriesNote,
-                game.UpdatedAt
-            });
+                rowsAffected = await ExecuteAsync(sql, new
+                {
+                    game.Id,
+                    DateTime = game.DateTime,
+                    game.HomeTeamScore,
+                    game.VisitorTeamScore,
+                    Status = game.Status.ToString(),
+                    game.Period,
+                    game.TimeRemaining,
+                    game.AiSummary,
+                    game.AiHighlights,
+                    game.LineScoreJson,
+                    game.GameLeadersJson,
+                    game.SeriesNote,
+                    game.UpdatedAt
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Falha no update padrão para {GameId}. Tentando fallback sem colunas novas...", game.Id);
+                try
+                {
+                    var fallbackSql = @"UPDATE games SET
+                        home_team_score = @HomeTeamScore,
+                        visitor_team_score = @VisitorTeamScore,
+                        status = @Status,
+                        period = @Period,
+                        time_remaining = @TimeRemaining,
+                        updated_at = @UpdatedAt
+                    WHERE id = @Id;";
+                    rowsAffected = await ExecuteAsync(fallbackSql, new
+                    {
+                        game.Id,
+                        game.HomeTeamScore,
+                        game.VisitorTeamScore,
+                        Status = game.Status.ToString(),
+                        game.Period,
+                        game.TimeRemaining,
+                        game.UpdatedAt
+                    });
+                }
+                catch (Exception fallbackEx)
+                {
+                    Logger.LogError(fallbackEx, "Falha também no fallback de update para {GameId}", game.Id);
+                }
+            }
 
             var updated = rowsAffected > 0;
             Logger.LogDebug("Game {Updated}: {GameId}", updated ? "updated" : "not updated", game.Id);

@@ -250,7 +250,7 @@
                                     <span class="material-icons info-icon">history</span>
                                 </div>
                                 <div class="pbp-timeline">
-                                    @for (play of gamesService.gamePlays(); track play.id) {
+                                    @for (play of gamesService.gamePlays(); track play.sequence || play.id || $index) {
                                         <div class="pbp-item" [class.scoring]="play.scoreValue > 0">
                                             <div class="pbp-time">{{ play.clock }}</div>
                                             <div class="pbp-dot"></div>

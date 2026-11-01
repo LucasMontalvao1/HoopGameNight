@@ -286,6 +286,13 @@ namespace HoopGameNight.Core.Services.AI
                 if (cleanerResponse.EndsWith("```")) cleanerResponse = cleanerResponse.Substring(0, cleanerResponse.Length - 3);
                 cleanerResponse = cleanerResponse.Trim();
 
+                int firstBrace = cleanerResponse.IndexOf('{');
+                int lastBrace = cleanerResponse.LastIndexOf('}');
+                if (firstBrace >= 0 && lastBrace > firstBrace)
+                {
+                    cleanerResponse = cleanerResponse.Substring(firstBrace, lastBrace - firstBrace + 1);
+                }
+
                 cleanerResponse = SanitizeJsonString(cleanerResponse);
 
                 var aiData = JsonSerializer.Deserialize<AiGameStory>(cleanerResponse, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
@@ -296,12 +303,20 @@ namespace HoopGameNight.Core.Services.AI
                     
                     gameEntity.AiSummary = aiData.Summary;
                     gameEntity.AiHighlights = JsonSerializer.Serialize(aiData.Highlights, options);
-                    await _gameRepository.UpdateAsync(gameEntity);
-                    
+
+                    // Persistência separada: não deve bloquear o retorno do resumo ao usuário
+                    try
+                    {
+                        await _gameRepository.UpdateAsync(gameEntity);
+                        _logger.LogInformation("Resumo e Highlights salvos para o jogo {GameId} (Status: {Status})", gameId, gameEntity.Status);
+                    }
+                    catch (Exception updateEx)
+                    {
+                        _logger.LogWarning(updateEx, "Falha ao persistir resumo no banco para o jogo {GameId}. Resumo ainda será retornado.", gameId);
+                    }
+
                     var cacheData = JsonSerializer.Serialize(new { summary = aiData.Summary, highlights = aiData.Highlights }, options);
                     await _cacheService.SetAsync(cacheKey, cacheData, expiration: null);
-                    
-                    _logger.LogInformation("Resumo e Highlights salvos para o jogo {GameId} (Status: {Status})", gameId, gameEntity.Status);
 
                     return new AskResponse
                     {

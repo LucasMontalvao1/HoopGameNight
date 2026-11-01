@@ -207,7 +207,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddSingleton<NbaPromptBuilder>();
             services.AddScoped<INbaAiService, NbaAiService>();
 
-            var apiKey = configuration["GROQ_API_KEY"] ?? "";
+            var apiKey = configuration["GROQ_API_KEY"] ?? configuration["Groq:ApiKey"] ?? Environment.GetEnvironmentVariable("GROQ_API_KEY") ?? "";
 
             services.AddHttpClient("Groq", client =>
             {

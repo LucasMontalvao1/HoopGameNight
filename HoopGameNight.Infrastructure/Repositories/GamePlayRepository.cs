@@ -22,35 +22,51 @@ namespace HoopGameNight.Infrastructure.Repositories
 
         public async Task<IEnumerable<GamePlay>> GetByGameIdAsync(int gameId)
         {
-            const string sql = "SELECT * FROM game_plays WHERE game_id = @GameId ORDER BY sequence ASC";
-            return await ExecuteQueryAsync<GamePlay>(sql, new { GameId = gameId });
+            try
+            {
+                const string sql = "SELECT * FROM game_plays WHERE game_id = @GameId ORDER BY sequence ASC";
+                return await ExecuteQueryAsync<GamePlay>(sql, new { GameId = gameId });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Falha ao buscar jogadas no banco para o jogo {GameId}. Fallback ativado.", gameId);
+                return Enumerable.Empty<GamePlay>();
+            }
         }
 
         public async Task<bool> SavePlaysAsync(int gameId, IEnumerable<GamePlay> plays)
         {
-            return await ExecuteInTransactionAsync(async (conn, trans) =>
+            try
             {
-                // Delete existing plays for this game to avoid duplicates on resync
-                const string deleteSql = "DELETE FROM game_plays WHERE game_id = @GameId";
-                await conn.ExecuteAsync(deleteSql, new { GameId = gameId }, trans);
-
-                // Insert new plays
-                const string insertSql = @"
-                    INSERT INTO game_plays (
-                        game_id, external_id, sequence, period, clock, text, type, 
-                        team_id, player_id, score_value, home_score, away_score
-                    ) VALUES (
-                        @GameId, @ExternalId, @Sequence, @Period, @Clock, @Text, @Type, 
-                        @TeamId, @PlayerId, @ScoreValue, @HomeScore, @AwayScore
-                    )";
-
-                foreach (var play in plays)
+                return await ExecuteInTransactionAsync(async (conn, trans) =>
                 {
-                    await conn.ExecuteAsync(insertSql, play, trans);
-                }
+                    // Delete existing plays for this game to avoid duplicates on resync
+                    const string deleteSql = "DELETE FROM game_plays WHERE game_id = @GameId";
+                    await conn.ExecuteAsync(deleteSql, new { GameId = gameId }, trans);
 
-                return true;
-            });
+                    // Insert new plays
+                    const string insertSql = @"
+                        INSERT INTO game_plays (
+                            game_id, external_id, sequence, period, clock, text, type, 
+                            team_id, player_id, score_value, home_score, away_score
+                        ) VALUES (
+                            @GameId, @ExternalId, @Sequence, @Period, @Clock, @Text, @Type, 
+                            @TeamId, @PlayerId, @ScoreValue, @HomeScore, @AwayScore
+                        )";
+
+                    foreach (var play in plays)
+                    {
+                        await conn.ExecuteAsync(insertSql, play, trans);
+                    }
+
+                    return true;
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Falha ao persistir jogadas no banco para o jogo {GameId}", gameId);
+                return false;
+            }
         }
 
         public async Task<bool> DeleteByGameIdAsync(int gameId)
