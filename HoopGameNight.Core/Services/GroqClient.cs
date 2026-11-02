@@ -19,10 +19,10 @@ namespace HoopGameNight.Core.Services
         private readonly ILogger<GroqClient> _logger;
         private readonly string _apiKey;
         private readonly string _model;
-        private const string FallbackModel = "llama-3.1-8b-instant"; 
+        private const string FallbackModel = "openai/gpt-oss-20b"; 
         private const int MaxPromptLength = 32000; 
 
-        public GroqClient(HttpClient httpClient, ILogger<GroqClient> logger, string apiKey = "", string model = "llama-3.1-8b-instant")
+        public GroqClient(HttpClient httpClient, ILogger<GroqClient> logger, string apiKey = "", string model = "openai/gpt-oss-20b")
         {
             _httpClient = httpClient;
             _logger = logger;

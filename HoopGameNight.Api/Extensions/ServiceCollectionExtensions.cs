@@ -208,7 +208,7 @@ namespace HoopGameNight.Api.Extensions
             services.AddScoped<INbaAiService, NbaAiService>();
 
             var apiKey = configuration["GROQ_API_KEY"] ?? configuration["Groq:ApiKey"] ?? Environment.GetEnvironmentVariable("GROQ_API_KEY") ?? "";
-            var model = configuration["GROQ_MODEL"] ?? configuration["Groq:Model"] ?? Environment.GetEnvironmentVariable("GROQ_MODEL") ?? "llama-3.1-8b-instant";
+            var model = configuration["GROQ_MODEL"] ?? configuration["Groq:Model"] ?? Environment.GetEnvironmentVariable("GROQ_MODEL") ?? "openai/gpt-oss-20b";
 
             services.AddHttpClient("Groq", client =>
             {
